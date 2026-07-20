@@ -1,4 +1,5 @@
 # A203 AIoT 프로젝트
+## 주제: AIoT - Jetson Orin Nano를 활용한 산책 일지 작성 반려봇
 
 ## Commit Convention
 | Type | 설명 |
