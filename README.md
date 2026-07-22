@@ -1,11 +1,18 @@
 # A203 AIoT 프로젝트
 ## 주제: AIoT - Jetson Orin Nano를 활용한 산책 일지 작성 반려봇
 
-## ☀️ Morining Routine
+## ☀️ Morning Routine
 ```
 git fetch
+git switch dev
 git pull origin dev
 git switch [본인 작업 브랜치]
+git merge dev
+
+# 충돌 발생 시:
+#   1. 충돌 파일 수정
+#   2. git add <파일>
+#   3. git commit
 ```
 
 ## Commit Convention
@@ -25,7 +32,7 @@ git switch [본인 작업 브랜치]
 | `🔥 Remove` | `파일 삭제` |
 
 #### Tip
-[gitmoji](https://gitmoji.dev/) 설치 가이드
+[![Gitmoji](https://img.shields.io/badge/gitmoji-%20😜%20😍-FFDD67.svg?style=for-the-badge)](https://gitmoji.dev/) 설치 가이드
 ```
 1. node js 설치
 2. node -v / npm -v 로 버전 확인
