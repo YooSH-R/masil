@@ -8,10 +8,10 @@ pipeline {
 
     triggers {
         gitlab(
-            triggerOnPush: true,
-            triggerOnMergeRequest: false,
+            triggerOnPush: false,
+            triggerOnMergeRequest: true,
             branchFilterType: 'NameBasedFilter',
-            includeBranchesSpec: 'feat/Infra/cicd-pipeline',
+            includeBranchesSpec: 'dev',
             excludeBranchesSpec: ''
         )
     }
