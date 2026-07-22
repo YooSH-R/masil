@@ -6,9 +6,20 @@ pipeline {
         timestamps()
     }
 
+    triggers {
+        gitlab(
+            triggerOnPush: true,
+            triggerOnMergeRequest: false,
+            branchFilterType: 'NameBasedFilter',
+            includeBranchesSpec: 'feat/Infra/cicd-pipeline',
+            excludeBranchesSpec: ''
+        )
+    }
+
     environment {
         KUBECTL_VERSION = 'v1.36.2'
         K8S_NAMESPACE = 's15a203-dev'
+        BACKEND_CHANGED = 'false'
     }
 
     stages {
@@ -16,7 +27,7 @@ pipeline {
             steps {
                 script {
                     git(
-                        branch: 'dev',
+                        branch: 'feat/Infra/cicd-pipeline',
                         credentialsId: 'gitlab-access-token',
                         url: 'https://lab.ssafy.com/s15-webmobile3-sub1/S15P11A203.git'
                     )
@@ -24,11 +35,39 @@ pipeline {
                         script: 'git rev-parse HEAD',
                         returnStdout: true
                     ).trim()
+
+                    def beforeCommit = env.gitlabBefore ?: env.GIT_PREVIOUS_COMMIT
+                    def validBeforeCommit = beforeCommit ==~ /[0-9a-fA-F]{40}/
+                    def changedFiles
+
+                    if (validBeforeCommit &&
+                        beforeCommit != '0000000000000000000000000000000000000000' &&
+                        sh(script: "git cat-file -e ${beforeCommit}^{commit}", returnStatus: true) == 0) {
+                        changedFiles = sh(
+                            script: "git diff --name-only ${beforeCommit} ${env.GIT_COMMIT}",
+                            returnStdout: true
+                        ).trim()
+                    } else {
+                        changedFiles = sh(
+                            script: 'git show --pretty= --name-only HEAD',
+                            returnStdout: true
+                        ).trim()
+                    }
+
+                    env.BACKEND_CHANGED = changedFiles
+                        .readLines()
+                        .any { it.startsWith('02_Backend/') }
+                        .toString()
+
+                    echo "Backend changed: ${env.BACKEND_CHANGED}"
                 }
             }
         }
 
         stage('Prepare') {
+            when {
+                expression { env.BACKEND_CHANGED == 'true' }
+            }
             steps {
                 withCredentials([
                     usernamePassword(
@@ -52,6 +91,9 @@ pipeline {
         }
 
         stage('Backend Test') {
+            when {
+                expression { env.BACKEND_CHANGED == 'true' }
+            }
             steps {
                 dir('02_Backend') {
                     sh 'chmod +x gradlew'
@@ -61,6 +103,9 @@ pipeline {
         }
 
         stage('Build and Push Image') {
+            when {
+                expression { env.BACKEND_CHANGED == 'true' }
+            }
             steps {
                 withCredentials([
                     usernamePassword(
@@ -83,6 +128,9 @@ pipeline {
         }
 
         stage('Deploy to AWS k3s') {
+            when {
+                expression { env.BACKEND_CHANGED == 'true' }
+            }
             steps {
                 withCredentials([
                     usernamePassword(
@@ -101,12 +149,12 @@ pipeline {
                           --dry-run=client -o yaml \
                           | .tools/kubectl apply -f -
 
-                        sed "s|__BACKEND_IMAGE__|$BACKEND_IMAGE|g" k8s/dev/deployment.yaml \
+                        sed "s|__BACKEND_IMAGE__|$BACKEND_IMAGE|g" 06_Infra/dev/deployment.yaml \
                           | .tools/kubectl -n "$K8S_NAMESPACE" apply -f -
 
                         .tools/kubectl -n "$K8S_NAMESPACE" apply \
-                          -f k8s/dev/service.yaml \
-                          -f k8s/dev/ingress.yaml
+                          -f 06_Infra/dev/service.yaml \
+                          -f 06_Infra/dev/ingress.yaml
 
                         .tools/kubectl -n "$K8S_NAMESPACE" rollout status \
                           deployment/backend --timeout=180s
@@ -116,6 +164,9 @@ pipeline {
         }
 
         stage('Verify') {
+            when {
+                expression { env.BACKEND_CHANGED == 'true' }
+            }
             steps {
                 sh '''
                     .tools/kubectl -n "$K8S_NAMESPACE" get deployment backend
@@ -129,7 +180,13 @@ pipeline {
 
     post {
         success {
-            echo "AWS k3s development deployment succeeded: ${env.BACKEND_IMAGE}"
+            script {
+                if (env.BACKEND_CHANGED == 'true') {
+                    echo "AWS k3s development deployment succeeded: ${env.BACKEND_IMAGE}"
+                } else {
+                    echo 'No 02_Backend changes. Backend pipeline skipped.'
+                }
+            }
         }
         failure {
             echo 'Backend build or AWS k3s deployment failed.'
