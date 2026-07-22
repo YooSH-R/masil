@@ -8,26 +8,6 @@ git pull origin dev
 git switch [본인 작업 브랜치]
 ```
 
-## Branch Guide
-```
-master Branch (Main Release Branch)
-  ↑
-  ├─ Merge(Pull) Request (Tested & Ready)
-  │
-dev Branch(Development Integration Branch)
-  ↑
-  ├─ Merge(Pull) Request
-  │
-Feature Branches - Role-based
-  ├─ [FE]/Web_Dashboard
-  ├─ [BE]/DB_ERD
-  ├─ [EMB]/Camera_Setting
-  ├─ [ML]/Model_Training
-  ├─ [Infra]/Docker_Setup
-  └─ [Docs]/README
-  ```
-
-
 ## Commit Convention
 | Type | 설명 |
 | --- | --- |
@@ -45,9 +25,64 @@ Feature Branches - Role-based
 | `🔥 Remove` | `파일 삭제` |
 
 #### Tip
+[gitmoji](https://gitmoji.dev/) 설치 가이드
 ```
 1. node js 설치
 2. node -v / npm -v 로 버전 확인
 3. npm i -g gitmoji-cli 로 깃모지 설치
 4. gitmoji -c 로 깃모지 활용 (커밋메시지 편하게 남기기)
 ```
+
+## Branch Guide
+```
+master Branch (Main Release Branch)
+  ↑
+  ├─ Merge(Pull) Request (Tested & Ready)
+  │
+dev Branch(Development Integration Branch)
+  ↑
+  ├─ Merge(Pull) Request
+  │
+Feature Branches - Role-based
+  ├─ feat/FE/Web_Dashboard
+  ├─ feat/BE/DB_ERD
+  ├─ feat/EMB/Camera_Setting
+  ├─ feat/AI/Model_Training
+  ├─ feat/Infra/Docker_Setup
+  └─ feat/Docs/README
+  ```
+
+## Branch Control
+```
+온라인 git 현황 최신화
+git fetch
+
+현재 "로컬" 브랜치 확인
+git branch
+
+새로운 브랜치 생성
+git switch -b [브랜치 명]
+
+브랜치 이동
+git switch [이동 할 브랜치 명]
+
+작업 현황 임시 저장
+git stash
+
+변경사항 저장
+git add . (점 하나면 변경한 작업물 모두)
+
+커밋 메시지 남기기
+git commit -m "[커밋 메시지 제목]" -m "[커밋 메시지 본문]"
+or
+git commit (편집기에서 작성)
+or
+gitmoji -c
+
+원격 저장소에 변경사항 업로드
+git push origin [브랜치 명]
+```
+---
+### 협업 툴
+[![Notion](https://img.shields.io/badge/Notion-000000?style=for-the-badge&logo=notion&logoColor=white)](https://app.notion.com/p/SSAFY-15-39c5283b0f4a8015b8a3fa2a71acea02?source=copy_link)
+[![Jira](https://img.shields.io/badge/Jira-0052CC?style=for-the-badge&logo=jira&logoColor=white)](https://ssafy.atlassian.net/jira/software/c/projects/S15P11A203/boards/14225)
