@@ -1,6 +1,13 @@
 # A203 AIoT 프로젝트
 ## 주제: AIoT - Jetson Orin Nano를 활용한 산책 일지 작성 반려봇
 
+## ☀️ Morining Routin
+```
+git fetch
+git pull origin dev
+git switch [본인 작업 브랜치]
+```
+
 ## Branch Guide
 ```
 master Branch (Main Release Branch)
@@ -12,9 +19,9 @@ dev Branch(Development Integration Branch)
   ├─ Merge(Pull) Request
   │
 Feature Branches - Role-based
-  ├─ [FE] Web_Dashboard
-  ├─ [BE] DB_ERD
-  ├─ [EMB] Camera_Setting
+  ├─ [FE]/Web_Dashboard
+  ├─ [BE]/DB_ERD
+  ├─ [EMB]/Camera_Setting
   ├─ [ML]/Model_Training
   ├─ [Infra]/Docker_Setup
   └─ [Docs]/README
