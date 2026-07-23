@@ -16,20 +16,23 @@ pipeline {
         )
     }
 
+    parameters {
+        booleanParam(
+            name: 'FORCE_BACKEND_BUILD',
+            defaultValue: false,
+            description: '백엔드 변경이 없어도 이미지 빌드와 배포를 실행한다.'
+        )
+    }
+
     environment {
         KUBECTL_VERSION = 'v1.36.2'
         K8S_NAMESPACE = 's15a203-dev'
     }
 
     stages {
-        stage('Git Clone') {
+        stage('Detect Backend Changes') {
             steps {
                 script {
-                    git(
-                        branch: 'feat/Infra/cicd-pipeline',
-                        credentialsId: 'gitlab-access-token',
-                        url: 'https://lab.ssafy.com/s15-webmobile3-sub1/S15P11A203.git'
-                    )
                     env.GIT_COMMIT = sh(
                         script: 'git rev-parse HEAD',
                         returnStdout: true
@@ -41,6 +44,7 @@ pipeline {
 
                     if (validBeforeCommit &&
                         beforeCommit != '0000000000000000000000000000000000000000' &&
+                        beforeCommit != env.GIT_COMMIT &&
                         sh(script: "git cat-file -e ${beforeCommit}^{commit}", returnStatus: true) == 0) {
                         changedFiles = sh(
                             script: "git diff --name-only ${beforeCommit} ${env.GIT_COMMIT}",
@@ -53,11 +57,14 @@ pipeline {
                         ).trim()
                     }
 
-                    env.BACKEND_CHANGED = changedFiles
+                    def backendChanged = changedFiles
                         .readLines()
                         .any { it.startsWith('02_Backend/') }
-                        .toString()
 
+                    env.BACKEND_CHANGED = (params.FORCE_BACKEND_BUILD || backendChanged).toString()
+
+                    echo "Changed files:\n${changedFiles ?: '(none)'}"
+                    echo "Force backend build: ${params.FORCE_BACKEND_BUILD}"
                     echo "Backend changed: ${env.BACKEND_CHANGED}"
                 }
             }
