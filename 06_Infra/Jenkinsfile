@@ -19,7 +19,6 @@ pipeline {
     environment {
         KUBECTL_VERSION = 'v1.36.2'
         K8S_NAMESPACE = 's15a203-dev'
-        BACKEND_CHANGED = 'false'
     }
 
     stages {
