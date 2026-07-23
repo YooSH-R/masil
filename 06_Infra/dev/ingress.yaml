@@ -5,7 +5,8 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - http:
+    - host: i15a203.p.ssafy.io
+      http:
         paths:
           - path: /api
             pathType: Prefix
