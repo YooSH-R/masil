@@ -25,7 +25,7 @@ CREATE TABLE social_accounts (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT social_accounts_provider_check
-        CHECK (provider IN ('GOOGLE', 'KAKAO', 'NAVER')),
+        CHECK (provider IN ('GOOGLE', 'KAKAO')),
     CONSTRAINT uq_social_provider_user UNIQUE (provider, provider_user_id),
     CONSTRAINT uq_social_user_provider UNIQUE (user_id, provider)
 );
@@ -42,7 +42,7 @@ CREATE TABLE social_signup_tickets (
     used_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT social_signup_tickets_provider_check
-        CHECK (provider IN ('GOOGLE', 'KAKAO', 'NAVER'))
+        CHECK (provider IN ('GOOGLE', 'KAKAO'))
 );
 
 CREATE INDEX idx_social_signup_tickets_expires_at
