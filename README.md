@@ -69,7 +69,7 @@ git fetch
 git branch
 
 새로운 브랜치 생성
-git switch -b [브랜치 명]
+git switch -c [브랜치 명]
 
 브랜치 이동
 git switch [이동 할 브랜치 명]
