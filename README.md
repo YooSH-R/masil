@@ -41,6 +41,7 @@ git merge dev
 ```
 
 ## Branch Guide
+  ![gitflow](./00_sub1/SeongHyun%20Kim/gitflow_img.png)
 ```
 master Branch (Main Release Branch)
   ↑
