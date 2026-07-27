@@ -143,6 +143,26 @@ pipeline {
                         credentialsId: 'dockerhub',
                         usernameVariable: 'DOCKERHUB_USERNAME',
                         passwordVariable: 'DOCKERHUB_TOKEN'
+                    ),
+                    string(
+                        credentialsId: 'google-client-id',
+                        variable: 'GOOGLE_CLIENT_ID'
+                    ),
+                    string(
+                        credentialsId: 'jwt-secret',
+                        variable: 'JWT_SECRET'
+                    ),
+                    string(
+                        credentialsId: 'dev-db-url',
+                        variable: 'DB_URL'
+                    ),
+                    string(
+                        credentialsId: 'dev-db-username',
+                        variable: 'DB_USERNAME'
+                    ),
+                    string(
+                        credentialsId: 'dev-db-password',
+                        variable: 'DB_PASSWORD'
                     )
                 ]) {
                     sh '''
@@ -155,7 +175,29 @@ pipeline {
                           --dry-run=client -o yaml \
                           | .tools/kubectl apply -f -
 
-                        sed "s|__BACKEND_IMAGE__|$BACKEND_IMAGE|g" 06_Infra/dev/deployment.yaml \
+                        .tools/kubectl -n "$K8S_NAMESPACE" create secret generic backend-auth-secret \
+                          --from-literal=GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
+                          --from-literal=JWT_SECRET="$JWT_SECRET" \
+                          --dry-run=client -o yaml \
+                          | .tools/kubectl apply -f -
+
+                        .tools/kubectl -n "$K8S_NAMESPACE" create secret generic backend-db-secret \
+                          --from-literal=DB_URL="$DB_URL" \
+                          --from-literal=DB_USERNAME="$DB_USERNAME" \
+                          --from-literal=DB_PASSWORD="$DB_PASSWORD" \
+                          --dry-run=client -o yaml \
+                          | .tools/kubectl apply -f -
+
+                        BACKEND_SECRET_CHECKSUM="$(
+                          printf '%s' "$GOOGLE_CLIENT_ID:$JWT_SECRET:$DB_URL:$DB_USERNAME:$DB_PASSWORD" \
+                            | sha256sum \
+                            | cut -d ' ' -f 1
+                        )"
+
+                        sed \
+                          -e "s|__BACKEND_IMAGE__|$BACKEND_IMAGE|g" \
+                          -e "s|__BACKEND_SECRET_CHECKSUM__|$BACKEND_SECRET_CHECKSUM|g" \
+                          06_Infra/dev/deployment.yaml \
                           | .tools/kubectl -n "$K8S_NAMESPACE" apply -f -
 
                         .tools/kubectl -n "$K8S_NAMESPACE" apply \
