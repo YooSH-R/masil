@@ -18,9 +18,9 @@ walkcam_v01.py - 산책 영상 촬영 베이스라인
     - v0.5  시계 앵커 및 메타데이터   (내2)
 
 사용법
-    python3 walkcam_v01.py                 # 무한 녹화, Ctrl+C로 종료
-    python3 walkcam_v01.py --duration 30   # 30초 녹화
-    python3 walkcam_v01.py --dry-run       # 실행 없이 명령만 출력
+    python3 pi_camera_v1.py                 # 무한 녹화, Ctrl+C로 종료
+    python3 pi_camera_v1.py --duration 30   # 30초 녹화
+    python3 pi_camera_v1.py --dry-run       # 실행 없이 명령만 출력
 """
 
 from __future__ import annotations
