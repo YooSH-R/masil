@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.ssafy.backend.auth.application.result.SocialAuthenticationResult;
 import com.ssafy.backend.auth.application.service.CompleteSocialSignupService;
 import com.ssafy.backend.auth.application.service.GoogleAuthenticationService;
+import com.ssafy.backend.auth.application.service.KakaoAuthenticationService;
 import com.ssafy.backend.common.api.ApiResponse;
 import com.ssafy.backend.user.application.port.out.UserRepository;
 import jakarta.validation.Valid;
@@ -25,20 +26,23 @@ import java.time.Instant;
 @Validated
 @RestController
 @RequestMapping("/v1")
-public class GoogleAuthenticationController {
+public class SocialAuthenticationController {
 
     private static final String NICKNAME_PATTERN = "^[가-힣a-zA-Z0-9_-]{2,20}$";
 
     private final GoogleAuthenticationService googleAuthenticationService;
+    private final KakaoAuthenticationService kakaoAuthenticationService;
     private final CompleteSocialSignupService completeSocialSignupService;
     private final UserRepository userRepository;
 
-    public GoogleAuthenticationController(
+    public SocialAuthenticationController(
             GoogleAuthenticationService googleAuthenticationService,
+            KakaoAuthenticationService kakaoAuthenticationService,
             CompleteSocialSignupService completeSocialSignupService,
             UserRepository userRepository
     ) {
         this.googleAuthenticationService = googleAuthenticationService;
+        this.kakaoAuthenticationService = kakaoAuthenticationService;
         this.completeSocialSignupService = completeSocialSignupService;
         this.userRepository = userRepository;
     }
@@ -48,6 +52,17 @@ public class GoogleAuthenticationController {
             @Valid @RequestBody GoogleAuthenticationRequest request
     ) {
         SocialAuthenticationResult result = googleAuthenticationService.authenticate(
+                request.idToken(),
+                request.deviceId()
+        );
+        return ApiResponse.success(SocialAuthenticationResponse.from(result));
+    }
+
+    @PostMapping("/auth/oauth/kakao")
+    public ApiResponse<SocialAuthenticationResponse> authenticateKakao(
+            @Valid @RequestBody KakaoAuthenticationRequest request
+    ) {
+        SocialAuthenticationResult result = kakaoAuthenticationService.authenticate(
                 request.idToken(),
                 request.deviceId()
         );
@@ -80,6 +95,12 @@ public class GoogleAuthenticationController {
     }
 
     public record GoogleAuthenticationRequest(
+            @NotBlank String idToken,
+            @NotBlank @Size(max = 255) String deviceId
+    ) {
+    }
+
+    public record KakaoAuthenticationRequest(
             @NotBlank String idToken,
             @NotBlank @Size(max = 255) String deviceId
     ) {
