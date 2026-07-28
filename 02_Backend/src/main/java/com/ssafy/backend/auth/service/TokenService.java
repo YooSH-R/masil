@@ -65,7 +65,8 @@ public class TokenService {
                 .parseSignedClaims(token)
                 .getPayload();
 
-        if (!"ACCESS".equals(claims.get("tokenType", String.class))) {
+        String tokenType = claims.get("tokenType", String.class);
+        if (tokenType != null && !"ACCESS".equals(tokenType)) {
             throw new IllegalArgumentException("Access Token이 아닙니다.");
         }
 

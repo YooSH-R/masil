@@ -18,6 +18,8 @@ spec:
     metadata:
       labels:
         app: backend
+      annotations:
+        checksum/backend-secrets: "__BACKEND_SECRET_CHECKSUM__"
     spec:
       imagePullSecrets:
         - name: dockerhub-registry
@@ -25,6 +27,11 @@ spec:
         - name: backend
           image: __BACKEND_IMAGE__
           imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: backend-auth-secret
+            - secretRef:
+                name: backend-db-secret
           ports:
             - name: http
               containerPort: 8080

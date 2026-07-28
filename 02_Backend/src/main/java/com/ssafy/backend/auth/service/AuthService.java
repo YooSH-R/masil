@@ -1,15 +1,15 @@
 package com.ssafy.backend.auth.service;
 
-import com.ssafy.backend.auth.domain.AuthSession;
+import com.ssafy.backend.auth.infrastructure.persistence.AuthSessionJpaEntity;
+import com.ssafy.backend.auth.infrastructure.persistence.SpringDataAuthSessionRepository;
 import com.ssafy.backend.auth.dto.AuthResponse;
 import com.ssafy.backend.auth.dto.LoginRequest;
 import com.ssafy.backend.auth.dto.LogoutRequest;
 import com.ssafy.backend.auth.dto.RefreshRequest;
 import com.ssafy.backend.auth.dto.SignupRequest;
-import com.ssafy.backend.auth.repository.AuthSessionRepository;
 import com.ssafy.backend.common.ApiException;
+import com.ssafy.backend.user.application.port.out.UserRepository;
 import com.ssafy.backend.user.domain.User;
-import com.ssafy.backend.user.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -21,7 +21,7 @@ import java.time.Instant;
 public class AuthService {
 
     private final UserRepository userRepository;
-    private final AuthSessionRepository authSessionRepository;
+    private final SpringDataAuthSessionRepository authSessionRepository;
     private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
     private final TokenHashService tokenHashService;
@@ -29,7 +29,7 @@ public class AuthService {
 
     public AuthService(
             UserRepository userRepository,
-            AuthSessionRepository authSessionRepository,
+            SpringDataAuthSessionRepository authSessionRepository,
             PasswordEncoder passwordEncoder,
             TokenService tokenService,
             TokenHashService tokenHashService,
@@ -45,7 +45,7 @@ public class AuthService {
 
     @Transactional
     public AuthResponse signup(SignupRequest request) {
-        if (userRepository.existsByEmailIgnoreCaseAndDeletedAtIsNull(request.email())) {
+        if (userRepository.existsByEmail(request.email())) {
             throw new ApiException(
                     HttpStatus.CONFLICT,
                     "EMAIL_ALREADY_IN_USE",
@@ -75,7 +75,7 @@ public class AuthService {
         );
 
         User user = userRepository.save(
-                User.createLocal(
+                User.newLocalUser(
                         request.email(),
                         passwordEncoder.encode(request.password()),
                         request.nickname(),
@@ -89,11 +89,11 @@ public class AuthService {
     @Transactional
     public AuthResponse login(LoginRequest request) {
         User user = userRepository
-                .findByEmailIgnoreCaseAndDeletedAtIsNull(request.email())
-                .filter(found -> found.getPasswordHash() != null)
+                .findByEmail(request.email())
+                .filter(found -> found.passwordHash() != null)
                 .filter(found -> passwordEncoder.matches(
                         request.password(),
-                        found.getPasswordHash()
+                        found.passwordHash()
                 ))
                 .orElseThrow(() -> new ApiException(
                         HttpStatus.UNAUTHORIZED,
@@ -107,7 +107,7 @@ public class AuthService {
     @Transactional
     public AuthResponse refresh(RefreshRequest request) {
         String tokenHash = tokenHashService.hash(request.refreshToken());
-        AuthSession session = authSessionRepository
+        AuthSessionJpaEntity session = authSessionRepository
                 .findByRefreshTokenHash(tokenHash)
                 .filter(found -> found.isUsableAt(Instant.now()))
                 .filter(found -> found.getDeviceId().equals(request.deviceId()))
@@ -118,7 +118,7 @@ public class AuthService {
                 ));
 
         TokenService.AccessToken accessToken =
-                tokenService.createAccessToken(session.getUser().getId());
+                tokenService.createAccessToken(session.getUserId());
         TokenService.RefreshToken refreshToken =
                 tokenService.createRefreshToken();
 
@@ -132,16 +132,21 @@ public class AuthService {
                 refreshToken.value(),
                 accessToken.expiresAt(),
                 refreshToken.expiresAt(),
-                session.getUser()
+                userRepository.findById(session.getUserId())
+                        .orElseThrow(() -> new ApiException(
+                                HttpStatus.UNAUTHORIZED,
+                                "REFRESH_TOKEN_INVALID",
+                                "Refresh Token이 유효하지 않습니다."
+                        ))
         );
     }
 
     @Transactional
     public void logout(Long userId, LogoutRequest request) {
         String tokenHash = tokenHashService.hash(request.refreshToken());
-        AuthSession session = authSessionRepository
+        AuthSessionJpaEntity session = authSessionRepository
                 .findByRefreshTokenHash(tokenHash)
-                .filter(found -> found.getUser().getId().equals(userId))
+                .filter(found -> found.getUserId().equals(userId))
                 .filter(found -> found.getDeviceId().equals(request.deviceId()))
                 .orElseThrow(() -> new ApiException(
                         HttpStatus.UNAUTHORIZED,
@@ -155,19 +160,19 @@ public class AuthService {
     private AuthResponse issueTokens(User user, String deviceId) {
         authSessionRepository
                 .findFirstByUserIdAndDeviceIdAndRevokedAtIsNullOrderByCreatedAtDesc(
-                        user.getId(),
+                        user.id(),
                         deviceId
                 )
-                .ifPresent(AuthSession::revoke);
+                .ifPresent(AuthSessionJpaEntity::revoke);
 
         TokenService.AccessToken accessToken =
-                tokenService.createAccessToken(user.getId());
+                tokenService.createAccessToken(user.id());
         TokenService.RefreshToken refreshToken =
                 tokenService.createRefreshToken();
 
         authSessionRepository.save(
-                AuthSession.create(
-                        user,
+                new AuthSessionJpaEntity(
+                        user.id(),
                         deviceId,
                         tokenHashService.hash(refreshToken.value()),
                         refreshToken.expiresAt()

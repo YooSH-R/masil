@@ -26,9 +26,9 @@ public record AuthResponse(
                 accessTokenExpiresAt,
                 refreshTokenExpiresAt,
                 new MemberResponse(
-                        user.getId(),
-                        user.getEmail(),
-                        user.getNickname()
+                        user.id(),
+                        user.email(),
+                        user.nickname()
                 )
         );
     }

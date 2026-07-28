@@ -41,6 +41,7 @@ git merge dev
 ```
 
 ## Branch Guide
+  ![gitflow](./00_sub1/SeongHyun%20Kim/gitflow_img.png)
 ```
 master Branch (Main Release Branch)
   ↑
@@ -68,7 +69,7 @@ git fetch
 git branch
 
 새로운 브랜치 생성
-git switch -b [브랜치 명]
+git switch -c [브랜치 명]
 
 브랜치 이동
 git switch [이동 할 브랜치 명]

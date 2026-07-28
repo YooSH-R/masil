@@ -1,7 +1,7 @@
 package com.ssafy.backend.user.controller;
 
 import com.ssafy.backend.common.ApiResponse;
-import com.ssafy.backend.user.repository.UserRepository;
+import com.ssafy.backend.user.application.port.out.UserRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Validated
-@RestController
 @RequestMapping("/v1/users")
 public class UserController {
 
