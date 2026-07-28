@@ -22,11 +22,17 @@ public class UserJpaEntity {
     @Column(length = 255)
     private String email;
 
+    @Column(name = "password_hash", length = 255)
+    private String passwordHash;
+
     @Column(nullable = false, unique = true, length = 100)
     private String nickname;
 
     @Column(name = "phone_number", unique = true, length = 20)
     private String phoneNumber;
+
+    @Column(name = "phone_verified_at")
+    private Instant phoneVerifiedAt;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -40,10 +46,18 @@ public class UserJpaEntity {
     protected UserJpaEntity() {
     }
 
-    public UserJpaEntity(String email, String nickname, String phoneNumber) {
+    public UserJpaEntity(
+            String email,
+            String passwordHash,
+            String nickname,
+            String phoneNumber,
+            Instant phoneVerifiedAt
+    ) {
         this.email = email;
+        this.passwordHash = passwordHash;
         this.nickname = nickname;
         this.phoneNumber = phoneNumber;
+        this.phoneVerifiedAt = phoneVerifiedAt;
     }
 
     @PrePersist
@@ -66,12 +80,20 @@ public class UserJpaEntity {
         return email;
     }
 
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
     public String getNickname() {
         return nickname;
     }
 
     public String getPhoneNumber() {
         return phoneNumber;
+    }
+
+    public Instant getPhoneVerifiedAt() {
+        return phoneVerifiedAt;
     }
 
     public Instant getCreatedAt() {

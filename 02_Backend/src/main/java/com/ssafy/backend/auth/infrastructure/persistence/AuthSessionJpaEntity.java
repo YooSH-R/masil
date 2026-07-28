@@ -51,6 +51,27 @@ public class AuthSessionJpaEntity {
         this.expiresAt = expiresAt;
     }
 
+    public void rotate(String refreshTokenHash, Instant expiresAt) {
+        this.refreshTokenHash = refreshTokenHash;
+        this.expiresAt = expiresAt;
+    }
+
+    public void revoke() {
+        this.revokedAt = Instant.now();
+    }
+
+    public boolean isUsableAt(Instant now) {
+        return revokedAt == null && expiresAt.isAfter(now);
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public String getDeviceId() {
+        return deviceId;
+    }
+
     @PrePersist
     void onCreate() {
         createdAt = Instant.now();

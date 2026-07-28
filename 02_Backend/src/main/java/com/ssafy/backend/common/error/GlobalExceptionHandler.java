@@ -1,5 +1,6 @@
 package com.ssafy.backend.common.error;
 
+import com.ssafy.backend.common.ApiException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +14,19 @@ import java.util.UUID;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(ApiException.class)
+    public ResponseEntity<ErrorResponse> handleApiException(
+            ApiException exception,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.status(exception.getStatus())
+                .body(ErrorResponse.of(
+                        exception.getCode(),
+                        exception.getMessage(),
+                        request
+                ));
+    }
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusinessException(
@@ -40,13 +54,21 @@ public class GlobalExceptionHandler {
             Instant timestamp
     ) {
         private static ErrorResponse of(ErrorCode errorCode, HttpServletRequest request) {
+            return of(errorCode.name(), errorCode.message(), request);
+        }
+
+        private static ErrorResponse of(
+                String code,
+                String message,
+                HttpServletRequest request
+        ) {
             Object existingTraceId = request.getAttribute("traceId");
             String traceId = existingTraceId == null
                     ? UUID.randomUUID().toString()
                     : existingTraceId.toString();
             return new ErrorResponse(
                     false,
-                    new ErrorBody(errorCode.name(), errorCode.message(), Map.of()),
+                    new ErrorBody(code, message, Map.of()),
                     traceId,
                     Instant.now()
             );

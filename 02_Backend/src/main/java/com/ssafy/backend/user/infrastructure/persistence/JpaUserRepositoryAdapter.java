@@ -7,6 +7,8 @@ import com.ssafy.backend.common.error.ErrorCode;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 public class JpaUserRepositoryAdapter implements UserRepository {
 
@@ -22,12 +24,35 @@ public class JpaUserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public boolean existsByEmail(String email) {
+        return repository.existsByEmailIgnoreCaseAndDeletedAtIsNull(email);
+    }
+
+    @Override
+    public boolean existsByPhoneNumber(String phoneNumber) {
+        return repository.existsByPhoneNumberAndDeletedAtIsNull(phoneNumber);
+    }
+
+    @Override
+    public Optional<User> findByEmail(String email) {
+        return repository.findByEmailIgnoreCaseAndDeletedAtIsNull(email)
+                .map(JpaUserRepositoryAdapter::toDomain);
+    }
+
+    @Override
+    public Optional<User> findById(Long id) {
+        return repository.findById(id).map(JpaUserRepositoryAdapter::toDomain);
+    }
+
+    @Override
     public User save(User user) {
         try {
             UserJpaEntity saved = repository.saveAndFlush(new UserJpaEntity(
                     user.email(),
+                    user.passwordHash(),
                     user.nickname(),
-                    user.phoneNumber()
+                    user.phoneNumber(),
+                    user.phoneVerifiedAt()
             ));
             return toDomain(saved);
         } catch (DataIntegrityViolationException exception) {
@@ -39,8 +64,10 @@ public class JpaUserRepositoryAdapter implements UserRepository {
         return new User(
                 entity.getId(),
                 entity.getEmail(),
+                entity.getPasswordHash(),
                 entity.getNickname(),
                 entity.getPhoneNumber(),
+                entity.getPhoneVerifiedAt(),
                 entity.getCreatedAt()
         );
     }
