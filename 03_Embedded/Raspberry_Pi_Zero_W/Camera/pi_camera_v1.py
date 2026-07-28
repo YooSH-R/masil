@@ -39,8 +39,36 @@ from pathlib import Path
 # 설정
 # ─────────────────────────────────────────────────────────
 
-# 실행 환경에 따라 HOME이 없을 수 있으므로 명시적으로 처리합니다.
-OUTPUT_DIR = Path(os.environ.get("WALKCAM_OUTPUT", Path.home() / "walk"))
+# [변경 전] 실행 환경에 따라 HOME이 없을 수 있으므로 명시적으로 처리합니다.
+# OUTPUT_DIR = Path(os.environ.get("WALKCAM_OUTPUT", Path.home() / "walk"))
+#
+# [변경 사유]
+# 위 코드는 모듈을 import하는 순간(스크립트 최상단, 함수 호출 이전)에 즉시 실행됩니다.
+# Path.home()은 HOME 환경변수도 없고 pwd 데이터베이스에서도 사용자를 찾지 못하면
+# RuntimeError를 던지는데, 이 시점은 argparse도, --dry-run 분기도, 아래
+# check_environment()의 "친절한 오류 메시지 출력 후 정상 종료(return 1)" 경로도
+# 전혀 거치지 못한 시점입니다. 즉 import만 해도 트레이스백과 함께 통째로 죽습니다.
+#
+# [변경 방식]
+# Path.home() 평가를 모듈 로드 시점에서 "실제로 경로가 필요한 시점"까지 지연시킵니다.
+# 1) WALKCAM_OUTPUT 환경변수가 있으면 Path.home()을 아예 호출하지 않고 그 값을 그대로 씁니다.
+# 2) 없을 때만 Path.home()을 호출하되 try/except로 감싸서, 실패 시 원인이 뭔지도 모른 채
+#    죽는 대신 "WALKCAM_OUTPUT을 지정하라"는 실행 가능한 안내가 담긴 RuntimeError로 바꿔줍니다.
+# 3) 이 함수는 정의만 되고 즉시 호출되지 않으므로, import 시점에는 아무 부작용이 없습니다.
+#    실제 호출은 check_environment()(사전 점검 시점, main 함수 참고)와
+#    _create_session_dir()(실제 디렉터리 생성 시점)에서 이루어집니다.
+def resolve_output_dir() -> Path:
+    env_value = os.environ.get("WALKCAM_OUTPUT")
+    if env_value:
+        return Path(env_value)
+
+    try:
+        return Path.home() / "walk"
+    except RuntimeError as e:
+        raise RuntimeError(
+            "홈 디렉터리를 확인할 수 없습니다. "
+            "WALKCAM_OUTPUT 환경 변수로 저장 경로를 직접 지정하세요."
+        ) from e
 
 # 1296x972 = OV5647 전체 화각 모드.
 # 1920x1080을 쓰면 센서 면적의 41%만 사용되어 화각이 좁아집니다.
@@ -89,11 +117,57 @@ class WalkCam:
                 "rpicam-apps가 설치되어 있는지 확인하세요."
             )
 
+        # [추가] resolve_output_dir()도 여기서 함께 검증합니다.
+        # rpicam-vid 부재를 검사하는 방식(shutil.which 결과가 None이면 예외)과
+        # 동일한 패턴으로, "사전 점검은 check_environment()에 모은다"는 기존 구조를
+        # 그대로 따릅니다. 반환값은 여기서 쓰지 않고 버립니다 — 목적은 저장 경로를
+        # 구하는 것이 아니라 "나중에 _create_session_dir()에서 터지지 않을지"를
+        # main()의 사전 점검 단계에서 미리 확인하는 것입니다. 실패하면 RuntimeError가
+        # main()의 기존 except 블록(line 296-300)에서 그대로 잡혀 친절한 오류 메시지로
+        # 출력되고 정상적으로 return 1 됩니다.
+        resolve_output_dir()
+
     def _create_session_dir(self) -> Path:
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        session_dir = OUTPUT_DIR / f"session_{stamp}"
-        session_dir.mkdir(parents=True, exist_ok=True)
-        return session_dir
+        # [변경 전] session_dir = OUTPUT_DIR / f"session_{stamp}"
+        # [변경 사유] OUTPUT_DIR은 모듈 임포트 시점에 평가되는 전역 상수였습니다.
+        # [변경 방식] 실제로 디렉터리를 만드는 "이 시점"에 resolve_output_dir()을
+        #             호출해 지연 평가합니다. check_environment()에서 이미 한 번
+        #             검증을 통과했더라도, 혹시 모를 실패 시 여기서도 동일한
+        #             RuntimeError로 안전하게 실패합니다.
+        #
+        # [변경 전] session_dir = resolve_output_dir() / f"session_{stamp}"
+        #           session_dir.mkdir(parents=True, exist_ok=True)
+        #           return session_dir
+        #
+        # [변경 사유] Docs.md/PainPoint.md의 내2(RTC 부재)에 정리된 대로, Zero W는
+        # 배터리 백업 RTC가 없어 네트워크 없이 야외에서 재부팅하면 시스템 시각이
+        # 과거의 특정 시점으로 되돌아가거나 고정될 수 있습니다. 이 상태로 재부팅을
+        # 반복하며 여러 번 녹화하면 datetime.now() 기반 이름("session_20260101_000000"
+        # 등)이 서로 다른 세션에서 동일하게 생성될 수 있습니다. 기존에는 mkdir이
+        # exist_ok=True였기 때문에 이 경우 새 세션이 기존 디렉터리를 그대로
+        # 재사용했고, rpicam-vid는 항상 seg_0000.h264부터 번호를 다시 매기므로
+        # 이전 세션의 세그먼트 파일을 덮어써 데이터가 손실됩니다.
+        #
+        # [변경 방식] mkdir을 exist_ok=False로 호출해 "이미 존재하는 디렉터리에는
+        # 절대 쓰지 않는다"를 원칙으로 삼습니다. 대상 디렉터리가 이미 있으면
+        # FileExistsError를 잡아 이름 뒤에 _001, _002 ... 순차 번호를 붙여가며
+        # 존재하지 않는 이름을 찾을 때까지 재시도합니다. parents=True는 유지하므로
+        # 상위 디렉터리(예: ~/walk)가 이미 있는 것은 문제되지 않고, 오직 최종
+        # session_* 디렉터리 자체의 충돌만 막습니다. 이렇게 하면 시스템 시각이
+        # 틀려도 세션끼리 파일이 섞이는 일은 없고, 디렉터리 이름이 겹쳤다는 사실
+        # 자체가 "이 세션은 시각이 어긋나 있었다"는 단서로 남습니다.
+        output_dir = resolve_output_dir()
+        base_name = f"session_{stamp}"
+        session_dir = output_dir / base_name
+        suffix = 1
+        while True:
+            try:
+                session_dir.mkdir(parents=True, exist_ok=False)
+                return session_dir
+            except FileExistsError:
+                session_dir = output_dir / f"{base_name}_{suffix:03d}"
+                suffix += 1
 
     def build_command(self, session_dir: Path) -> list[str]:
         """rpicam-vid 실행 명령을 조립합니다.
@@ -274,7 +348,13 @@ def main() -> int:
     cam = WalkCam(duration=args.duration)
 
     if args.dry_run:
-        fake_dir = OUTPUT_DIR / "session_YYYYmmdd_HHMMSS"
+        # [변경 전] fake_dir = OUTPUT_DIR / "session_YYYYmmdd_HHMMSS"
+        # [변경 사유] 위와 동일하게 모듈 전역 상수 OUTPUT_DIR을 참조하던 부분입니다.
+        # [변경 방식] resolve_output_dir()로 대체합니다. 이 시점은 이미 위쪽의
+        #             check_environment() 호출(line 296-300)을 통과한 뒤이므로
+        #             정상적인 경우 여기서 새로 실패할 일은 없습니다. dry-run은
+        #             디스크에 실제로 쓰지 않으므로 mkdir은 호출하지 않습니다.
+        fake_dir = resolve_output_dir() / "session_YYYYmmdd_HHMMSS"
         print(" ".join(cam.build_command(fake_dir)))
         return 0
 

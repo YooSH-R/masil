@@ -46,7 +46,18 @@ from pathlib import Path
 # 촬영 설정 (v0.1과 동일)
 # ─────────────────────────────────────────────────────────
 
-OUTPUT_DIR = Path(os.environ.get("WALKCAM_OUTPUT", Path.home() / "walk"))
+def resolve_output_dir() -> Path:
+    env_value = os.environ.get("WALKCAM_OUTPUT")
+    if env_value:
+        return Path(env_value)
+
+    try:
+        return Path.home() / "walk"
+    except RuntimeError as e:
+        raise RuntimeError(
+            "홈 디렉터리를 확인할 수 없습니다. "
+            "WALKCAM_OUTPUT 환경 변수로 저장 경로를 직접 지정하세요."
+        ) from e
 
 SENSOR_MODE = "1296:972"
 WIDTH = 1296
@@ -334,12 +345,21 @@ class WalkCam:
             raise RuntimeError(
                 "rpicam-vid를 찾을 수 없습니다. rpicam-apps 설치를 확인하세요."
             )
+        resolve_output_dir()
 
     def _create_session_dir(self) -> Path:
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        session_dir = OUTPUT_DIR / f"session_{stamp}"
-        session_dir.mkdir(parents=True, exist_ok=True)
-        return session_dir
+        output_dir = resolve_output_dir()
+        base_name = f"session_{stamp}"
+        session_dir = output_dir / base_name
+        suffix = 1
+        while True:
+            try:
+                session_dir.mkdir(parents=True, exist_ok=False)
+                return session_dir
+            except FileExistsError:
+                session_dir = output_dir / f"{base_name}_{suffix:03d}"
+                suffix += 1
 
     def _attach_file_log(self, session_dir: Path) -> None:
         """세션 폴더에 walkcam 자체 로그를 남깁니다.
@@ -621,7 +641,7 @@ def main() -> int:
     cam = WalkCam(duration=args.duration)
 
     if args.dry_run:
-        fake_dir = OUTPUT_DIR / "session_YYYYmmdd_HHMMSS"
+        fake_dir = resolve_output_dir() / "session_YYYYmmdd_HHMMSS"
         print(" ".join(cam.build_command(fake_dir)))
         return 0
 
