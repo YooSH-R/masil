@@ -352,3 +352,17 @@ pyrightconfig.json
 
 .claude
 .vscode
+
+# Project-specific
+CLAUDE.md
+
+# ROS2 colcon build artifacts
+install/
+log/
+
+# model weights / large binaries
+*.pt
+*.onnx
+
+# python venv
+yolo-env/
