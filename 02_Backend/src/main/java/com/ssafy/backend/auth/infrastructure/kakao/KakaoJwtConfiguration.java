@@ -21,7 +21,7 @@ public class KakaoJwtConfiguration {
     @Bean
     public JwtDecoder kakaoJwtDecoder(
             @Value("${auth.kakao.jwk-set-uri}") String jwkSetUri,
-            @Value("${auth.kakao.app-key}") String appKey
+            @Value("${auth.kakao.allowed-audience}") String allowedAudience
     ) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder
                 .withJwkSetUri(jwkSetUri)
@@ -38,7 +38,8 @@ public class KakaoJwtConfiguration {
                                         null
                                 )
                         );
-        OAuth2TokenValidator<Jwt> audience = jwt -> jwt.getAudience().contains(appKey)
+        OAuth2TokenValidator<Jwt> audience =
+                jwt -> jwt.getAudience().contains(allowedAudience)
                 ? OAuth2TokenValidatorResult.success()
                 : OAuth2TokenValidatorResult.failure(
                         new OAuth2Error("invalid_token", "Invalid Kakao token audience.", null)
