@@ -1,5 +1,4 @@
-## 2026-07-29 산책 일지
-
-**한 줄 요약**: 햇살 비치는 실내에서의 차분한 아침
-
-아침 여덟 시가 조금 넘은 시각, 현대적이고 차분한 실내 공간에서 하루를 시작했다. 검은색 노출 천장 아래 길게 늘어선 일자
+Final Polish:**
+    *   The prompt asks for "지나온 장소 유형을 순서대로" in 코스. Since it's all "실내", I will write "실내".
+    *   "오늘 만난 것" must be 3 things, comma-separated.
+    *   Check for any prohibited items: no appearance description, no brand names, no
