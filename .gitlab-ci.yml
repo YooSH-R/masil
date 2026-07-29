@@ -3,6 +3,8 @@ workflow:
     - if: >-
         $CI_PIPELINE_SOURCE == "merge_request_event" &&
         $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev"
+      changes:
+        - 02_Backend/**/*
     - when: never
 
 stages:
@@ -43,8 +45,3 @@ backend_verify:
         - 02_Backend/build/test-results/test/TEST-*.xml
     paths:
       - 02_Backend/build/reports/tests/test/
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - 02_Backend/**/*
-        - .gitlab-ci.yml
