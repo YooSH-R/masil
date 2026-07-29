@@ -31,7 +31,6 @@ backend_verify:
       files:
         - 02_Backend/gradle/wrapper/gradle-wrapper.properties
         - 02_Backend/build.gradle
-        - 02_Backend/settings.gradle
     paths:
       - .gradle/caches/
       - .gradle/wrapper/
