@@ -19,10 +19,6 @@ AI의 동작을 바꾸고 싶으면 이 패키지만 수정하면 된다.
      user_template : str.format
 3. 동기화가 필수인 문구(개인정보 정책)는 rules.py에, enum 값은 vocab.py에 둔다.
    그 외의 중복은 의도적으로 허용한다. 스테이지별로 따로 튜닝되기 때문이다.
-
-[프롬프트를 추가할 때 이 파일에서 손댈 곳]
-  import 줄 / __all__ / _FACTORIES  - 세 군데 모두.
-  빠뜨리면 에러 없이 그냥 안 보이므로 __all__ 존재 검사 테스트를 함께 둔다.
 """
 
 from __future__ import annotations
@@ -41,6 +37,7 @@ from .image import (
     IMAGE_SUFFIX,
     PANEL_CAPTION_WRITER,
     build_image_prompt,
+    build_image_request,
 )
 from .spec import PromptSpec
 
@@ -60,6 +57,7 @@ __all__ = [
     "IMAGE_NEGATIVE",
     "IMAGE_SUFFIX",
     "build_image_prompt",
+    "build_image_request",
     "REGISTRY",
     "get",
     "rules",

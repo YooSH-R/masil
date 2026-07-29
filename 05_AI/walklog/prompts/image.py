@@ -178,3 +178,32 @@ def build_image_prompt(
         "prompt": ", ".join(p for p in parts if p),
         "negative_prompt": ", ".join(IMAGE_NEGATIVE),
     }
+
+
+# ------------------------------------------------------------ Gemini 전용 어댑터
+ 
+# Gemini 이미지 API에는 negative_prompt 필드가 없다. 그래서 부정 조건을
+# 본문에 서술형으로 녹여야 하는데, 그 문구가 실행 코드에 있으면
+# 프롬프트 관리 지점이 두 곳으로 쪼개진다.
+# (분할 전 generate_flow_image.py 의 compose_prompt 안에 이 문장들이 숨어 있었다)
+_NEGATIVE_LINE = "Do not include any of the following: {negative}."
+_OUTPUT_RULE = "Output the illustration only, with no caption or text in the image."
+ 
+ 
+def build_image_request(
+    scene_prompt: str,
+    style: str = DEFAULT_IMAGE_STYLE,
+    extra: str = "",
+) -> str:
+    """이미지 모델에 실제로 보낼 최종 프롬프트 문자열.
+ 
+    build_image_prompt()는 모델에 무관한 dict를 돌려준다(negative_prompt 필드를
+    지원하는 다른 이미지 API에 붙일 때 그 형태가 유효하다).
+    이 함수는 그 위에 얹는 Gemini 전용 어댑터로, 부정 조건을 본문에 합친다.
+    """
+    parts = build_image_prompt(scene_prompt, style=style, extra=extra)
+    return "\n\n".join([
+        parts["prompt"],
+        _NEGATIVE_LINE.format(negative=parts["negative_prompt"]),
+        _OUTPUT_RULE,
+    ])
