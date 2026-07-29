@@ -1,59 +1,41 @@
-# MYSIL Project Implementation Plan (FRS v0.1)
+# Walk Log Feed Interaction & Data Enhancement Plan
 
-This plan details the end-to-end implementation of the MYSIL project based on the Functional Requirements Specification (FRS) v0.1, excluding FR-09 (Video features).
+This plan details the refinement of `WalkLogFeedScreen` (D7) to ensure data consistency, enhanced interactivity, and multi-month content support.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> **FR-09 (Walk Video)** is excluded as per user request.
+> **Data Consistency**: The "Total X logs" label will now dynamically calculate the number of records for the visible month.
 >
 > [!NOTE]
-> I will use **Provider** for state management and **Dio** for API communication as they are industry standards for Flutter projects of this scale. If you have a preference for BLoC or GetX, please let me know.
->
-> [!WARNING]
-> For **FR-10 (Walk Path)**, I will assume the use of a Kakao Map plugin. You will need to provide a Kakao Native App Key for full functionality.
+> **Daily Summary Card**: A new high-fidelity summary card (Location, Distance, Duration) will be inserted between the calendar and the statistics section, appearing only when a log exists for the selected day.
 
 ## Proposed Changes
 
-### 1. Foundation & Architecture
-- **Architecture**: MVVM (Model-View-ViewModel) with a Repository pattern for clean separation of concerns.
-- **State Management**: `provider` for reactive UI updates.
-- **Networking**: `dio` with interceptors for JWT (Access/Refresh Token) management and error handling (CR-01, CR-02, CR-10).
-- **Navigation**: `go_router` for robust routing and deep link support (FR-19).
-- **Storage**: `flutter_secure_storage` for sensitive data like tokens (CR-06).
+### 1. Presentation Layer (WalkLogFeedScreen)
 
-### 2. Module Implementation Breakdown
+#### [MODIFY] Mock Data Expansion
+- **June 2026**: Add 4-5 mock records (e.g., June 10, 15, 20).
+- **July 2026**: Add more records to reach a total of ~10-12 to match the "12 logs" feel.
+- **August 2026**: Add 3-4 initial records (e.g., August 2, 5).
 
-#### [Section 1] Member & Pet Management
-- **FR-01 (Signup)**: Implement email/phone verification flow, nickname duplication checks.
-- **FR-02 (Login/Logout)**: Implement standard & SSO login, auto-login using Refresh Tokens, and password reset.
-- **FR-03 (Member Info)**: Inquiry, update, and withdrawal with re-authentication for sensitive actions.
-- **FR-04 (Pet Management)**: CRUD operations for pet profiles.
-- **FR-05 (Robot Registration)**: QR code scanning logic and connection status monitoring.
+#### [MODIFY] Dynamic Calculation
+- Update the build logic to count how many keys in `_mockLogs` start with `"${_currentYear}-${_currentMonth.toString().padLeft(2, '0')}"`.
 
-#### [Section 2] Walk Feature
-- **FR-07 (Walk Suggestion)**: Notification handling and accept/decline logic.
-- **FR-08 (Walk Session)**: Real-time walk progress UI, duration tracking, and reconnection handling.
-- **FR-10 (Walk Path)**: Map integration using GPS coordinates, handling path exceptions (GPS loss).
-- **FR-11 (Walk Dashboard)**: Statistical visualization (Daily/Weekly/Monthly).
-- **FR-12 (Emotional Walk Log)**: Feed UI for AI-generated logs.
+#### [NEW] Daily Summary Widget
+- **Function**: `_buildDailySummaryCard(log)`
+- **UI**: A white card with three vertical stat columns:
+  - **Location**: Icon + Text (e.g., "서울숲")
+  - **Distance**: Icon + Text (e.g., "2.5km")
+  - **Duration**: Icon + Text (e.g., "40분")
+- **Placement**: Directly below the "Total Logs" indicator and above the "Weekly/Monthly Stats" section.
 
-#### [Section 3] Emotional Interaction
-- **FR-13 to FR-15**: Indoor status management (Autonomous roaming, Charging/Sleep animations).
-- **FR-16 (Play Request)**: Proactive interaction settings and notifications.
-- **FR-17 (Intimacy/Mood)**: Intimacy level dashboard and history.
-- **FR-18 (Welcome Home)**: Geofencing logic (GPS-based) to trigger robot movement.
-
-#### [Section 4] Admin & Common
-- **FR-06 (Admin)**: Member/Robot management with search, filters, and audit logs.
-- **CR (Common Requirements)**: Global error handling, network status UI, and debouncing on buttons (CR-11, CR-12).
+### 2. Logic Refinement
+- Ensure `_selectedDate` remains within the visible month range when navigating months, or reset it to the 1st of the month for clarity.
 
 ## Verification Plan
 
-### Automated Tests
-- Unit tests for Repositories and ViewModels.
-- Widget tests for critical screens (Login, Signup).
-
 ### Manual Verification
-- Testing the full app flow from Splash -> Login -> Home.
-- Mocking API responses to verify error handling and edge cases (e.g., 401 Unauthorized, Network Disconnection).
+- **Multi-Month Test**: Navigate to June/August and verify that dots and the "Total Logs" count update.
+- **Summary Test**: Click on a dotted day and verify the new "Daily Summary Card" appears with correct data.
+- **Consistency Check**: Count the dots in July and compare them with the "Total X logs" text.

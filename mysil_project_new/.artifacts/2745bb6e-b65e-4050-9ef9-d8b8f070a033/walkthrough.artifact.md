@@ -1,34 +1,36 @@
-# MYSIL Project Skeleton Structure Walkthrough
+# Walk Log Feed Calendar Enhancement Walkthrough
 
-I have successfully created the directory structure and placeholder Dart files for the MYSIL project, mapped to the provided screen list and images.
+I have significantly upgraded the `WalkLogFeedScreen` (D7) to include a fully functional, interactive monthly calendar and dynamic statistics display.
 
 ## Changes Made
 
-### Directory Structure
-Created the following domain-based subdirectories under `lib/screens/`:
-- `splash/`
-- `home/`
-- `auth/`
-- `user/`
-- `robot/`
-- `pet/`
-- `walk/`
-- `indoor/`
-- `notification/`
-- `admin/`
-- `error/`
+### 1. Advanced Monthly Calendar
+- **Full Month Grid**: Replaced the single-row layout with a professional `GridView` that displays every day of the month correctly aligned by weekday (e.g., July 1st, 2026 starts on a Wednesday).
+- **Navigation**: Implemented "<" and ">" arrow logic to navigate between months and years (June, July, August 2026, and beyond).
+- **Date Highlighting**:
+    - **Today**: Marked with a subtle border for clear identification.
+    - **Selected Day**: Highlighted with a solid brown circle.
+    - **Logged Days**: Days with existing walk records (22nd, 25th, 27th) feature a small dot indicator.
 
-### Screen Files
-Created a total of 46 placeholder Dart files. Each file contains a basic `StatelessWidget` shell:
-- `SplashScreen`, `HomeScreen`, `AutoLoginScreen`, `LoginScreen`, etc.
+### 2. Dynamic Daily Details
+- **Log Interaction**: Clicking on a day with a record (e.g., July 27) instantly updates the "Walk Log Post" below the calendar.
+- **Detailed Content**: The display now includes:
+    - **Duration**: (e.g., "45분")
+    - **Distance**: (e.g., "2.3km")
+    - **Location**: (e.g., "숲속 공원")
+    - **Narrative**: AI-generated title and summary of the walk.
+- **Empty State**: Days without records show a friendly "No walk records for this day" message with a pet icon.
+
+### 3. Statistics & Toggles
+- **Weekly vs. Monthly**: Implemented the "주간/월간" toggle. Switching between them updates the summary cards (Walk count, Distance, Time, Calories) with aggregate mock data.
+- **Visual Refinement**: Increased the overall size of the calendar container and improved typography for better legibility as requested.
 
 ## Verification Results
 
-### Directory Content Check
-All 11 subdirectories were created, and all 46 files were placed in their respective folders as specified in the mapping list.
-
-### Image Mapping
-Confirmed that the filenames match the images located in `C:\Users\SSAFY\Desktop\mysil_project_final_image`.
+### Functionality Check
+- [x] **Month Switching**: Verified that clicking arrows correctly changes the month name and the grid of days.
+- [x] **Day Selection**: Verified that clicking different days (22nd vs 25th vs 27th) displays unique content.
+- [x] **Stats Update**: Verified that the summary numbers change when toggling between Weekly and Monthly views.
 
 > [!TIP]
-> Each file is now ready for implementation. You can start by adding UI components to the `build` method of each screen.
+> To see the dynamic updates, try clicking on **July 22, 25, or 27** in the calendar. Other days will show an empty state.

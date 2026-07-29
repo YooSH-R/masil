@@ -1,10 +1,156 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class WalkSuggestionScreen extends StatelessWidget {
   const WalkSuggestionScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold();
+    return Scaffold(
+      backgroundColor: const Color(0xFFF9F3E7),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Top App Bar
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+              child: Row(
+                children: [
+                  Image.asset('assets/images/mysil_logo.png', height: 28),
+                ],
+              ),
+            ),
+            
+            // Notification-style Banner
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(25),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 15, offset: const Offset(0, 5)),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: const BoxDecoration(color: Color(0xFFFDF7F0), shape: BoxShape.circle),
+                    child: Image.asset('assets/images/mysil_character.png'),
+                  ),
+                  const SizedBox(width: 16),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('마실 · 지금 · 산책 제안 알림', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                        SizedBox(height: 4),
+                        Text('오후 3시, 산책하기 딱 좋아요! ☁️', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const Spacer(),
+            
+            // Large Character
+            Image.asset('assets/images/mysil_character.png', height: 280),
+            
+            const SizedBox(height: 40),
+            
+            const Text(
+              '오늘도 같이\n마실 나가요!',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF5D4037), height: 1.3),
+            ),
+            const SizedBox(height: 12),
+            const Text('마실이가 산책을 기다리고 있어요', style: TextStyle(color: Color(0xFF8D6E63), fontSize: 16)),
+            
+            const SizedBox(height: 40),
+            
+            // Stats Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildChip(Icons.wb_cloudy_outlined, '맑음 22°'),
+                const SizedBox(width: 8),
+                _buildChip(Icons.air, '미세먼지 좋음'),
+                const SizedBox(width: 8),
+                _buildChip(Icons.access_time, '오후 3:00'),
+              ],
+            ),
+            
+            const SizedBox(height: 16),
+            const Text('일몰까지 4시간 · 오늘 아직 산책하지 않았어요', style: TextStyle(color: Color(0xFFBCAAA4), fontSize: 13)),
+            
+            const Spacer(),
+            
+            // Buttons
+            Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 60,
+                      child: ElevatedButton(
+                        onPressed: () => context.push('/walk/declined'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFF5D4037),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          elevation: 0,
+                        ),
+                        child: const Text('나중에 할게요', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: SizedBox(
+                      height: 60,
+                      child: ElevatedButton(
+                        onPressed: () => context.push('/walk/ready'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFC67C4E),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          elevation: 0,
+                        ),
+                        child: const Text('산책 수락하기', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const Text('산책 제안 시간대는 설정에서 바꿀 수 있어요', style: TextStyle(color: Colors.grey, fontSize: 11)),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: const Color(0xFF5D4037)),
+          const SizedBox(width: 6),
+          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF5D4037))),
+        ],
+      ),
+    );
   }
 }

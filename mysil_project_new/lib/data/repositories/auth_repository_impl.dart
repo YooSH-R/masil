@@ -12,40 +12,30 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<User?> login(String email, String password) async {
-    try {
-      final response = await _dioClient.dio.post('/auth/login', data: {
-        'email': email,
-        'password': password,
-      });
+    // Simulate network delay
+    await Future.delayed(const Duration(seconds: 1));
 
-      if (response.statusCode == 200) {
-        final accessToken = response.data['access_token'];
-        final refreshToken = response.data['refresh_token'];
-        final userData = response.data['user'];
+    // MOCK SUCCESS LOGIC
+    final mockUser = UserModel(
+      id: '1',
+      email: email,
+      nickname: '마실이친구',
+      profileImageUrl: null,
+    );
 
-        await _storage.write(key: 'access_token', value: accessToken);
-        await _storage.write(key: 'refresh_token', value: refreshToken);
+    await _storage.write(key: 'access_token', value: 'mock_access_token');
+    await _storage.write(key: 'refresh_token', value: 'mock_refresh_token');
 
-        return UserModel.fromJson(userData);
-      }
-    } catch (e) {
-      // Handle error
-    }
-    return null;
+    return mockUser;
   }
 
   @override
-  Future<bool> signup(String email, String password, String nickname) async {
-    try {
-      final response = await _dioClient.dio.post('/auth/signup', data: {
-        'email': email,
-        'password': password,
-        'nickname': nickname,
-      });
-      return response.statusCode == 201;
-    } catch (e) {
-      return false;
-    }
+  Future<bool> signup(String email, String password, String nickname, String phone) async {
+    // Simulate network delay
+    await Future.delayed(const Duration(seconds: 1));
+    
+    // MOCK SUCCESS LOGIC
+    return true;
   }
 
   @override
@@ -76,5 +66,23 @@ class AuthRepositoryImpl implements AuthRepository {
       // Handle error
     }
     return null;
+  }
+
+  @override
+  Future<bool> checkEmailDuplicate(String email) async {
+    await Future.delayed(const Duration(milliseconds: 500));
+    return false; // Mock: Email is always available
+  }
+
+  @override
+  Future<bool> requestSmsVerification(String phone) async {
+    await Future.delayed(const Duration(milliseconds: 500));
+    return true; // Mock: SMS sent
+  }
+
+  @override
+  Future<bool> verifySmsCode(String phone, String code) async {
+    await Future.delayed(const Duration(milliseconds: 500));
+    return code == '1234'; // Mock: 1234 is the correct code
   }
 }
