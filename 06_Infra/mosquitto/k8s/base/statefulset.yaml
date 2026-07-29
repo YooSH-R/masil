@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mosquitto
+  labels:
+    app: mosquitto
+spec:
+  serviceName: mosquitto
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mosquitto
+  template:
+    metadata:
+      labels:
+        app: mosquitto
+    spec:
+      initContainers:
+        - name: create-password-file
+          image: eclipse-mosquitto:2.0.22
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -ec
+            - |
+              mosquitto_passwd -b -c /security/password_file "$MQTT_BACKEND_USERNAME" "$MQTT_BACKEND_PASSWORD"
+              mosquitto_passwd -b /security/password_file "$MQTT_DEVICE_USERNAME" "$MQTT_DEVICE_PASSWORD"
+              chmod 0600 /security/password_file
+          envFrom:
+            - secretRef:
+                name: mosquitto-credentials
+          volumeMounts:
+            - name: mosquitto-security
+              mountPath: /security
+      containers:
+        - name: mosquitto
+          image: eclipse-mosquitto:2.0.22
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: mqtt
+              containerPort: 1883
+          volumeMounts:
+            - name: mosquitto-config
+              mountPath: /mosquitto/config
+              readOnly: true
+            - name: mosquitto-security
+              mountPath: /mosquitto/security
+              readOnly: true
+            - name: mosquitto-data
+              mountPath: /mosquitto/data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            tcpSocket:
+              port: mqtt
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: mqtt
+            initialDelaySeconds: 15
+            periodSeconds: 10
+      volumes:
+        - name: mosquitto-config
+          configMap:
+            name: mosquitto-config
+        - name: mosquitto-security
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: mosquitto-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 5Gi
