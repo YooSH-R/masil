@@ -27,7 +27,7 @@ from PIL import Image, ImageDraw, ImageFont
 from .. import config
 from .. import prompts as P
 from ..console import step, warn
-from ..gms import GMSClient
+from ..gms import GMSClient, GMSError
 from ..records import UNKNOWN, FrameRecord, to_json_lines, usable, walk_duration
 
 __all__ = [
@@ -384,10 +384,18 @@ def build_storyboard(
             directory.mkdir(parents=True, exist_ok=True)
             (directory / f"panel_{position:02d}.png").write_bytes(scene.panel)
 
+        # 캡션은 장식이다. 여기서 실패했다고 이미 생성한(=이미 과금된) 삽화를
+        # 버리면 손해가 크다. 실패하면 경고만 남기고 location_type으로 대체한다.
+        fallback = scene.observation.get("location_type", "")
         if use_caption_llm:
-            scene.record.caption = write_caption(client, scene, position=position)
+            try:
+                scene.record.caption = write_caption(client, scene, position=position)
+            except GMSError as exc:
+                warn(f"{position}번 칸 캡션 생성 실패({exc}). "
+                     f"'{fallback}' 로 대체합니다.")
+                scene.record.caption = fallback
         else:
-            scene.record.caption = scene.observation.get("location_type", "")
+            scene.record.caption = fallback
 
     step("[Stage D] 스토리보드 합성")
     title = f"{walk_date + ' ' if walk_date != UNKNOWN else ''}산책 흐름"
