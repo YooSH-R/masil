@@ -1,0 +1,404 @@
+{
+  "schema": 1,
+  "generated_at": "2026-07-29T20:33:27",
+  "frame_count": 10,
+  "prompt_version": "2026-07-29",
+  "walk": {
+    "date": "불명",
+    "started_at": "2026-07-28T08:12:03",
+    "location": "청계천 산책로"
+  },
+  "records": [
+    {
+      "file": "f_0000128_t000m08.53s.jpg",
+      "segment": "불명",
+      "index": 128,
+      "offset_seconds": 8.53,
+      "elapsed": "0분 9초",
+      "shot_datetime": "2026-07-28 08:12:11",
+      "location": "청계천 산책로",
+      "observation": {
+        "scene": "실내 천장에 일자형 LED 조명과 원형 스포트라이트가 켜져 있으며 모니터가 매달려 있는 모습이다.",
+        "location_type": "실내",
+        "time_of_day": "아침",
+        "weather": "불명",
+        "people": "2~5",
+        "atmosphere": [
+          "현대적",
+          "인공적",
+          "차분함"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 1.0,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "천장에 매달려 있는 모니터와 평행하게 늘어선 일자형 조명",
+        "objects": [
+          "천장 조명",
+          "모니터",
+          "스포트라이트"
+        ],
+        "plants": [],
+        "season_hint": "불명",
+        "surface": "불명",
+        "time_evidence": "촬영 일시 정보(오전 8시 12분)에 따름",
+        "weather_evidence": "실내 공간이므로 외부 날씨 확인 불가"
+      }
+    },
+    {
+      "file": "f_0000160_t000m10.67s.jpg",
+      "segment": "불명",
+      "index": 160,
+      "offset_seconds": 10.67,
+      "elapsed": "0분 11초",
+      "shot_datetime": "2026-07-28 08:12:13",
+      "location": "청계천 산책로",
+      "observation": {
+        "scene": "길게 늘어선 선형 조명과 원형 스포트라이트가 설치된 어두운 톤의 실내 천장 아래로 사람들의 머리 부분이 일부 보입니다.",
+        "location_type": "실내",
+        "time_of_day": "아침",
+        "weather": "불명",
+        "people": "2~5",
+        "atmosphere": [
+          "인공적임",
+          "차분함",
+          "현대적임"
+        ],
+        "confidence": {
+          "location_type": 0.9,
+          "time_of_day": 1.0,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "천장을 가로지르는 밝은 선형 조명 장치들",
+        "objects": [
+          "조명등",
+          "천장"
+        ],
+        "plants": [],
+        "season_hint": "불명",
+        "surface": "불명",
+        "time_evidence": "제공된 촬영 일시(08:12:13)에 근거함",
+        "weather_evidence": "실내 공간으로 외부 날씨를 관찰할 수 없음"
+      }
+    },
+    {
+      "file": "f_0000448_t000m29.87s.jpg",
+      "segment": "불명",
+      "index": 448,
+      "offset_seconds": 29.87,
+      "elapsed": "0분 30초",
+      "shot_datetime": "2026-07-28 08:12:32",
+      "location": "청계천 산책로",
+      "observation": {
+        "scene": "실내 공간에서 한 인물이 정면을 바라보고 있으며, 뒤편의 큰 유리창 너머로 고층 빌딩들이 보입니다.",
+        "location_type": "실내",
+        "time_of_day": "아침",
+        "weather": "맑음",
+        "people": "1",
+        "atmosphere": [
+          "차분함",
+          "정적인",
+          "현대적"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 1.0,
+          "weather": 0.6
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "야외 산책로가 아닌 빌딩 실내에서 촬영된 장면",
+        "objects": [
+          "유리창",
+          "천장 조명",
+          "사원증 목걸이"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시가 오전 8시 12분으로 기록되어 있음",
+        "weather_evidence": "창밖 맞은편 빌딩 외벽에 밝은 빛이 반사되어 있음"
+      }
+    },
+    {
+      "file": "f_0000540_t000m36.00s.jpg",
+      "segment": "불명",
+      "index": 540,
+      "offset_seconds": 36.0,
+      "elapsed": "0분 36초",
+      "shot_datetime": "2026-07-28 08:12:39",
+      "location": "청계천 산책로",
+      "observation": {
+        "scene": "실내 사무실 공간에서 한 사람이 투명한 생수병을 손으로 들어 올려 보여주고 있다.",
+        "location_type": "실내",
+        "time_of_day": "아침",
+        "weather": "불명",
+        "people": "1",
+        "atmosphere": [
+          "차분함",
+          "일상적",
+          "실내"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 1.0,
+          "weather": 0.3
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "카메라 정면에서 생수병을 들어 올리고 있는 동작",
+        "objects": [
+          "생수병",
+          "창문",
+          "천장 조명"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "제공된 촬영 일시(08:12:39)에 근거함",
+        "weather_evidence": "실내 촬영으로 인해 외부 날씨를 판별하기 어려움"
+      }
+    },
+    {
+      "file": "f_0000686_t000m45.73s.jpg",
+      "segment": "불명",
+      "index": 686,
+      "offset_seconds": 45.73,
+      "elapsed": "0분 46초",
+      "shot_datetime": "2026-07-28 08:12:48",
+      "location": "청계천 산책로",
+      "observation": {
+        "scene": "실내에서 한 인물이 페트병에 담긴 물을 마시고 있으며 배경으로 큰 창문과 맞은편 빌딩이 보입니다.",
+        "location_type": "실내",
+        "time_of_day": "아침",
+        "weather": "맑음",
+        "people": "1",
+        "atmosphere": [
+          "일상적",
+          "차분함",
+          "현대적"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 1.0,
+          "weather": 0.7
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "실내 창가 근처에서 물을 마시는 모습",
+        "objects": [
+          "페트병",
+          "무선이어폰",
+          "사원증 스트랩",
+          "창문"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시가 오전 8시 12분으로 기록되어 있음",
+        "weather_evidence": "창밖 맞은편 건물 외벽에 밝은 햇빛이 비치고 있음"
+      }
+    },
+    {
+      "file": "f_0000870_t000m58.00s.jpg",
+      "segment": "불명",
+      "index": 870,
+      "offset_seconds": 58.0,
+      "elapsed": "0분 58초",
+      "shot_datetime": "2026-07-28 08:13:01",
+      "location": "청계천 산책로",
+      "observation": {
+        "scene": "실내 사무실 혹은 교육 공간으로 보이는 곳에서 한 인물이 고개를 숙이고 아래를 바라보고 있다.",
+        "location_type": "실내",
+        "time_of_day": "아침",
+        "weather": "맑음",
+        "people": "1",
+        "atmosphere": [
+          "차분함",
+          "정적인",
+          "집중하는"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 1.0,
+          "weather": 0.7
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "인물이 'SSAFY'라고 적힌 보라색 카드 홀더 스트랩을 목에 걸고 있음",
+        "objects": [
+          "벽시계",
+          "천장 조명",
+          "카드 홀더 스트랩"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시가 오전 8시 13분이며 창밖으로 밝은 빛이 들어옴",
+        "weather_evidence": "창밖으로 보이는 외부 전경이 밝고 맑음"
+      }
+    },
+    {
+      "file": "f_0000960_t001m04.00s.jpg",
+      "segment": "불명",
+      "index": 960,
+      "offset_seconds": 64.0,
+      "elapsed": "1분 4초",
+      "shot_datetime": "2026-07-28 08:13:07",
+      "location": "청계천 산책로",
+      "observation": {
+        "scene": "실내 공간에서 보라색 목걸이를 착용한 인물이 아래를 내려다보고 있으며, 천장에는 라인 조명이 켜져 있다.",
+        "location_type": "실내",
+        "time_of_day": "아침",
+        "weather": "불명",
+        "people": "2~5",
+        "atmosphere": [
+          "차분함",
+          "집중함",
+          "실내"
+        ],
+        "confidence": {
+          "location_type": 0.9,
+          "time_of_day": 1.0,
+          "weather": 0.5
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "SSAFY라고 적힌 목걸이를 착용한 인물이 화면 전면에 위치함",
+        "objects": [
+          "라인 조명",
+          "벽시계",
+          "목걸이",
+          "기둥"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시 정보(08:13) 및 창밖으로 들어오는 밝은 빛",
+        "weather_evidence": "실내 촬영으로 인해 외부 날씨 판별이 어려움"
+      }
+    },
+    {
+      "file": "f_0001125_t001m15.00s.jpg",
+      "segment": "불명",
+      "index": 1125,
+      "offset_seconds": 75.0,
+      "elapsed": "1분 15초",
+      "shot_datetime": "2026-07-28 08:13:18",
+      "location": "청계천 산책로",
+      "observation": {
+        "scene": "실내 사무실로 보이는 공간에서 한 인물이 정면을 응시하고 있으며, 배경으로 창문과 천장 조명이 보인다.",
+        "location_type": "실내",
+        "time_of_day": "아침",
+        "weather": "불명",
+        "people": "1",
+        "atmosphere": [
+          "차분함",
+          "정적인",
+          "단조로운"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 1.0,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "제공된 위치 정보와 달리 실제 이미지는 실내 공간임",
+        "objects": [
+          "천장 조명",
+          "창문",
+          "사원증 스트랩"
+        ],
+        "plants": [],
+        "season_hint": "불명",
+        "surface": "불명",
+        "time_evidence": "제공된 촬영 시간인 오전 8시 13분에 근거함",
+        "weather_evidence": "실내에서 촬영되어 외부 날씨를 명확히 판별하기 어려움"
+      }
+    },
+    {
+      "file": "f_0001347_t001m29.80s.jpg",
+      "segment": "불명",
+      "index": 1347,
+      "offset_seconds": 89.8,
+      "elapsed": "1분 30초",
+      "shot_datetime": "2026-07-28 08:13:32",
+      "location": "청계천 산책로",
+      "observation": {
+        "scene": "노출형 천장에 일자형 조명이 켜져 있고 사람들이 모니터 앞에 앉아 있는 실내 공간이다.",
+        "location_type": "실내",
+        "time_of_day": "아침",
+        "weather": "불명",
+        "people": "2~5",
+        "atmosphere": [
+          "차분함",
+          "정적인",
+          "현대적"
+        ],
+        "confidence": {
+          "location_type": 0.9,
+          "time_of_day": 1.0,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "배관이 노출된 검은색 천장과 길게 늘어선 LED 조명",
+        "objects": [
+          "모니터",
+          "조명",
+          "책상"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시(08:13:32)에 근거함",
+        "weather_evidence": "창문이 보이지 않는 실내 공간으로 외부 날씨 확인 불가"
+      }
+    },
+    {
+      "file": "f_0001351_t001m30.07s.jpg",
+      "segment": "불명",
+      "index": 1351,
+      "offset_seconds": 90.07,
+      "elapsed": "1분 30초",
+      "shot_datetime": "2026-07-28 08:13:33",
+      "location": "청계천 산책로",
+      "observation": {
+        "scene": "검은색 노출 천장에 여러 개의 선형 조명과 배관, 그리고 모니터가 설치되어 있는 실내 전경입니다.",
+        "location_type": "실내",
+        "time_of_day": "아침",
+        "weather": "불명",
+        "people": "없음",
+        "atmosphere": [
+          "인공적",
+          "차분함",
+          "단조로움"
+        ],
+        "confidence": {
+          "location_type": 0.95,
+          "time_of_day": 1.0,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "선형 조명과 모니터가 매달려 있는 노출형 천장 구조",
+        "objects": [
+          "천장 조명",
+          "모니터",
+          "배관"
+        ],
+        "plants": [],
+        "season_hint": "불명",
+        "surface": "불명",
+        "time_evidence": "촬영 일시 정보(08:13:33)에 따름",
+        "weather_evidence": "실내 천장만 촬영되어 외부 날씨 확인 불가"
+      }
+    }
+  ]
+}

@@ -41,7 +41,13 @@ from .image import (
 )
 from .spec import PromptSpec
 
+# 프롬프트 세대 표시. 관찰 기록에 함께 저장해 두면, 프롬프트를 손보는 동안
+# 쌓인 기록들이 서로 비교 불가능한 데이터가 되는 것을 막는다.
+# 프롬프트 내용을 바꿀 때 이 값을 올린다.
+PROMPT_VERSION = "2026-07-29"
+
 __all__ = [
+    "PROMPT_VERSION",
     "PromptSpec",
     "FRAME_EXTRACT",
     "FRAME_SCHEMA",
