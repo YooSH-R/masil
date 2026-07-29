@@ -1,6 +1,7 @@
 package com.ssafy.backend.config;
 
 import com.ssafy.backend.auth.security.JwtAuthenticationFilter;
+import com.ssafy.backend.robot.security.DeviceAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,7 +23,8 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            JwtAuthenticationFilter jwtAuthenticationFilter
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            DeviceAuthenticationFilter deviceAuthenticationFilter
     ) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
@@ -51,9 +53,14 @@ public class SecurityConfig {
                                 "/v1/auth/verifications/*/confirm",
                                 "/v1/auth/oauth/google",
                                 "/v1/auth/oauth/signup",
-                                "/v1/users/nickname-availability"
+                                "/v1/users/nickname-availability",
+                                "/v1/devices/*/images/**"
                         ).permitAll()
                         .anyRequest().authenticated()
+                )
+                .addFilterBefore(
+                        deviceAuthenticationFilter,
+                        UsernamePasswordAuthenticationFilter.class
                 )
                 .addFilterBefore(
                         jwtAuthenticationFilter,
