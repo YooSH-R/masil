@@ -149,6 +149,10 @@ pipeline {
                         variable: 'GOOGLE_CLIENT_ID'
                     ),
                     string(
+                        credentialsId: 'kakao-native-app-key',
+                        variable: 'KAKAO_NATIVE_APP_KEY'
+                    ),
+                    string(
                         credentialsId: 'jwt-secret',
                         variable: 'JWT_SECRET'
                     ),
@@ -177,6 +181,7 @@ pipeline {
 
                         .tools/kubectl -n "$K8S_NAMESPACE" create secret generic backend-auth-secret \
                           --from-literal=GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
+                          --from-literal=KAKAO_NATIVE_APP_KEY="$KAKAO_NATIVE_APP_KEY" \
                           --from-literal=JWT_SECRET="$JWT_SECRET" \
                           --dry-run=client -o yaml \
                           | .tools/kubectl apply -f -
@@ -189,7 +194,7 @@ pipeline {
                           | .tools/kubectl apply -f -
 
                         BACKEND_SECRET_CHECKSUM="$(
-                          printf '%s' "$GOOGLE_CLIENT_ID:$JWT_SECRET:$DB_URL:$DB_USERNAME:$DB_PASSWORD" \
+                          printf '%s' "$GOOGLE_CLIENT_ID:$KAKAO_NATIVE_APP_KEY:$JWT_SECRET:$DB_URL:$DB_USERNAME:$DB_PASSWORD" \
                             | sha256sum \
                             | cut -d ' ' -f 1
                         )"
