@@ -1,4 +1,6 @@
 import os
+import queue
+import threading
 import time
 
 import rclpy
@@ -6,6 +8,9 @@ import sounddevice as sd
 from ament_index_python.packages import get_package_share_directory
 from rclpy.node import Node
 from std_msgs.msg import Bool
+
+# Max queued audio chunks before dropping the oldest (~4s of audio at 80ms/chunk)
+AUDIO_QUEUE_MAXSIZE = 50
 
 
 class WakewordNode(Node):
@@ -41,6 +46,13 @@ class WakewordNode(Node):
         self._publisher = self.create_publisher(Bool, '/wakeword_detected', 10)
         self._last_trigger_time = 0.0
 
+        # Audio callback only enqueues raw PCM; inference/publish happens on a worker
+        # thread so the realtime PortAudio callback thread never blocks on model inference.
+        self._audio_queue: queue.Queue = queue.Queue(maxsize=AUDIO_QUEUE_MAXSIZE)
+        self._stop_event = threading.Event()
+        self._worker_thread = threading.Thread(target=self._inference_worker, daemon=True)
+        self._worker_thread.start()
+
         self._stream = sd.InputStream(
             samplerate=16000,
             blocksize=self.chunk_size,
@@ -63,27 +75,50 @@ class WakewordNode(Node):
         raise RuntimeError(f'"{name_substring}"가 포함된 입력 장치를 찾을 수 없습니다.')
 
     def _audio_callback(self, indata, frames, time_info, status):
+        # Runs on PortAudio's realtime thread: keep this as cheap as possible.
         if status:
             self.get_logger().warn(f'오디오 스트림 상태: {status}')
 
-        pcm = indata[:, 0]
-        prediction = self._model.predict(pcm)
-        score = prediction[self._model_name]
+        try:
+            self._audio_queue.put_nowait(indata[:, 0].copy())
+        except queue.Full:
+            # Consumer can't keep up; drop the oldest chunk to make room rather than
+            # blocking the realtime callback.
+            try:
+                self._audio_queue.get_nowait()
+            except queue.Empty:
+                pass
+            try:
+                self._audio_queue.put_nowait(indata[:, 0].copy())
+            except queue.Full:
+                pass
 
-        if score > self.threshold:
-            now = time.monotonic()
-            if now - self._last_trigger_time < self.debounce_sec:
-                return
-            self._last_trigger_time = now
+    def _inference_worker(self):
+        while not self._stop_event.is_set():
+            try:
+                pcm = self._audio_queue.get(timeout=0.5)
+            except queue.Empty:
+                continue
 
-            self.get_logger().info(f'웨이크워드 감지: 마실아 (score={score:.3f})')
-            msg = Bool()
-            msg.data = True
-            self._publisher.publish(msg)
+            prediction = self._model.predict(pcm)
+            score = prediction[self._model_name]
+
+            if score > self.threshold:
+                now = time.monotonic()
+                if now - self._last_trigger_time < self.debounce_sec:
+                    continue
+                self._last_trigger_time = now
+
+                self.get_logger().info(f'웨이크워드 감지: 마실아 (score={score:.3f})')
+                msg = Bool()
+                msg.data = True
+                self._publisher.publish(msg)
 
     def destroy_node(self):
         self._stream.stop()
         self._stream.close()
+        self._stop_event.set()
+        self._worker_thread.join(timeout=2.0)
         super().destroy_node()
 
 

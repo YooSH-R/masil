@@ -3,7 +3,7 @@
 <package format="3">
   <name>petbot_wakeword</name>
   <version>0.0.0</version>
-  <description>"마실아" 웨이크워드 인식 노드 (Porcupine 기반)</description>
+  <description>"마실아" 웨이크워드 인식 노드 (openWakeWord 커스텀 모델 기반)</description>
   <maintainer email="jetson@todo.todo">jetson</maintainer>
   <license>TODO: License declaration</license>
 
