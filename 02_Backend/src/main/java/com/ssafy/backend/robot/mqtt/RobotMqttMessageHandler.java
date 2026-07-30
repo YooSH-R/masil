@@ -1,7 +1,6 @@
 package com.ssafy.backend.robot.mqtt;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.integration.annotation.ServiceActivator;
 import org.springframework.integration.mqtt.support.MqttHeaders;
 import org.springframework.messaging.Message;
 import org.springframework.stereotype.Component;
@@ -23,7 +22,6 @@ public class RobotMqttMessageHandler {
         this.mqttService = mqttService;
     }
 
-    @ServiceActivator(inputChannel = "mqttInboundChannel")
     public void handle(Message<String> message) throws JacksonException {
         String topic = message.getHeaders().get(
                 MqttHeaders.RECEIVED_TOPIC,
