@@ -85,42 +85,7 @@ jdbc:postgresql://postgres:5432/mysil
 
 DB가 준비된 다음 기존 CI/CD 방식으로 백엔드를 배포합니다.
 
-### 6. 기존 DB 스키마 마이그레이션
-
-기존 PVC를 유지하는 환경에서는 초기 SQL이 다시 실행되지 않으므로
-마이그레이션 파일을 별도로 적용합니다.
-
-마이그레이션은 기존 로봇 자격증명의 컬럼명을 변경하고 QR 등록 컬럼,
-로봇 소유권, 활성 펫 제약조건을 추가합니다. 기존 로봇에는 출력 가능한
-QR 원문이 없으므로 `qr_token_hash`를 일시적으로 nullable로 유지합니다.
-
-```bash
-kubectl -n NAMESPACE exec -i statefulset/postgres -- \
-  sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
-  < 06_Infra/postgres/migrations/002_robot_ownership.sql
-```
-
-기존 로봇에 QR을 프로비저닝한 뒤 마이그레이션을 한 번 더 실행하면
-누락된 QR 해시가 없는 경우 `qr_token_hash`가 `NOT NULL`로 강화됩니다.
-
-마이그레이션 전에 활성 펫 중복과 기기 토큰 중복이 없는지 확인합니다.
-조회 결과가 없어야 정상입니다.
-
-```sql
-SELECT pet_id, COUNT(*)
-FROM robot_pairings
-WHERE unpaired_at IS NULL
-GROUP BY pet_id
-HAVING COUNT(*) > 1;
-
-SELECT device_token_hash, COUNT(*)
-FROM robot_credentials
-WHERE device_token_hash IS NOT NULL
-GROUP BY device_token_hash
-HAVING COUNT(*) > 1;
-```
-
-### 7. 시연용 로봇 QR 프로비저닝
+### 6. 시연용 로봇 QR 프로비저닝
 
 로컬 PostgreSQL 컨테이너가 실행 중인 상태에서 저장소 루트 기준으로
 다음 명령을 실행합니다.
