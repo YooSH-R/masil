@@ -6,21 +6,19 @@ DEPLOYMENT="${JENKINS_DEPLOYMENT:-jenkins}"
 SECRET_NAME="${JENKINS_WEBHOOK_SECRET_NAME:-jenkins-webhook-secret}"
 SECRET_KEY="GITLAB_WEBHOOK_TOKEN"
 
-if [[ -z "${GITLAB_WEBHOOK_TOKEN:-}" ]]; then
-  read -r -s -p "GitLab webhook secret token: " GITLAB_WEBHOOK_TOKEN
-  printf '\n'
+if kubectl -n "${NAMESPACE}" get secret "${SECRET_NAME}" >/dev/null 2>&1; then
+  echo "Reusing existing ${SECRET_NAME}; the webhook token was not rotated."
+elif [[ -n "${GITLAB_WEBHOOK_TOKEN:-}" ]]; then
+  kubectl -n "${NAMESPACE}" create secret generic "${SECRET_NAME}" \
+    --from-literal="${SECRET_KEY}=${GITLAB_WEBHOOK_TOKEN}"
+  echo "Created ${SECRET_NAME} from the supplied environment variable."
+else
+  GITLAB_WEBHOOK_TOKEN="$(openssl rand -hex 32)"
+  kubectl -n "${NAMESPACE}" create secret generic "${SECRET_NAME}" \
+    --from-literal="${SECRET_KEY}=${GITLAB_WEBHOOK_TOKEN}"
+  unset GITLAB_WEBHOOK_TOKEN
+  echo "Created ${SECRET_NAME} with a cryptographically random token."
 fi
-
-if [[ -z "${GITLAB_WEBHOOK_TOKEN}" ]]; then
-  echo "Webhook token must not be empty." >&2
-  exit 1
-fi
-
-kubectl -n "${NAMESPACE}" create secret generic "${SECRET_NAME}" \
-  --from-literal="${SECRET_KEY}=${GITLAB_WEBHOOK_TOKEN}" \
-  --dry-run=client \
-  -o yaml \
-  | kubectl apply -f -
 
 kubectl -n "${NAMESPACE}" set env "deployment/${DEPLOYMENT}" \
   --from="secret/${SECRET_NAME}"
