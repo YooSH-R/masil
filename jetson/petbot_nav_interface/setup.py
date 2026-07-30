@@ -15,7 +15,7 @@ setup(
     zip_safe=True,
     maintainer='jetson',
     maintainer_email='jetson@todo.todo',
-    description='TODO: Package description',
+    description='Nav2 SimpleCommander를 감싼 공용 이동 인터페이스(MoveInterface). 좌표를 넘기면 이동/취소/피드백 조회가 가능한 액션을 제공한다.',
     license='TODO: License declaration',
     extras_require={
         'test': [

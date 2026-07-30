@@ -3,7 +3,7 @@
 <package format="3">
   <name>petbot_person_locator</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>YOLO(카메라)와 라이다를 융합해 사람의 상대 위치를 추정하고, MoveInterface로 Nav2 목표를 전송해 접근하는 노드.</description>
   <maintainer email="jetson@todo.todo">jetson</maintainer>
   <license>TODO: License declaration</license>
 
@@ -11,6 +11,7 @@
   <depend>sensor_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>cv_bridge</depend>
+  <depend>petbot_nav_interface</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

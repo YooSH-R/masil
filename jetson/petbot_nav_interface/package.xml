@@ -3,7 +3,7 @@
 <package format="3">
   <name>petbot_nav_interface</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>Nav2 SimpleCommander를 감싼 공용 이동 인터페이스(MoveInterface). 좌표를 넘기면 이동/취소/피드백 조회가 가능한 액션을 제공한다.</description>
   <maintainer email="jetson@todo.todo">jetson</maintainer>
   <license>TODO: License declaration</license>
 
