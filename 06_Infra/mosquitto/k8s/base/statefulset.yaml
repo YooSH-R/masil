@@ -15,6 +15,9 @@ spec:
       labels:
         app: mosquitto
     spec:
+      securityContext:
+        fsGroup: 1883
+        fsGroupChangePolicy: OnRootMismatch
       initContainers:
         - name: create-password-file
           image: eclipse-mosquitto:2.0.22
@@ -25,6 +28,8 @@ spec:
             - |
               mosquitto_passwd -b -c /security/password_file "$MQTT_BACKEND_USERNAME" "$MQTT_BACKEND_PASSWORD"
               mosquitto_passwd -b /security/password_file "$MQTT_DEVICE_USERNAME" "$MQTT_DEVICE_PASSWORD"
+              chown 1883:1883 /security /security/password_file
+              chmod 0750 /security
               chmod 0600 /security/password_file
           envFrom:
             - secretRef:
@@ -36,6 +41,11 @@ spec:
         - name: mosquitto
           image: eclipse-mosquitto:2.0.22
           imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1883
+            runAsGroup: 1883
+            allowPrivilegeEscalation: false
           ports:
             - name: mqtt
               containerPort: 1883
