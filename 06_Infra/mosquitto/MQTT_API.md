@@ -191,10 +191,16 @@ BUILD SUCCESSFUL
 
 #### 1. dev Broker로 SSH 터널 연결
 
-아래 명령은 별도 터미널에서 계속 실행한다.
+로컬 Mosquitto와 포트가 충돌하지 않도록 `11883`을 사용한다. 아래 명령은
+별도 터미널에서 계속 실행한다.
 
-```bash
-ssh -L 1883:localhost:31883 ubuntu@<EC2_PUBLIC_IP>
+```powershell
+ssh `
+  -i C:\path\to\key.pem `
+  -N -T -q `
+  -o ExitOnForwardFailure=yes `
+  -L 127.0.0.1:11883:127.0.0.1:31883 `
+  ubuntu@<EC2_PUBLIC_IP>
 ```
 
 #### 2. 로컬 환경변수 설정
@@ -203,7 +209,7 @@ ssh -L 1883:localhost:31883 ubuntu@<EC2_PUBLIC_IP>
 
 ```properties
 MQTT_ENABLED=true
-MQTT_URL=tcp://localhost:1883
+MQTT_URL=tcp://localhost:11883
 MQTT_CLIENT_ID=robot-pet-backend-<본인이름>
 MQTT_USERNAME=backend
 MQTT_PASSWORD=<백엔드 MQTT 비밀번호>
@@ -213,6 +219,28 @@ MQTT_REQUEST_SCHEDULER_INITIAL_DELAY_MS=60000
 ```
 
 각 실행자의 `MQTT_CLIENT_ID`는 서로 달라야 한다.
+
+#### 자동 pub/sub 연결 확인
+
+Spring 실행 전에도 Broker 인증, ACL, 양방향 pub/sub를 자동으로 확인할 수 있다.
+`02_Backend/.env`의 backend MQTT 계정을 사용하고 디바이스 비밀번호는 프롬프트로
+입력한다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File `
+  .\06_Infra\mosquitto\scripts\Test-LocalMqttPubSub.ps1
+```
+
+정상 결과:
+
+```text
+[PASS] device -> broker -> backend subscriber
+[PASS] backend -> broker -> device subscriber
+[PASS] MQTT local pub/sub test completed
+```
+
+이 테스트는 Broker와 ACL 연결만 검증한다. 실제 호감도 DB 저장과 `/affection`
+응답은 아래 Spring 실행 테스트로 확인한다.
 
 #### 3. Spring 실행
 
