@@ -18,8 +18,10 @@ import static org.mockito.Mockito.when;
 class RobotMqttMessageHandlerTest {
 
     private final ObjectMapper objectMapper = mock(ObjectMapper.class);
+    private final RobotMqttApplicationService mqttService =
+            mock(RobotMqttApplicationService.class);
     private final RobotMqttMessageHandler handler =
-            new RobotMqttMessageHandler(objectMapper);
+            new RobotMqttMessageHandler(objectMapper, mqttService);
 
     @Test
     void acceptsEventWhenTopicAndPayloadDeviceIdsMatch() throws Exception {
@@ -35,6 +37,7 @@ class RobotMqttMessageHandlerTest {
 
         assertDoesNotThrow(() -> handler.handle(message));
         verify(objectMapper).readValue(payload, RobotEventMessage.class);
+        verify(mqttService).processEvent(event);
     }
 
     @Test
@@ -62,6 +65,54 @@ class RobotMqttMessageHandlerTest {
                 IllegalArgumentException.class,
                 () -> handler.handle(message)
         );
+    }
+
+    @Test
+    void routesHeartbeatToApplicationService() throws Exception {
+        String payload = "{\"deviceId\":\"device-001\"}";
+        RobotHeartbeatMessage heartbeat = new RobotHeartbeatMessage(
+                UUID.randomUUID(),
+                "1.0",
+                "device-001",
+                Instant.parse("2026-07-30T00:00:00Z"),
+                75,
+                false,
+                "IDLE"
+        );
+        when(objectMapper.readValue(payload, RobotHeartbeatMessage.class))
+                .thenReturn(heartbeat);
+
+        handler.handle(message(
+                "robot-pet/v1/devices/device-001/heartbeat",
+                payload
+        ));
+
+        verify(mqttService).processHeartbeat(heartbeat);
+    }
+
+    @Test
+    void routesRequestResultToApplicationService() throws Exception {
+        String payload = "{\"deviceId\":\"device-001\"}";
+        RobotRequestResultMessage result = new RobotRequestResultMessage(
+                UUID.randomUUID(),
+                "1.0",
+                "device-001",
+                UUID.randomUUID(),
+                BehaviorRequestStatus.COMPLETED,
+                Instant.parse("2026-07-30T00:00:00Z"),
+                null
+        );
+        when(objectMapper.readValue(
+                payload,
+                RobotRequestResultMessage.class
+        )).thenReturn(result);
+
+        handler.handle(message(
+                "robot-pet/v1/devices/device-001/request-results",
+                payload
+        ));
+
+        verify(mqttService).processRequestResult(result);
     }
 
     private Message<String> message(String topic, String payload) {

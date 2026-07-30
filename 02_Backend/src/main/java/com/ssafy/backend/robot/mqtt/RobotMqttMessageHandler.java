@@ -13,14 +13,22 @@ import tools.jackson.databind.ObjectMapper;
 public class RobotMqttMessageHandler {
 
     private final ObjectMapper objectMapper;
+    private final RobotMqttApplicationService mqttService;
 
-    public RobotMqttMessageHandler(ObjectMapper objectMapper) {
+    public RobotMqttMessageHandler(
+            ObjectMapper objectMapper,
+            RobotMqttApplicationService mqttService
+    ) {
         this.objectMapper = objectMapper;
+        this.mqttService = mqttService;
     }
 
     @ServiceActivator(inputChannel = "mqttInboundChannel")
     public void handle(Message<String> message) throws JacksonException {
-        String topic = message.getHeaders().get(MqttHeaders.RECEIVED_TOPIC, String.class);
+        String topic = message.getHeaders().get(
+                MqttHeaders.RECEIVED_TOPIC,
+                String.class
+        );
         if (topic == null) {
             throw new IllegalArgumentException("MQTT 수신 토픽이 없습니다.");
         }
@@ -31,10 +39,39 @@ public class RobotMqttMessageHandler {
                     message.getPayload(),
                     RobotEventMessage.class
             );
-            if (!topicDeviceId.equals(event.deviceId())) {
-                throw new IllegalArgumentException("토픽과 메시지의 deviceId가 다릅니다.");
-            }
+            requireMatchingDeviceId(topicDeviceId, event.deviceId());
+            mqttService.processEvent(event);
+            return;
         }
-        // heartbeat와 request-results 처리는 후속 애플리케이션 서비스에서 연결한다.
+        if (topic.endsWith("/heartbeat")) {
+            RobotHeartbeatMessage heartbeat = objectMapper.readValue(
+                    message.getPayload(),
+                    RobotHeartbeatMessage.class
+            );
+            requireMatchingDeviceId(topicDeviceId, heartbeat.deviceId());
+            mqttService.processHeartbeat(heartbeat);
+            return;
+        }
+        if (topic.endsWith("/request-results")) {
+            RobotRequestResultMessage result = objectMapper.readValue(
+                    message.getPayload(),
+                    RobotRequestResultMessage.class
+            );
+            requireMatchingDeviceId(topicDeviceId, result.deviceId());
+            mqttService.processRequestResult(result);
+            return;
+        }
+        throw new IllegalArgumentException("지원하지 않는 MQTT 토픽입니다.");
+    }
+
+    private void requireMatchingDeviceId(
+            String topicDeviceId,
+            String messageDeviceId
+    ) {
+        if (!topicDeviceId.equals(messageDeviceId)) {
+            throw new IllegalArgumentException(
+                    "토픽과 메시지의 deviceId가 다릅니다."
+            );
+        }
     }
 }
