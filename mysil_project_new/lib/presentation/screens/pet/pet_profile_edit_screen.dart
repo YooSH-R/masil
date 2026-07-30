@@ -124,7 +124,7 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
                   Switch(
                     value: _isNotificationEnabled,
                     onChanged: (val) => setState(() => _isNotificationEnabled = val),
-                    activeColor: const Color(0xFFC67C4E),
+                    activeThumbColor: const Color(0xFFC67C4E),
                   ),
                 ],
               ),

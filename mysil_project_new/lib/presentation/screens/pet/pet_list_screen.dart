@@ -17,8 +17,8 @@ class PetListScreen extends StatelessWidget {
         ),
         title: const Text('내 반려동물', style: TextStyle(color: Color(0xFF5D4037), fontWeight: FontWeight.bold)),
         centerTitle: true,
-        actions: [
-          const Padding(
+        actions: const [
+          Padding(
             padding: EdgeInsets.only(right: 20),
             child: Center(child: Text('3 / 3', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold))),
           ),

@@ -90,7 +90,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                           ],
                         ),
                       ),
-                      Switch(value: _isDnd, onChanged: (v) => setState(() => _isDnd = v), activeColor: const Color(0xFFC67C4E)),
+                      Switch(value: _isDnd, onChanged: (v) => setState(() => _isDnd = v), activeThumbColor: const Color(0xFFC67C4E)),
                     ],
                   ),
                   const Divider(height: 40),
@@ -141,12 +141,12 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       children: [
         Container(
           padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: const Color(0xFFF9F3E7), shape: BoxShape.circle),
+          decoration: const BoxDecoration(color: Color(0xFFF9F3E7), shape: BoxShape.circle),
           child: Icon(icon, color: const Color(0xFFC67C4E), size: 20),
         ),
         const SizedBox(width: 16),
         Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
-        Switch(value: value, onChanged: onChanged, activeColor: const Color(0xFFC67C4E)),
+        Switch(value: value, onChanged: onChanged, activeThumbColor: const Color(0xFFC67C4E)),
       ],
     );
   }

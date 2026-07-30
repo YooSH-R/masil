@@ -4,6 +4,7 @@ import '../../presentation/screens/splash/splash_screen.dart';
 import '../../presentation/screens/home/home_screen.dart';
 import '../../presentation/screens/auth/login_screen.dart';
 import '../../presentation/screens/auth/signup_screen.dart';
+import '../../presentation/screens/auth/social_signup_screen.dart';
 import '../../presentation/screens/auth/auto_login_screen.dart';
 import '../../presentation/screens/auth/login_locked_screen.dart';
 import '../../presentation/screens/auth/password_reset_screen.dart';
@@ -59,6 +60,11 @@ final GoRouter router = GoRouter(
     GoRoute(
       path: '/signup',
       builder: (context, state) => const SignupScreen(),
+    ),
+    GoRoute(
+      // 구글로 처음 로그인한 회원의 닉네임 설정 단계
+      path: '/social-signup',
+      builder: (context, state) => const SocialSignupScreen(),
     ),
     GoRoute(
       path: '/login-locked',

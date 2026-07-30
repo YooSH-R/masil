@@ -50,7 +50,7 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     final selectedLog = _mockLogs[dateKey];
     
     // Calculate current month's log count
-    final monthPrefix = "${_currentYear}-${_currentMonth.toString().padLeft(2, '0')}";
+    final monthPrefix = "$_currentYear-${_currentMonth.toString().padLeft(2, '0')}";
     final monthLogCount = _mockLogs.keys.where((k) => k.startsWith(monthPrefix)).length;
 
     return Scaffold(
@@ -81,7 +81,7 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
                   onPressed: _prevMonth,
                 ),
                 Text(
-                  '${_currentYear}년 ${_currentMonth.toString().padLeft(2, '0')}월 산책 일지',
+                  '$_currentYear년 ${_currentMonth.toString().padLeft(2, '0')}월 산책 일지',
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF5D4037)),
                 ),
                 IconButton(

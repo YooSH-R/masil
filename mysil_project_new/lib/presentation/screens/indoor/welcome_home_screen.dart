@@ -24,7 +24,7 @@ class _WelcomeHomeScreenState extends State<WelcomeHomeScreen> {
         title: const Text('귀가 마중', style: TextStyle(color: Color(0xFF5D4037), fontWeight: FontWeight.bold)),
         centerTitle: true,
         actions: [
-          Switch(value: _isEnabled, onChanged: (v) => setState(() => _isEnabled = v), activeColor: const Color(0xFFC67C4E)),
+          Switch(value: _isEnabled, onChanged: (v) => setState(() => _isEnabled = v), activeThumbColor: const Color(0xFFC67C4E)),
           const SizedBox(width: 12),
         ],
       ),
@@ -179,7 +179,7 @@ class _WelcomeHomeScreenState extends State<WelcomeHomeScreen> {
                       ],
                     ),
                   ),
-                  Switch(value: _isNotificationEnabled, onChanged: (v) => setState(() => _isNotificationEnabled = v), activeColor: const Color(0xFFC67C4E)),
+                  Switch(value: _isNotificationEnabled, onChanged: (v) => setState(() => _isNotificationEnabled = v), activeThumbColor: const Color(0xFFC67C4E)),
                 ],
               ),
             ),
@@ -204,7 +204,7 @@ class _WelcomeHomeScreenState extends State<WelcomeHomeScreen> {
       children: [
         Container(
           padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: const Color(0xFFF9F3E7), shape: BoxShape.circle),
+          decoration: const BoxDecoration(color: Color(0xFFF9F3E7), shape: BoxShape.circle),
           child: const Icon(Icons.pets, color: Colors.brown, size: 20),
         ),
         const SizedBox(width: 16),

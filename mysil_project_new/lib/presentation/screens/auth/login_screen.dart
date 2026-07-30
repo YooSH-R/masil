@@ -16,6 +16,54 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    // 회원가입 직후 넘어온 이메일을 미리 채워 준다.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final extra = GoRouterState.of(context).extra;
+      if (extra is String && extra.isNotEmpty) {
+        _emailController.text = extra;
+      }
+    });
+  }
+
+  /// 구글 계정으로 인증 → 기존 회원은 홈, 신규 회원은 닉네임 화면으로.
+  Future<void> _signInWithGoogle() => _handleSocialSignIn(
+        () => context.read<AuthViewModel>().signInWithGoogle(),
+        '구글 로그인에 실패했어요.',
+      );
+
+  /// 카카오 계정으로 인증. 이후 흐름은 구글과 같다.
+  Future<void> _signInWithKakao() => _handleSocialSignIn(
+        () => context.read<AuthViewModel>().signInWithKakao(),
+        '카카오 로그인에 실패했어요.',
+      );
+
+  Future<void> _handleSocialSignIn(
+    Future<SocialSignInOutcome> Function() signIn,
+    String failureMessage,
+  ) async {
+    final authViewModel = context.read<AuthViewModel>();
+    final outcome = await signIn();
+    if (!mounted) return;
+
+    switch (outcome) {
+      case SocialSignInOutcome.loggedIn:
+        context.go('/home');
+      case SocialSignInOutcome.needsNickname:
+        context.go('/social-signup');
+      case SocialSignInOutcome.cancelled:
+        break;
+      case SocialSignInOutcome.failed:
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(authViewModel.errorMessage ?? failureMessage),
+          backgroundColor: Colors.redAccent,
+        ));
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final authViewModel = context.watch<AuthViewModel>();
 
@@ -151,15 +199,19 @@ class _LoginScreenState extends State<LoginScreen> {
                                   _emailController.text,
                                   _passwordController.text,
                                 );
-                                if (!mounted) return;
+                                if (!context.mounted) return;
                                 if (success) {
-                                  if (mounted) context.go('/home');
+                                  context.go('/home');
                                 } else {
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('로그인 실패')),
-                                    );
-                                  }
+                                  // 서버가 준 오류 메시지를 그대로 노출한다.
+                                  // (예: INVALID_CREDENTIALS → "이메일 또는 비밀번호가 올바르지 않습니다.")
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(authViewModel.errorMessage ??
+                                          '로그인에 실패했어요.'),
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                  );
                                 }
                               },
                         style: ElevatedButton.styleFrom(
@@ -192,20 +244,22 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 20),
                     // Social Buttons
+                    // POST /auth/oauth/kakao
                     _buildSocialButton(
                       label: '카카오로 시작하기',
                       color: const Color(0xFFFFE812),
                       textColor: Colors.black87,
                       icon: Icons.chat_bubble,
-                      onPressed: () {},
+                      onPressed: authViewModel.isLoading ? null : _signInWithKakao,
                     ),
                     const SizedBox(height: 12),
+                    // POST /auth/oauth/google
                     _buildSocialButton(
                       label: 'Google로 시작하기',
                       color: Colors.white,
                       textColor: Colors.black87,
                       icon: Icons.g_mobiledata,
-                      onPressed: () {},
+                      onPressed: authViewModel.isLoading ? null : _signInWithGoogle,
                       border: BorderSide(color: Colors.grey.shade200),
                     ),
                   ],
@@ -275,7 +329,8 @@ class _LoginScreenState extends State<LoginScreen> {
     required Color color,
     required Color textColor,
     required IconData icon,
-    required VoidCallback onPressed,
+    // 로딩 중에는 null을 넘겨 비활성화한다.
+    required VoidCallback? onPressed,
     BorderSide? border,
   }) {
     return SizedBox(
