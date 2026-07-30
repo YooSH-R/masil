@@ -84,7 +84,7 @@ class DeviceConnectionManagementScreen extends StatelessWidget {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(color: const Color(0xFFE8F6F3), shape: BoxShape.circle),
+                    decoration: const BoxDecoration(color: Color(0xFFE8F6F3), shape: BoxShape.circle),
                     child: const Icon(Icons.qr_code_scanner, color: Color(0xFF16A085), size: 40),
                   ),
                   const SizedBox(height: 24),

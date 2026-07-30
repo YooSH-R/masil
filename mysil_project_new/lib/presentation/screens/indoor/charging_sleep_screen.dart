@@ -53,7 +53,7 @@ class ChargingSleepScreen extends StatelessWidget {
             const SizedBox(height: 48),
             
             // Circular Progress
-            SizedBox(
+            const SizedBox(
               width: 180,
               height: 180,
               child: Stack(
@@ -66,7 +66,7 @@ class ChargingSleepScreen extends StatelessWidget {
                         value: 0.68,
                         strokeWidth: 12,
                         backgroundColor: Colors.white10,
-                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFFA000)),
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFA000)),
                       ),
                     ),
                   ),
@@ -74,8 +74,8 @@ class ChargingSleepScreen extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text('68%', style: TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.bold)),
-                        const Text('충전 중', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                        Text('68%', style: TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.bold)),
+                        Text('충전 중', style: TextStyle(color: Colors.white70, fontSize: 14)),
                       ],
                     ),
                   ),

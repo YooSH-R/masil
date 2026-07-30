@@ -89,7 +89,7 @@ class WalkDeclinedScreen extends StatelessWidget {
                         Text('자정까지 알림을 보내지 않아요', style: TextStyle(color: Colors.grey, fontSize: 12)),
                       ],
                     ),
-                    Switch(value: false, onChanged: (v) {}, activeColor: const Color(0xFFC67C4E)),
+                    Switch(value: false, onChanged: (v) {}, activeThumbColor: const Color(0xFFC67C4E)),
                   ],
                 ),
               ),

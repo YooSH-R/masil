@@ -197,7 +197,7 @@ class _ProactivePlayRequestScreenState extends State<ProactivePlayRequestScreen>
               ],
             ),
           ),
-          Switch(value: _isDndEnabled, onChanged: (v) => setState(() => _isDndEnabled = v), activeColor: const Color(0xFFC67C4E)),
+          Switch(value: _isDndEnabled, onChanged: (v) => setState(() => _isDndEnabled = v), activeThumbColor: const Color(0xFFC67C4E)),
         ],
       ),
     );

@@ -69,7 +69,7 @@ class IntimacyMoodScreen extends StatelessWidget {
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(30)),
       child: Column(
         children: [
-          SizedBox(
+          const SizedBox(
             width: 180,
             height: 180,
             child: Stack(
@@ -81,8 +81,8 @@ class IntimacyMoodScreen extends StatelessWidget {
                     child: CircularProgressIndicator(
                       value: 0.78,
                       strokeWidth: 12,
-                      backgroundColor: const Color(0xFFF9F3E7),
-                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFC67C4E)),
+                      backgroundColor: Color(0xFFF9F3E7),
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFC67C4E)),
                     ),
                   ),
                 ),
@@ -90,8 +90,8 @@ class IntimacyMoodScreen extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('🥰', style: TextStyle(fontSize: 32)),
-                      const Text('78%', style: TextStyle(fontSize: 42, fontWeight: FontWeight.bold, color: Color(0xFF5D4037))),
+                      Text('🥰', style: TextStyle(fontSize: 32)),
+                      Text('78%', style: TextStyle(fontSize: 42, fontWeight: FontWeight.bold, color: Color(0xFF5D4037))),
                     ],
                   ),
                 ),

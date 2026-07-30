@@ -126,11 +126,11 @@ class IndoorHomeScreen extends StatelessWidget {
           const SizedBox(height: 20),
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(
+            child: const LinearProgressIndicator(
               value: 0.76,
               minHeight: 10,
-              backgroundColor: const Color(0xFFF9F3E7),
-              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFC67C4E)),
+              backgroundColor: Color(0xFFF9F3E7),
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFC67C4E)),
             ),
           ),
         ],
@@ -159,7 +159,7 @@ class IndoorHomeScreen extends StatelessWidget {
               ],
             ),
           ),
-          Switch(value: true, onChanged: (v) => context.push('/indoor/roaming'), activeColor: const Color(0xFFE8F6F3), activeTrackColor: const Color(0xFFE8F5E9)),
+          Switch(value: true, onChanged: (v) => context.push('/indoor/roaming'), activeThumbColor: const Color(0xFFE8F6F3), activeTrackColor: const Color(0xFFE8F5E9)),
           const Icon(Icons.chevron_right, color: Colors.grey),
         ],
       ),

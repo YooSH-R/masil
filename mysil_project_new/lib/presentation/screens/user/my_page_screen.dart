@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../../viewmodels/auth_view_model.dart';
 
 class MyPageScreen extends StatelessWidget {
   const MyPageScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final authViewModel = context.watch<AuthViewModel>();
+    final user = authViewModel.user;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9F3E7),
       appBar: AppBar(
@@ -48,13 +54,28 @@ class MyPageScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  const Expanded(
+                  // 로그인 응답(3.4)의 user 정보를 그대로 보여준다.
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('김싸피 님', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF5D4037))),
-                        SizedBox(height: 4),
-                        Text('반려견과 함께하는 삶', style: TextStyle(color: Color(0xFF8D6E63), fontSize: 13)),
+                        Text(
+                          user == null ? '로그인이 필요해요' : '${user.nickname} 님',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF5D4037)),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          user?.email ?? '반려견과 함께하는 삶',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Color(0xFF8D6E63), fontSize: 13),
+                        ),
                       ],
                     ),
                   ),
@@ -192,8 +213,15 @@ class MyPageScreen extends StatelessWidget {
             ),
             
             const SizedBox(height: 32),
+            // POST /auth/logout — 서버 세션 종료 후 로컬 토큰까지 정리한다.
             TextButton(
-              onPressed: () => context.go('/login'),
+              onPressed: authViewModel.isLoading
+                  ? null
+                  : () async {
+                      await authViewModel.logout();
+                      if (!context.mounted) return;
+                      context.go('/login');
+                    },
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [

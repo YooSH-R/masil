@@ -45,7 +45,7 @@ class _AutonomousRoamingScreenState extends State<AutonomousRoamingScreen> {
                   Switch(
                     value: _isAllowed,
                     onChanged: (v) => setState(() => _isAllowed = v),
-                    activeColor: const Color(0xFFC67C4E),
+                    activeThumbColor: const Color(0xFFC67C4E),
                   ),
                 ],
               ),

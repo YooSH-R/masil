@@ -75,7 +75,7 @@ class WalkSummaryScreen extends StatelessWidget {
                             ],
                           ),
                           const SizedBox(height: 4),
-                          Text('목표 30분을 넘겨서 보너스를 받았어요', style: TextStyle(color: Color(0xFF2E7D32).withValues(alpha: 0.8), fontSize: 13)),
+                          Text('목표 30분을 넘겨서 보너스를 받았어요', style: TextStyle(color: const Color(0xFF2E7D32).withValues(alpha: 0.8), fontSize: 13)),
                         ],
                       ),
                     ),
