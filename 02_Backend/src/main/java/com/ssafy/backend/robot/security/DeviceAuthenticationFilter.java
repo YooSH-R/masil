@@ -62,7 +62,10 @@ public class DeviceAuthenticationFilter extends OncePerRequestFilter {
                 JOIN robot_credentials c ON c.robot_id = r.id
                 WHERE r.serial_number = ?
                   AND c.device_token_hash = ?
-                  AND (c.expires_at IS NULL OR c.expires_at > CURRENT_TIMESTAMP)
+                  AND (
+                    c.device_token_expires_at IS NULL
+                    OR c.device_token_expires_at > CURRENT_TIMESTAMP
+                  )
                 """,
                 (rs, rowNum) -> rs.getLong(1),
                 deviceId,
