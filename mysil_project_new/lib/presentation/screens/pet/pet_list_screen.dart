@@ -29,7 +29,10 @@ class PetListScreen extends StatelessWidget {
         child: Column(
           children: [
             // Main Representative Pet Card
-            Container(
+            // 탭하면 프로필 편집으로 — 산책 주기·시간을 여기서 설정한다.
+            GestureDetector(
+              onTap: () => context.push('/user/pet-list/edit'),
+              child: Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -71,9 +74,10 @@ class PetListScreen extends StatelessWidget {
                   ),
                 ],
               ),
+              ),
             ),
             const SizedBox(height: 16),
-            
+
             // Other Pets
             _buildPetCard('구름이', '하루 2회 · 30분 · MS-1187', Icons.pets),
             const SizedBox(height: 16),

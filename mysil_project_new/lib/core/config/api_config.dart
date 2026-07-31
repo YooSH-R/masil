@@ -3,7 +3,11 @@ class ApiConfig {
   ApiConfig._();
 
   /// 배포 서버 주소 + 명세서의 /v1 버전 경로.
-  static const String baseUrl = 'http://i15a203.p.ssafy.io/api/v1';
+  ///
+  /// 서버가 HTTPS로 전환되면서 http 로 보내면 308 Permanent Redirect 가 온다.
+  /// (dio 는 이를 에러로 처리해 로그인·소셜로그인이 전부 실패했다)
+  /// https 로 직접 보내야 하고, 덕분에 Android 평문 트래픽 허용도 필요 없다.
+  static const String baseUrl = 'https://i15a203.p.ssafy.io/api/v1';
 
   static const Duration connectTimeout = Duration(seconds: 15);
   static const Duration receiveTimeout = Duration(seconds: 15);

@@ -24,15 +24,19 @@ class ChargingSleepScreen extends StatelessWidget {
           const SizedBox(width: 20),
         ],
       ),
+      // 하단 탭바가 있는 높이에서 고정 크기 요소들이 넘쳐 '살짝 깨우기' 버튼이
+      // 잘렸다(147px 오버플로우). Spacer 대신 고정 여백을 쓰고 스크롤 가능하게
+      // 만들어, 작은 화면에서도 버튼까지 닿게 한다.
       body: SafeArea(
-        child: Column(
-          children: [
-            const Spacer(),
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+            const SizedBox(height: 8),
             // Character with sleep icons
             Stack(
               alignment: Alignment.center,
               children: [
-                Image.asset('assets/images/mysil_character.png', height: 200),
+                Image.asset('assets/images/mysil_character.png', height: 150),
                 const Positioned(
                   top: -20,
                   right: 40,
@@ -40,7 +44,7 @@ class ChargingSleepScreen extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 24),
             const Text(
               '마실이가 자는 중이에요',
               style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white),
@@ -50,18 +54,18 @@ class ChargingSleepScreen extends StatelessWidget {
               '충전소에서 곤히 쉬고 있어요 💤',
               style: TextStyle(color: Colors.white70, fontSize: 16),
             ),
-            const SizedBox(height: 48),
-            
+            const SizedBox(height: 28),
+
             // Circular Progress
             const SizedBox(
-              width: 180,
-              height: 180,
+              width: 150,
+              height: 150,
               child: Stack(
                 children: [
                   Center(
                     child: SizedBox(
-                      width: 160,
-                      height: 160,
+                      width: 132,
+                      height: 132,
                       child: CircularProgressIndicator(
                         value: 0.68,
                         strokeWidth: 12,
@@ -74,7 +78,7 @@ class ChargingSleepScreen extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('68%', style: TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.bold)),
+                        Text('68%', style: TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.bold)),
                         Text('충전 중', style: TextStyle(color: Colors.white70, fontSize: 14)),
                       ],
                     ),
@@ -82,8 +86,8 @@ class ChargingSleepScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const Spacer(),
-            
+            const SizedBox(height: 24),
+
             // Info Cards
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -112,9 +116,9 @@ class ChargingSleepScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(12),
                     child: const Row(
                       children: [
                         Icon(Icons.info_outline, color: Colors.white38, size: 18),
@@ -132,15 +136,24 @@ class ChargingSleepScreen extends StatelessWidget {
               ),
             ),
             
-            const SizedBox(height: 32),
+            const SizedBox(height: 8),
             // Bottom Action
             Padding(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12),
               child: SizedBox(
                 width: double.infinity,
                 height: 60,
                 child: ElevatedButton(
-                  onPressed: () => context.pop(),
+                  // 깨우면 자율 배회 화면으로 넘긴다.
+                  // pushReplacement 를 쓰는 이유: push 로 쌓으면 뒤로가기가
+                  // '자는 중' 화면으로 되돌아와 깨운 것과 모순된다.
+                  //
+                  // TODO: 실제로 로봇을 깨우는 명령 전송은 아직 못 한다.
+                  // 앱 엔드포인트에 명령 전송용이 없고(robotStatus/pairing 만 있음),
+                  // 백엔드 BehaviorRequestType 에도 깨우기가 없다
+                  // (PLAY_REQUEST / WALK_REQUEST / CARE_REQUEST /
+                  //  INTERACTION_REQUEST 뿐). API 가 생기면 이동 전에 호출한다.
+                  onPressed: () => context.pushReplacement('/indoor/roaming'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white.withValues(alpha: 0.9),
                     foregroundColor: const Color(0xFF3E363F),
@@ -151,8 +164,9 @@ class ChargingSleepScreen extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
-          ],
+            const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );

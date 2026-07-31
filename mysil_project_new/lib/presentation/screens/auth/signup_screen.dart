@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -12,6 +14,9 @@ class SignupScreen extends StatefulWidget {
   State<SignupScreen> createState() => _SignupScreenState();
 }
 
+/// 인증번호 기본 유효시간. 서버가 expiresAt을 주지 않을 때 쓴다.
+const _kCodeTtl = Duration(minutes: 3);
+
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
@@ -24,6 +29,16 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isAgreedToTerms = false;
+
+  /// 인증번호 입력 제한시간. 1초마다 줄어들고, 0이 되면 타이머를 멈춘다.
+  Timer? _codeTimer;
+  int _codeSecondsLeft = 0;
+
+  /// 카운트다운이 한 번이라도 시작됐는지. 발송 응답을 기다리는 동안
+  /// (아직 0초인 상태로) 만료 표시가 새어 나가지 않게 하는 조건이다.
+  bool _isCodeCountdownStarted = false;
+
+  bool get _isCodeExpired => _isCodeCountdownStarted && _codeSecondsLeft <= 0;
 
   // 이메일 중복 확인 API가 없어 형식 검사만 로컬로 처리한다.
   // (닉네임은 GET /users/nickname-availability 로 서버에 물어본다)
@@ -46,7 +61,74 @@ class _SignupScreenState extends State<SignupScreen> {
       AuthValidation.verificationCode.hasMatch(_codeController.text);
 
   @override
+  void initState() {
+    super.initState();
+    // AuthViewModel은 앱 전역이라 이 화면을 떠났다 돌아와도 인증 진행 상태가
+    // 남아 있다. 그때 카운트다운이 0:00으로 보이지 않게 남은 시간을 복원한다.
+    final authViewModel = context.read<AuthViewModel>();
+    if (authViewModel.isVerificationRequested &&
+        !authViewModel.isPhoneVerified) {
+      _startCodeCountdown(authViewModel.codeExpiresAt);
+    }
+  }
+
+  /// 인증번호 제한시간 카운트다운 시작. 재전송 때도 다시 호출된다.
+  ///
+  /// 서버가 준 expiresAt을 우선 쓰되, 값이 없거나 시계 차이/타임존 때문에
+  /// 상식적인 범위(0초~10분)를 벗어나면 기본 3분으로 떨어진다.
+  void _startCodeCountdown(DateTime? expiresAt) {
+    final int seconds;
+    if (expiresAt == null) {
+      // 서버가 만료 시각을 안 줬으면 기본 3분.
+      seconds = _kCodeTtl.inSeconds;
+    } else {
+      // 올림으로 계산한다. 발송~수신 사이에 0.x초가 지나 179.5초가 되는데,
+      // 내림이면 첫 표시가 2:59로 시작해 3:00을 못 보여준다.
+      final remaining =
+          (expiresAt.toUtc().difference(DateTime.now().toUtc()).inMilliseconds /
+                  1000)
+              .ceil();
+      if (remaining > const Duration(minutes: 10).inSeconds) {
+        // 시계 차이나 타임존 문제로 비상식적인 값이면 기본 3분으로 떨어진다.
+        seconds = _kCodeTtl.inSeconds;
+      } else {
+        // 이미 지났으면 0 (화면 재진입 시 만료 상태를 그대로 보여준다).
+        seconds = remaining > 0 ? remaining : 0;
+      }
+    }
+
+    _codeTimer?.cancel();
+    _codeTimer = null;
+    _codeSecondsLeft = seconds;
+    _isCodeCountdownStarted = true;
+    if (seconds <= 0) return;
+
+    _codeTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() => _codeSecondsLeft--);
+      if (_codeSecondsLeft <= 0) timer.cancel();
+    });
+  }
+
+  void _stopCodeCountdown() {
+    _codeTimer?.cancel();
+    _codeTimer = null;
+    _codeSecondsLeft = 0;
+    _isCodeCountdownStarted = false;
+  }
+
+  /// 남은 시간을 3:00 / 0:07 형태로.
+  String get _codeTimeLabel {
+    final s = _codeSecondsLeft < 0 ? 0 : _codeSecondsLeft;
+    return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
+  }
+
+  @override
   void dispose() {
+    _codeTimer?.cancel();
     _emailController.dispose();
     _nicknameController.dispose();
     _passwordController.dispose();
@@ -108,6 +190,9 @@ class _SignupScreenState extends State<SignupScreen> {
     );
     if (!mounted) return;
 
+    // 발송이 됐을 때만 카운트다운을 (재)시작한다.
+    if (sent) setState(() => _startCodeCountdown(authViewModel.codeExpiresAt));
+
     _showSnackBar(
       sent
           ? '인증번호를 보냈어요. 3분 안에 입력해 주세요.'
@@ -121,6 +206,11 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _confirmVerification() async {
     final authViewModel = context.read<AuthViewModel>();
 
+    if (_isCodeExpired) {
+      _showSnackBar('시간이 만료됐어요. 재전송해 주세요.', isError: true);
+      return;
+    }
+
     if (!_isCodeValid) {
       _showSnackBar('인증번호 6자리를 입력해 주세요.', isError: true);
       return;
@@ -129,6 +219,9 @@ class _SignupScreenState extends State<SignupScreen> {
     final verified =
         await authViewModel.confirmPhoneVerification(_codeController.text);
     if (!mounted) return;
+
+    // 인증이 끝나면 입력칸이 사라지므로 타이머도 정리한다.
+    if (verified) setState(_stopCodeCountdown);
 
     _showSnackBar(
       verified
@@ -394,7 +487,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           // 번호가 바뀌면 인증을 처음부터 다시 받아야 한다.
                           authViewModel.resetPhoneVerification();
                           _codeController.clear();
-                          setState(() {});
+                          setState(_stopCodeCountdown);
                         },
                       ),
                     ),
@@ -440,17 +533,50 @@ class _SignupScreenState extends State<SignupScreen> {
                             LengthLimitingTextInputFormatter(6),
                           ],
                           onChanged: (v) => setState(() {}),
+                          // 칸 오른쪽 끝에 남은 시간(3:00 → 0:00)을 띄운다.
+                          suffixIcon: !_isCodeCountdownStarted
+                              ? null
+                              : Padding(
+                                  padding: const EdgeInsets.only(
+                                      right: 16, left: 8),
+                                  child: Text(
+                                    _codeTimeLabel,
+                                    style: TextStyle(
+                                      color: _isCodeExpired
+                                          ? Colors.redAccent
+                                          : const Color(0xFFC67C4E),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                          suffixIconConstraints: const BoxConstraints(
+                            minWidth: 0,
+                            minHeight: 0,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       _buildSmallButton(
                         label: '확인',
-                        onPressed: authViewModel.isLoading || !_isCodeValid
+                        // 시간이 만료되면 서버가 어차피 거절하므로 미리 잠근다.
+                        onPressed: authViewModel.isLoading ||
+                                !_isCodeValid ||
+                                _isCodeExpired
                             ? null
                             : _confirmVerification,
                       ),
                     ],
                   ),
+                  if (_isCodeExpired)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8.0, left: 4),
+                      child: Text(
+                        '! 시간이 만료됐어요. 재전송해 주세요',
+                        style:
+                            TextStyle(color: Colors.redAccent, fontSize: 12),
+                      ),
+                    ),
                 ],
                 if (authViewModel.isPhoneVerified)
                   const Padding(
@@ -603,6 +729,7 @@ class _SignupScreenState extends State<SignupScreen> {
       TextInputType? keyboardType,
       List<TextInputFormatter>? inputFormatters,
       Widget? suffixIcon,
+      BoxConstraints? suffixIconConstraints,
       ValueChanged<String>? onChanged}) {
     return TextFormField(
       controller: controller,
@@ -611,7 +738,10 @@ class _SignupScreenState extends State<SignupScreen> {
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
       onChanged: onChanged,
-      decoration: _inputDecoration(hint).copyWith(suffixIcon: suffixIcon),
+      decoration: _inputDecoration(hint).copyWith(
+        suffixIcon: suffixIcon,
+        suffixIconConstraints: suffixIconConstraints,
+      ),
     );
   }
 
