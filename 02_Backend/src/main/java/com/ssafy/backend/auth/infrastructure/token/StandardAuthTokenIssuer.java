@@ -35,12 +35,10 @@ public class StandardAuthTokenIssuer implements AuthTokenIssuer {
                 )
                 .ifPresent(AuthSessionJpaEntity::revoke);
 
-        TokenService.AccessToken accessToken =
-                tokenService.createAccessToken(user.id());
         TokenService.RefreshToken refreshToken =
                 tokenService.createRefreshToken();
 
-        authSessionRepository.save(
+        AuthSessionJpaEntity session = authSessionRepository.saveAndFlush(
                 new AuthSessionJpaEntity(
                         user.id(),
                         deviceId,
@@ -48,6 +46,12 @@ public class StandardAuthTokenIssuer implements AuthTokenIssuer {
                         refreshToken.expiresAt()
                 )
         );
+        TokenService.AccessToken accessToken =
+                tokenService.createAccessToken(
+                        user.id(),
+                        deviceId,
+                        session.getId()
+                );
 
         return new IssuedTokens(
                 accessToken.value(),
