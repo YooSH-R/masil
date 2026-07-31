@@ -6,6 +6,7 @@ import com.ssafy.backend.common.ApiException;
 import com.ssafy.backend.user.infrastructure.persistence.SpringDataUserRepository;
 import com.ssafy.backend.user.infrastructure.persistence.UserJpaEntity;
 import org.springframework.http.HttpStatus;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,7 +44,7 @@ public class PasswordResetService {
                 request.phoneNumber()
         );
         UserJpaEntity user = userRepository
-                .findActiveByPhoneNumberForUpdate(phoneNumber)
+                .findByPhoneNumberAndDeletedAtIsNull(phoneNumber)
                 .orElseThrow(() -> new ApiException(
                         HttpStatus.NOT_FOUND,
                         "MEMBER_NOT_FOUND",
@@ -61,6 +62,15 @@ public class PasswordResetService {
         user.changePasswordHash(
                 passwordEncoder.encode(request.newPassword())
         );
+        try {
+            userRepository.flush();
+        } catch (ObjectOptimisticLockingFailureException exception) {
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "MEMBER_UPDATE_CONFLICT",
+                    "회원정보가 동시에 변경되었습니다. 다시 시도해 주세요."
+            );
+        }
         authSessionRepository.revokeAllByUserId(user.getId(), now);
     }
 }

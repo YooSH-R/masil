@@ -7,6 +7,7 @@ import com.ssafy.backend.auth.service.TokenHashService;
 import com.ssafy.backend.auth.service.TokenService;
 import com.ssafy.backend.user.domain.User;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -53,6 +54,12 @@ class StandardAuthTokenIssuerTest {
                         "device-id"
                 ))
                 .thenReturn(Optional.of(existingSession));
+        when(repository.saveAndFlush(any(AuthSessionJpaEntity.class)))
+                .thenAnswer(invocation -> {
+                    AuthSessionJpaEntity saved = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(saved, "id", 101L);
+                    return saved;
+                });
 
         IssuedTokens tokens = issuer.issue(user, "device-id");
 
@@ -62,7 +69,12 @@ class StandardAuthTokenIssuerTest {
                 tokenService.parseAccessTokenPrincipal(tokens.accessToken())
                         .deviceId()
         );
+        assertEquals(
+                101L,
+                tokenService.parseAccessTokenPrincipal(tokens.accessToken())
+                        .sessionId()
+        );
         assertFalse(existingSession.isUsableAt(Instant.now()));
-        verify(repository).save(any(AuthSessionJpaEntity.class));
+        verify(repository).saveAndFlush(any(AuthSessionJpaEntity.class));
     }
 }

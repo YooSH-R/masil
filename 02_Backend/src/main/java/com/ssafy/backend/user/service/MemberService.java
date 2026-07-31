@@ -12,6 +12,7 @@ import com.ssafy.backend.user.infrastructure.persistence.SpringDataUserRepositor
 import com.ssafy.backend.user.infrastructure.persistence.UserJpaEntity;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -67,7 +68,7 @@ public class MemberService {
             );
         }
 
-        UserJpaEntity user = findActiveUserForUpdate(userId);
+        UserJpaEntity user = findActiveUser(userId);
         updateNickname(user, request.nickname());
         updatePhoneNumber(
                 user,
@@ -77,6 +78,8 @@ public class MemberService {
 
         try {
             userRepository.flush();
+        } catch (ObjectOptimisticLockingFailureException exception) {
+            throw memberUpdateConflict();
         } catch (DataIntegrityViolationException exception) {
             throw translateDuplicate(exception);
         }
@@ -86,10 +89,10 @@ public class MemberService {
     @Transactional
     public void changePassword(
             Long userId,
-            String currentDeviceId,
+            Long currentSessionId,
             ChangePasswordRequest request
     ) {
-        UserJpaEntity user = findActiveUserForUpdate(userId);
+        UserJpaEntity user = findActiveUser(userId);
         if (user.getPasswordHash() == null) {
             throw new ApiException(
                     HttpStatus.CONFLICT,
@@ -107,16 +110,24 @@ public class MemberService {
                     "현재 비밀번호가 올바르지 않습니다."
             );
         }
+        if (currentSessionId == null) {
+            throw currentSessionNotIdentified();
+        }
 
         user.changePasswordHash(
                 passwordEncoder.encode(request.newPassword())
         );
-        revokeOtherSessions(userId, currentDeviceId, clock.instant());
+        flushUserChanges();
+        authSessionRepository.revokeAllByUserIdExceptSessionId(
+                userId,
+                currentSessionId,
+                clock.instant()
+        );
     }
 
     @Transactional
     public void withdraw(Long userId, WithdrawMemberRequest request) {
-        UserJpaEntity user = findActiveUserForUpdate(userId);
+        UserJpaEntity user = findActiveUser(userId);
         if (!"WITHDRAW".equals(request.confirmation())) {
             throw new ApiException(
                     HttpStatus.BAD_REQUEST,
@@ -139,7 +150,7 @@ public class MemberService {
 
         Instant now = clock.instant();
         user.withdraw(now);
-        userRepository.flush();
+        flushUserChanges();
         authSessionRepository.revokeAllByUserId(userId, now);
         socialAccountRepository.deleteByUserId(userId);
     }
@@ -187,32 +198,18 @@ public class MemberService {
         user.changePhoneNumber(verifiedPhoneNumber, clock.instant());
     }
 
-    private void revokeOtherSessions(
-            Long userId,
-            String currentDeviceId,
-            Instant now
-    ) {
-        if (currentDeviceId == null || currentDeviceId.isBlank()) {
-            authSessionRepository.revokeAllByUserId(userId, now);
-            return;
-        }
-        authSessionRepository.revokeAllByUserIdExceptDeviceId(
-                userId,
-                currentDeviceId,
-                now
-        );
-    }
-
     private UserJpaEntity findActiveUser(Long userId) {
         UserJpaEntity user = userRepository.findById(userId)
                 .orElseThrow(this::memberNotFound);
         return requireActive(user);
     }
 
-    private UserJpaEntity findActiveUserForUpdate(Long userId) {
-        UserJpaEntity user = userRepository.findByIdForUpdate(userId)
-                .orElseThrow(this::memberNotFound);
-        return requireActive(user);
+    private void flushUserChanges() {
+        try {
+            userRepository.flush();
+        } catch (ObjectOptimisticLockingFailureException exception) {
+            throw memberUpdateConflict();
+        }
     }
 
     private UserJpaEntity requireActive(UserJpaEntity user) {
@@ -231,6 +228,22 @@ public class MemberService {
                 HttpStatus.NOT_FOUND,
                 "MEMBER_NOT_FOUND",
                 "회원을 찾을 수 없습니다."
+        );
+    }
+
+    private ApiException currentSessionNotIdentified() {
+        return new ApiException(
+                HttpStatus.UNAUTHORIZED,
+                "CURRENT_SESSION_NOT_IDENTIFIED",
+                "현재 로그인 세션을 확인할 수 없습니다. 다시 로그인해 주세요."
+        );
+    }
+
+    private ApiException memberUpdateConflict() {
+        return new ApiException(
+                HttpStatus.CONFLICT,
+                "MEMBER_UPDATE_CONFLICT",
+                "회원정보가 동시에 변경되었습니다. 다시 시도해 주세요."
         );
     }
 
@@ -268,11 +281,7 @@ public class MemberService {
                 || constraintName.contains("users_phone_number_key")) {
             return phoneNumberAlreadyInUse();
         }
-        return new ApiException(
-                HttpStatus.CONFLICT,
-                "MEMBER_UPDATE_CONFLICT",
-                "회원정보 변경 중 충돌이 발생했습니다."
-        );
+        return memberUpdateConflict();
     }
 
     private String findConstraintName(Throwable exception) {

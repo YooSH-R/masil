@@ -34,10 +34,18 @@ public class TokenService {
     }
 
     public AccessToken createAccessToken(Long userId) {
-        return createAccessToken(userId, null);
+        return createAccessToken(userId, null, null);
     }
 
     public AccessToken createAccessToken(Long userId, String deviceId) {
+        return createAccessToken(userId, deviceId, null);
+    }
+
+    public AccessToken createAccessToken(
+            Long userId,
+            String deviceId,
+            Long sessionId
+    ) {
         Instant issuedAt = Instant.now();
         Instant expiresAt = issuedAt.plusSeconds(accessValiditySeconds);
 
@@ -48,6 +56,9 @@ public class TokenService {
                 .expiration(Date.from(expiresAt));
         if (deviceId != null) {
             builder.claim("deviceId", deviceId);
+        }
+        if (sessionId != null) {
+            builder.claim("sessionId", sessionId);
         }
 
         String value = builder.signWith(secretKey).compact();
@@ -81,16 +92,22 @@ public class TokenService {
             throw new IllegalArgumentException("Access Token이 아닙니다.");
         }
 
+        Number sessionId = claims.get("sessionId", Number.class);
         return new AccessTokenPrincipal(
                 Long.valueOf(claims.getSubject()),
-                claims.get("deviceId", String.class)
+                claims.get("deviceId", String.class),
+                sessionId == null ? null : sessionId.longValue()
         );
     }
 
     public record AccessToken(String value, Instant expiresAt) {
     }
 
-    public record AccessTokenPrincipal(Long userId, String deviceId) {
+    public record AccessTokenPrincipal(
+            Long userId,
+            String deviceId,
+            Long sessionId
+    ) {
     }
 
     public record RefreshToken(String value, Instant expiresAt) {

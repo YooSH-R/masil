@@ -35,12 +35,12 @@ public interface SpringDataAuthSessionRepository extends JpaRepository<AuthSessi
             update AuthSessionJpaEntity session
             set session.revokedAt = :revokedAt
             where session.userId = :userId
-              and session.deviceId <> :deviceId
+              and session.id <> :sessionId
               and session.revokedAt is null
             """)
-    int revokeAllByUserIdExceptDeviceId(
+    int revokeAllByUserIdExceptSessionId(
             @Param("userId") Long userId,
-            @Param("deviceId") String deviceId,
+            @Param("sessionId") Long sessionId,
             @Param("revokedAt") Instant revokedAt
     );
 }

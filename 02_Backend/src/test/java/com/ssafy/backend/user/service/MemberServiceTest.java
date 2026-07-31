@@ -10,6 +10,7 @@ import com.ssafy.backend.user.infrastructure.persistence.UserJpaEntity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -53,7 +54,7 @@ class MemberServiceTest {
                 Instant.now()
         );
         ReflectionTestUtils.setField(user, "id", 1L);
-        when(userRepository.findByIdForUpdate(1L))
+        when(userRepository.findById(1L))
                 .thenReturn(Optional.of(user));
         when(userRepository.existsByNicknameAndDeletedAtIsNullAndIdNot(
                 "중복닉네임",
@@ -77,5 +78,37 @@ class MemberServiceTest {
                         "중복닉네임",
                         1L
                 );
+    }
+
+    @Test
+    void translatesOptimisticLockConflict() {
+        UserJpaEntity user = new UserJpaEntity(
+                "member@example.com",
+                "password-hash",
+                "기존닉네임",
+                "01012345678",
+                Instant.now()
+        );
+        ReflectionTestUtils.setField(user, "id", 1L);
+        when(userRepository.findById(1L))
+                .thenReturn(Optional.of(user));
+        when(userRepository.existsByNicknameAndDeletedAtIsNullAndIdNot(
+                "새닉네임",
+                1L
+        )).thenReturn(false);
+        doThrow(new ObjectOptimisticLockingFailureException(
+                UserJpaEntity.class,
+                1L
+        )).when(userRepository).flush();
+
+        ApiException exception = assertThrows(
+                ApiException.class,
+                () -> memberService.updateMember(
+                        1L,
+                        new UpdateMemberRequest("새닉네임", null, null)
+                )
+        );
+
+        assertEquals("MEMBER_UPDATE_CONFLICT", exception.getCode());
     }
 }

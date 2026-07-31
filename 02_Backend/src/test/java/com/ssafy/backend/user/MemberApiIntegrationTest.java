@@ -162,7 +162,7 @@ class MemberApiIntegrationTest {
     }
 
     @Test
-    void changesPasswordAndKeepsOnlyCurrentDeviceSession() throws Exception {
+    void changesPasswordAndKeepsOnlyAuthenticatedSession() throws Exception {
         UserJpaEntity user = saveLocalUser(
                 "member@example.com",
                 "마이실",
@@ -175,12 +175,17 @@ class MemberApiIntegrationTest {
         );
         AuthSessionJpaEntity other = saveSession(
                 user.getId(),
-                "other-device",
+                CURRENT_DEVICE_ID,
                 "other-refresh"
         );
+        String accessToken = tokenService.createAccessToken(
+                user.getId(),
+                CURRENT_DEVICE_ID,
+                current.getId()
+        ).value();
 
         mockMvc.perform(patch("/v1/users/me/password")
-                        .header("Authorization", bearer(user))
+                        .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -199,6 +204,59 @@ class MemberApiIntegrationTest {
                 .orElseThrow()
                 .isUsableAt(Instant.now()));
         assertFalse(authSessionRepository.findById(other.getId())
+                .orElseThrow()
+                .isUsableAt(Instant.now()));
+    }
+
+    @Test
+    void rejectsPasswordChangeWithoutSessionIdAndKeepsEverySession()
+            throws Exception {
+        UserJpaEntity user = saveLocalUser(
+                "member@example.com",
+                "마이실",
+                "01012345678"
+        );
+        AuthSessionJpaEntity current = saveSession(
+                user.getId(),
+                CURRENT_DEVICE_ID,
+                "current-refresh"
+        );
+        AuthSessionJpaEntity other = saveSession(
+                user.getId(),
+                "other-device",
+                "other-refresh"
+        );
+        String legacyAccessToken = tokenService.createAccessToken(
+                user.getId(),
+                CURRENT_DEVICE_ID
+        ).value();
+
+        mockMvc.perform(patch("/v1/users/me/password")
+                        .header(
+                                "Authorization",
+                                "Bearer " + legacyAccessToken
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "currentPassword": "%s",
+                                  "newPassword": "%s"
+                                }
+                                """.formatted(OLD_PASSWORD, NEW_PASSWORD)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code")
+                        .value("CURRENT_SESSION_NOT_IDENTIFIED"));
+
+        UserJpaEntity unchanged =
+                userRepository.findById(user.getId()).orElseThrow();
+        assertTrue(passwordEncoder.matches(
+                OLD_PASSWORD,
+                unchanged.getPasswordHash()
+        ));
+        assertTrue(authSessionRepository.findById(current.getId())
+                .orElseThrow()
+                .isUsableAt(Instant.now()));
+        assertTrue(authSessionRepository.findById(other.getId())
                 .orElseThrow()
                 .isUsableAt(Instant.now()));
     }
@@ -390,8 +448,19 @@ class MemberApiIntegrationTest {
     }
 
     private String bearer(UserJpaEntity user) {
+        Long sessionId = authSessionRepository
+                .findFirstByUserIdAndDeviceIdAndRevokedAtIsNullOrderByCreatedAtDesc(
+                        user.getId(),
+                        CURRENT_DEVICE_ID
+                )
+                .map(AuthSessionJpaEntity::getId)
+                .orElse(null);
         return "Bearer " + tokenService
-                .createAccessToken(user.getId(), CURRENT_DEVICE_ID)
+                .createAccessToken(
+                        user.getId(),
+                        CURRENT_DEVICE_ID,
+                        sessionId
+                )
                 .value();
     }
 }

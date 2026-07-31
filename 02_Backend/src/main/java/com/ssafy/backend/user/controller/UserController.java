@@ -62,13 +62,13 @@ public class UserController {
     public ResponseEntity<Void> changePassword(
             @AuthenticationPrincipal Long userId,
             @RequestAttribute(
-                    name = "authenticatedDeviceId",
+                    name = "authenticatedSessionId",
                     required = false
             )
-            String currentDeviceId,
+            Long currentSessionId,
             @Valid @RequestBody ChangePasswordRequest request
     ) {
-        memberService.changePassword(userId, currentDeviceId, request);
+        memberService.changePassword(userId, currentSessionId, request);
         return ResponseEntity.noContent().build();
     }
 

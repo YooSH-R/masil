@@ -41,6 +41,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         "authenticatedDeviceId",
                         principal.deviceId()
                 );
+                request.setAttribute(
+                        "authenticatedSessionId",
+                        principal.sessionId()
+                );
                 SecurityContextHolder.getContext().setAuthentication(
                         new UsernamePasswordAuthenticationToken(
                                 principal.userId(),
