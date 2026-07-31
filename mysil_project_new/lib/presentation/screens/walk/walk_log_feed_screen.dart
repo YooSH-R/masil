@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
+import '../../../domain/entities/walk_diary.dart';
+import '../../viewmodels/walk_diary_view_model.dart';
+
+/// 산책 일지. GET /walk-diaries 로 받은 기록을 달력에 표시하고,
+/// 날짜를 누르면 그 날의 장소·거리·시간을 보여준다.
 class WalkLogFeedScreen extends StatefulWidget {
   const WalkLogFeedScreen({super.key});
 
@@ -9,49 +15,52 @@ class WalkLogFeedScreen extends StatefulWidget {
 }
 
 class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
-  int _currentMonth = 7;
-  int _currentYear = 2026;
-  DateTime _selectedDate = DateTime(2026, 7, 27);
+  late int _currentMonth;
+  late int _currentYear;
+  late DateTime _selectedDate;
   bool _isWeekly = true;
 
-  // Mock Data: Map of ISO date string -> Walk Data
-  final Map<String, Map<String, dynamic>> _mockLogs = {
-    // June 2026
-    '2026-06-05': {'duration': '35분', 'distance': '1.8km', 'location': '골목길 탐험', 'title': '새로운 골목 발견', 'content': '마실이가 처음 가보는 골목에서 호기심이 폭발했어요!', 'calories': '110 kcal', 'mood': '궁금함 🤔', 'weather': '맑음 ☀️'},
-    '2026-06-12': {'duration': '50분', 'distance': '2.5km', 'location': '수변 공원', 'title': '물 구경하기', 'content': '강물이 반짝이는 걸 보며 한참을 서있었네요.', 'calories': '160 kcal', 'mood': '평온함 😌', 'weather': '맑음 ☀️'},
-    '2026-06-18': {'duration': '25분', 'distance': '1.2km', 'location': '집 앞 마당', 'title': '짧고 굵은 산책', 'content': '비가 오기 전이라 짧게 다녀왔어요.', 'calories': '70 kcal', 'mood': '바쁨 💨', 'weather': '흐림 ☁️'},
-    '2026-06-25': {'duration': '40분', 'distance': '2.0km', 'location': '근린 공원', 'title': '친구 만난 날', 'content': '동네 강아지 친구들을 많이 만나서 신나게 인사했어요.', 'calories': '130 kcal', 'mood': '신남 😆', 'weather': '맑음 ☀️'},
-    
-    // July 2026
-    '2026-07-01': {'duration': '30분', 'distance': '1.5km', 'location': '동네 한 바퀴', 'title': '7월의 시작', 'content': '본격적인 여름 산책 시작!', 'calories': '90 kcal', 'mood': '활기참 ⚡', 'weather': '맑음 ☀️'},
-    '2026-07-04': {'duration': '45분', 'distance': '2.2km', 'location': '숲속 공원', 'title': '그늘 산책', 'content': '나무 그늘 아래는 시원해서 걷기 좋았어요.', 'calories': '140 kcal', 'mood': '쾌적함 😊', 'weather': '맑음 ☀️'},
-    '2026-07-08': {'duration': '20분', 'distance': '1.0km', 'location': '아파트 단지', 'title': '더위 피하기', 'content': '너무 더워서 해 지고 잠시 나왔어요.', 'calories': '60 kcal', 'mood': '나른함 🥱', 'weather': '더움 🌡️'},
-    '2026-07-12': {'duration': '55분', 'distance': '2.8km', 'location': '중앙 광장', 'title': '주말 나들이', 'content': '분수대 구경하며 시원하게 보냈습니다.', 'calories': '180 kcal', 'mood': '최고! ✨', 'weather': '맑음 ☀️'},
-    '2026-07-15': {'duration': '40분', 'distance': '2.0km', 'location': '뒷산 산책로', 'title': '등산(?) 산책', 'content': '언덕길도 씩씩하게 잘 올라가는 마실이!', 'calories': '155 kcal', 'mood': '씩씩함 💪', 'weather': '구름 ☁️'},
-    '2026-07-19': {'duration': '35분', 'distance': '1.7km', 'location': '동네 카페 거리', 'title': '맛있는 냄새 솔솔', 'content': '빵 냄새를 따라가는 마실이가 귀여웠어요.', 'calories': '105 kcal', 'mood': '행복함 🥰', 'weather': '맑음 ☀️'},
-    '2026-07-22': {'duration': '60분', 'distance': '3.2km', 'location': '한강 시민공원', 'title': '한강 나들이', 'content': '다른 강아지 친구들도 많이 만나고 즐거운 시간이었어요.', 'calories': '210 kcal', 'mood': '신남 😆', 'weather': '맑음 ☀️'},
-    '2026-07-25': {'duration': '30분', 'distance': '1.5km', 'location': '동네 한 바퀴', 'title': '가벼운 저녁 산책', 'content': '선선한 바람이 불어서 걷기 딱 좋은 날씨였어요.', 'calories': '85 kcal', 'mood': '좋음 🙂', 'weather': '구름 ☁️'},
-    '2026-07-27': {
-      'duration': '45분',
-      'distance': '2.3km',
-      'location': '숲속 공원',
-      'title': '마실이가 나비를 쫓아다녔어요!',
-      'content': '나비를 따라가느라 평소보다 더 많이 걸었네요. 마실이의 행복한 표정을 보니 저도 기분이 좋아졌습니다.',
-      'calories': '142 kcal',
-      'mood': '최고! 😊',
-      'weather': '맑음 ☀️',
-    },
-    '2026-07-31': {'duration': '40분', 'distance': '2.1km', 'location': '수변 산책로', 'title': '7월 마무리', 'content': '한 달 동안 열심히 걸어준 마실이 고마워!', 'calories': '135 kcal', 'mood': '만족함 😋', 'weather': '맑음 ☀️'},
-  };
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _currentYear = now.year;
+    _currentMonth = now.month;
+    _selectedDate = DateTime(now.year, now.month, now.day);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<WalkDiaryViewModel>().loadFeed(refresh: true);
+    });
+  }
+
+  /// 날짜를 누르면 그 날 산책의 상세(경로)와 장소명을 불러온다.
+  void _selectDate(DateTime date) {
+    setState(() => _selectedDate = date);
+
+    final diaryVm = context.read<WalkDiaryViewModel>();
+    final item = diaryVm.itemOn(date);
+    if (item != null) diaryVm.selectWalk(item.walkId);
+  }
+
 
   @override
   Widget build(BuildContext context) {
-    final dateKey = "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
-    final selectedLog = _mockLogs[dateKey];
-    
-    // Calculate current month's log count
-    final monthPrefix = "$_currentYear-${_currentMonth.toString().padLeft(2, '0')}";
-    final monthLogCount = _mockLogs.keys.where((k) => k.startsWith(monthPrefix)).length;
+    final diaryVm = context.watch<WalkDiaryViewModel>();
+
+    final walkDays = diaryVm.byDate.keys.toSet();
+    final selectedItem = diaryVm.itemOn(_selectedDate);
+    final placeName =
+        selectedItem == null ? null : diaryVm.placeNameOf(selectedItem.walkId);
+
+    final monthLogCount = walkDays
+        .where((d) => d.year == _currentYear && d.month == _currentMonth)
+        .length;
+
+    // 주간은 선택한 날이 속한 주, 월간은 보고 있는 달 기준으로 집계한다.
+    final stats = _isWeekly
+        ? diaryVm.statsForWeek(_selectedDate)
+        : diaryVm.statsForMonth(DateTime(_currentYear, _currentMonth));
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F3E7),
@@ -93,7 +102,7 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
             const SizedBox(height: 20),
             
             // Full Month Calendar
-            _buildMonthlyCalendar(),
+            _buildMonthlyCalendar(walkDays),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.start,
@@ -105,23 +114,23 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Daily Summary Detail (Requested feature)
-            if (selectedLog != null)
-              _buildDailySummaryCard(selectedLog)
+            // 선택한 날의 장소·거리·시간
+            if (selectedItem != null)
+              _buildDailySummaryCard(selectedItem, placeName)
             else
               _buildEmptySummaryCard(),
-              
+
             const SizedBox(height: 32),
-            
+
             // Stats Section
             _buildSectionHeader(_isWeekly ? '이번 주 산책 통계' : '이번 달 산책 통계'),
             const SizedBox(height: 16),
-            _buildStatsGrid(),
+            _buildStatsGrid(stats),
             const SizedBox(height: 32),
-            
+
             // Detailed View for Selected Day
-            if (selectedLog != null)
-              _buildLogPost(context, selectedLog)
+            if (selectedItem != null)
+              _buildLogPost(context, selectedItem, placeName)
             else
               _buildEmptyState(),
             
@@ -156,7 +165,8 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     });
   }
 
-  Widget _buildMonthlyCalendar() {
+  /// [walkDays] 는 산책 기록이 있는 날짜(시각 제거) 집합.
+  Widget _buildMonthlyCalendar(Set<DateTime> walkDays) {
     final firstDayOfMonth = DateTime(_currentYear, _currentMonth, 1);
     final lastDayOfMonth = DateTime(_currentYear, _currentMonth + 1, 0);
     final daysInMonth = lastDayOfMonth.day;
@@ -207,14 +217,13 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
               
               final day = index - startWeekday + 1;
               final date = DateTime(_currentYear, _currentMonth, day);
-              final dateStr = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
-              
+
               bool isSelected = _selectedDate.year == date.year && _selectedDate.month == date.month && _selectedDate.day == date.day;
-              bool hasLog = _mockLogs.containsKey(dateStr);
+              bool hasLog = walkDays.contains(date);
               bool isToday = DateTime.now().year == date.year && DateTime.now().month == date.month && DateTime.now().day == date.day;
 
               return GestureDetector(
-                onTap: () => setState(() => _selectedDate = date),
+                onTap: () => _selectDate(date),
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
@@ -260,7 +269,23 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     );
   }
 
-  Widget _buildDailySummaryCard(Map<String, dynamic> log) {
+  /// 선택한 날의 요약. 장소는 역지오코딩 결과이고, 아직 못 구했으면 `-`.
+  Widget _buildDailySummaryCard(WalkDiaryFeedItem item, String? placeName) {
+    final distance = item.distanceMeters == null
+        ? '-'
+        : '${(item.distanceMeters! / 1000).toStringAsFixed(1)}km';
+    return _buildSummaryCardShell(
+      place: placeName ?? '-',
+      distance: distance,
+      duration: item.durationLabel,
+    );
+  }
+
+  Widget _buildSummaryCardShell({
+    required String place,
+    required String distance,
+    required String duration,
+  }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -274,11 +299,11 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildSummaryCol(Icons.location_on_outlined, '산책 장소', log['location']),
+          _buildSummaryCol(Icons.location_on_outlined, '산책 장소', place),
           Container(width: 1, height: 40, color: Colors.grey.shade100),
-          _buildSummaryCol(Icons.map_outlined, '산책 거리', log['distance']),
+          _buildSummaryCol(Icons.map_outlined, '산책 거리', distance),
           Container(width: 1, height: 40, color: Colors.grey.shade100),
-          _buildSummaryCol(Icons.timer_outlined, '산책 시간', log['duration']),
+          _buildSummaryCol(Icons.timer_outlined, '산책 시간', duration),
         ],
       ),
     );
@@ -361,22 +386,30 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     );
   }
 
-  Widget _buildStatsGrid() {
+  /// 주간/월간 집계 결과를 카드 4개로 보여준다.
+  ///
+  /// 칼로리는 서버가 주는 값이 없어(체중·보폭 정보가 없어 추정도 부정확하다)
+  /// '평균 거리'로 대체했다.
+  Widget _buildStatsGrid(WalkStats stats) {
     return Column(
       children: [
         Row(
           children: [
-            _buildMiniStatCard(Icons.directions_walk, _isWeekly ? '5 회' : '22 회', '산책 횟수', const Color(0xFFFFF1F0)),
+            _buildMiniStatCard(Icons.directions_walk, stats.countLabel, '산책 횟수',
+                const Color(0xFFFFF1F0)),
             const SizedBox(width: 16),
-            _buildMiniStatCard(Icons.map_outlined, _isWeekly ? '11.4 km' : '48.2 km', '총 거리', const Color(0xFFE8F6F3)),
+            _buildMiniStatCard(Icons.map_outlined, stats.distanceLabel, '총 거리',
+                const Color(0xFFE8F6F3)),
           ],
         ),
         const SizedBox(height: 16),
         Row(
           children: [
-            _buildMiniStatCard(Icons.timer_outlined, _isWeekly ? '3시간 12분' : '14시간 45분', '산책 시간', const Color(0xFFF9F3E7)),
+            _buildMiniStatCard(Icons.timer_outlined, stats.durationLabel, '산책 시간',
+                const Color(0xFFF9F3E7)),
             const SizedBox(width: 16),
-            _buildMiniStatCard(Icons.local_fire_department_outlined, _isWeekly ? '640 kcal' : '2,850 kcal', '소모 칼로리', const Color(0xFFFFF8F1)),
+            _buildMiniStatCard(Icons.straighten, stats.averageDistanceLabel,
+                '평균 거리', const Color(0xFFFFF8F1)),
           ],
         ),
       ],
@@ -405,7 +438,32 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     );
   }
 
-  Widget _buildLogPost(BuildContext context, Map<String, dynamic> log) {
+  Widget _buildLogPost(
+      BuildContext context, WalkDiaryFeedItem item, String? placeName) {
+    final distance = item.distanceMeters == null
+        ? '-'
+        : '${(item.distanceMeters! / 1000).toStringAsFixed(1)}km';
+    final thumbnailUrl = item.thumbnailUrl;
+    return _buildLogPostShell(
+      context: context,
+      walkId: item.walkId,
+      placeName: placeName,
+      summary: item.summary,
+      durationLabel: item.durationLabel,
+      distanceLabel: distance,
+      thumbnailUrl: thumbnailUrl,
+    );
+  }
+
+  Widget _buildLogPostShell({
+    required BuildContext context,
+    required int walkId,
+    required String? placeName,
+    required String? summary,
+    required String durationLabel,
+    required String distanceLabel,
+    required String? thumbnailUrl,
+  }) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(30)),
@@ -422,12 +480,30 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
             ),
             child: Stack(
               children: [
-                const Center(child: Icon(Icons.image_outlined, size: 48, color: Color(0xFFD7CCC8))),
+                if (thumbnailUrl == null)
+                  const Center(
+                      child: Icon(Icons.image_outlined,
+                          size: 48, color: Color(0xFFD7CCC8)))
+                else
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.network(
+                        thumbnailUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Center(
+                            child: Icon(Icons.broken_image_outlined,
+                                size: 48, color: Color(0xFFD7CCC8))),
+                      ),
+                    ),
+                  ),
                 Positioned(
                   bottom: 20,
                   right: 20,
                   child: ElevatedButton(
-                    onPressed: () => context.push('/walk/path-detail'),
+                    // 어떤 산책의 경로인지 walkId 를 넘긴다.
+                    onPressed: () =>
+                        context.push('/walk/path-detail', extra: walkId),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFC67C4E),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -442,45 +518,27 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
           
           Text("${_selectedDate.year}.${_selectedDate.month.toString().padLeft(2, '0')}.${_selectedDate.day.toString().padLeft(2, '0')}", style: const TextStyle(color: Colors.grey, fontSize: 13)),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Text('날씨 : ${log['weather']}', style: const TextStyle(color: Color(0xFF5D4037), fontSize: 14)),
-              const SizedBox(width: 16),
-              Text('기분 : ${log['mood']}', style: const TextStyle(color: Color(0xFF5D4037), fontSize: 14)),
-            ],
-          ),
-          const SizedBox(height: 16),
+          // 날씨·기분은 서버가 주는 값이 없어 표시하지 않는다.
           Text(
-            log['title'],
+            placeName ?? '산책 기록',
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF5D4037)),
           ),
           const SizedBox(height: 12),
           Text(
-            log['content'],
+            summary ?? '이 산책에 남긴 기록이 아직 없어요.',
             style: TextStyle(color: Colors.grey.shade700, height: 1.5),
           ),
           const SizedBox(height: 24),
-          
+
           Row(
             children: [
               const Icon(Icons.timer_outlined, size: 16, color: Color(0xFFC67C4E)),
               const SizedBox(width: 6),
-              Text(log['duration'], style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(durationLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(width: 20),
-              const Icon(Icons.location_on_outlined, size: 16, color: Color(0xFFC67C4E)),
+              const Icon(Icons.map_outlined, size: 16, color: Color(0xFFC67C4E)),
               const SizedBox(width: 6),
-              Text(log['distance'], style: const TextStyle(fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const SizedBox(height: 24),
-          
-          const Text('오늘 산책은 정말 즐거웠어요 😊', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF5D4037))),
-          const SizedBox(height: 12),
-          const Row(
-            children: [
-              Text('✨ AI 감성 사진 3장', style: TextStyle(color: Color(0xFF16A085), fontSize: 12, fontWeight: FontWeight.bold)),
-              SizedBox(width: 16),
-              Text('✨ AI 감성일지 자동 생성됨', style: TextStyle(color: Color(0xFF16A085), fontSize: 12, fontWeight: FontWeight.bold)),
+              Text(distanceLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 24),

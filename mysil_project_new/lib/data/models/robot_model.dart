@@ -42,6 +42,9 @@ class RobotPairingModel extends RobotPairing {
     required super.petId,
     required super.serialNumber,
     required super.pairingStatus,
+    super.pairingId,
+    super.modelName,
+    super.firmwareVersion,
     super.deviceAccessToken,
     super.pairedAt,
   });
@@ -52,6 +55,9 @@ class RobotPairingModel extends RobotPairing {
       petId: Json.asInt(json['petId']),
       serialNumber: Json.asString(json['serialNumber']),
       pairingStatus: Json.asString(json['pairingStatus'], fallback: 'UNKNOWN'),
+      pairingId: Json.asIntOrNull(json['pairingId']),
+      modelName: Json.asStringOrNull(json['modelName']),
+      firmwareVersion: Json.asStringOrNull(json['firmwareVersion']),
       deviceAccessToken: Json.asStringOrNull(json['deviceAccessToken']),
       pairedAt: Json.asDateTime(json['pairedAt']),
     );

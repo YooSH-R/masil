@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- 기기 등록 QR 스캔에 카메라를 쓴다. iOS 는 이 설명이 없으면
+	     카메라 접근 순간 앱이 그대로 종료된다(권한 팝업도 뜨지 않는다). -->
+	<key>NSCameraUsageDescription</key>
+	<string>마실이 기기 등록을 위해 QR 코드를 스캔할 때 카메라를 사용해요. 사진은 저장되지 않아요.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

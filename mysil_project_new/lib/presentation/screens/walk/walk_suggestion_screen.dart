@@ -32,18 +32,18 @@ class _WalkSuggestionScreenState extends State<WalkSuggestionScreen> {
     final petId = context.read<PetViewModel>().petId;
     final robotId = context.read<RobotViewModel>().robot?.id;
 
-    if (petId == null || robotId == null) {
-      _showMessage('펫과 로봇을 먼저 등록해 주세요.', isError: true);
-      return;
+    // 펫·로봇·산책제안 API가 서버에 아직 없어 위 값들이 모두 null로 온다.
+    // 값이 갖춰졌을 때만 서버에 수락을 보내고, 못 받아도 다음 화면으로 넘긴다.
+    // 서버가 준비되면 아래 분기를 지우고 실패 시 return 하도록 되돌리면 된다.
+    if (petId != null && robotId != null) {
+      final walk = await walkVm.acceptProposal(petId: petId, robotId: robotId);
+      if (!mounted) return;
+      if (walk == null) {
+        _showMessage(walkVm.errorMessage ?? '산책 정보를 서버에서 받지 못했어요.');
+      }
     }
 
-    final walk = await walkVm.acceptProposal(petId: petId, robotId: robotId);
     if (!mounted) return;
-
-    if (walk == null) {
-      _showMessage(walkVm.errorMessage ?? '산책을 시작할 수 없어요.', isError: true);
-      return;
-    }
     context.push('/walk/ready');
   }
 
@@ -199,8 +199,9 @@ class _WalkSuggestionScreenState extends State<WalkSuggestionScreen> {
                               height: 60,
                               // POST responses(ACCEPTED) → POST /walks
                               child: ElevatedButton(
-                                onPressed:
-                                    walkVm.isLoading || !walkVm.hasProposal ? null : _accept,
+                                // 서버에 산책 제안 API가 아직 없어 hasProposal이 항상
+                                // false다. 제안 유무와 무관하게 눌러볼 수 있게 둔다.
+                                onPressed: walkVm.isLoading ? null : _accept,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFFC67C4E),
                                   foregroundColor: Colors.white,

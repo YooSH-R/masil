@@ -43,6 +43,9 @@ class RobotPairing {
     required this.petId,
     required this.serialNumber,
     required this.pairingStatus,
+    this.pairingId,
+    this.modelName,
+    this.firmwareVersion,
     this.deviceAccessToken,
     this.pairedAt,
   });
@@ -51,6 +54,12 @@ class RobotPairing {
   final int petId;
   final String serialNumber;
   final String pairingStatus;
+
+  /// 서버 RobotPairingResponse 가 함께 내려주는 값들.
+  final int? pairingId;
+  final String? modelName;
+  final String? firmwareVersion;
+
   final String? deviceAccessToken;
   final DateTime? pairedAt;
 

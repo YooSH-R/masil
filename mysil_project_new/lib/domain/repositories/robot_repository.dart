@@ -6,10 +6,12 @@ import '../entities/robot.dart';
 /// 호출하는 엔드포인트라 앱에서는 다루지 않는다(명세서 5.1).
 abstract class RobotRepository {
   /// POST /robots/pairings — QR 로봇 등록
+  ///
+  /// [qrToken] 은 기기 밑면 QR 에 담긴 정적 토큰이다.
+  /// 서버 규칙: 43~512자, `^[A-Za-z0-9_-]+$` ([RobotQr.isValidToken] 참고)
   Future<RobotPairing> pairRobot({
     required int petId,
     required String qrToken,
-    required String deviceNonce,
   });
 
   /// GET /robots/{robotId}/status — 로봇 상태 조회

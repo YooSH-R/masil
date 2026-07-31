@@ -116,7 +116,12 @@ final GoRouter router = GoRouter(
             ),
             GoRoute(
               path: 'path-detail',
-              builder: (context, state) => const WalkPathDetailScreen(),
+              // 어떤 산책의 경로인지는 extra 로 넘긴다.
+              //   context.push('/walk/path-detail', extra: walkId)
+              // 넘기지 않으면 진행/최근 산책을 보여준다.
+              builder: (context, state) => WalkPathDetailScreen(
+                walkId: state.extra is int ? state.extra as int : null,
+              ),
               routes: [
                 GoRoute(
                   path: 'exception',

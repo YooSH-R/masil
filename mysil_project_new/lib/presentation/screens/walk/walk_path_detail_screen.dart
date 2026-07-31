@@ -1,11 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
-class WalkPathDetailScreen extends StatelessWidget {
-  const WalkPathDetailScreen({super.key});
+import '../../viewmodels/walk_view_model.dart';
+import '../../widgets/walk_route_map.dart';
+
+/// 지난 산책의 경로 상세. GET /walks/{walkId}/summary 의 route 를
+/// 카카오맵 위에 굵은 선으로 그린다.
+class WalkPathDetailScreen extends StatefulWidget {
+  const WalkPathDetailScreen({super.key, this.walkId});
+
+  /// 볼 산책의 id. null 이면 진행/최근 산책을 보여준다.
+  final int? walkId;
+
+  @override
+  State<WalkPathDetailScreen> createState() => _WalkPathDetailScreenState();
+}
+
+class _WalkPathDetailScreenState extends State<WalkPathDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final walkVm = context.read<WalkViewModel>();
+      final id = widget.walkId ?? walkVm.currentWalk?.walkId;
+      if (id != null) walkVm.loadSummary(id);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final walkVm = context.watch<WalkViewModel>();
+    final summary = walkVm.summary;
+
+    // 저장된 경로가 있으면 그걸 쓰고, 없으면(방금 끝낸 산책 등) 메모리의 좌표를 쓴다.
+    final route =
+        (summary?.route.isNotEmpty ?? false) ? summary!.route : walkVm.routePoints;
+
+    final distanceMeters = summary?.distanceMeters ?? walkVm.distanceMeters;
+    final durationSeconds =
+        summary?.durationSeconds ?? walkVm.elapsed.inSeconds;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9F3E7),
       appBar: AppBar(
@@ -23,34 +59,29 @@ class WalkPathDetailScreen extends StatelessWidget {
         child: Column(
           children: [
             // Map Area
+            // 주의: borderRadius/clipBehavior 로 감싸지 않는다. 내부가 WebView
+            // (플랫폼 뷰)라서 클리핑하면 지도가 렌더링되지 않는다.
             Container(
               height: 350,
               width: double.infinity,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8F6F3),
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: Colors.white, width: 4),
-              ),
+              color: const Color(0xFFE8F6F3),
               child: Stack(
                 children: [
-                  CustomPaint(painter: MapGridPainter(), size: Size.infinite),
-                  // Markers
-                  Positioned(top: 60, left: 100, child: _buildMarker('출발', Colors.green)),
-                  Positioned(bottom: 80, right: 80, child: _buildMarker('도착', Colors.redAccent)),
-                  // Kakao Button
-                  Positioned(
-                    bottom: 20,
-                    right: 20,
-                    child: ElevatedButton(
-                      onPressed: () => context.push('/walk/path-detail/exception'), // Link to D11 for testing
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFFE812),
-                        foregroundColor: Colors.black87,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                      ),
-                      child: const Text('카카오맵으로 열기', style: TextStyle(fontWeight: FontWeight.bold)),
+                  // 경로 전체가 보이도록 줌을 맞추고, 출발·도착에 마커를 찍는다.
+                  Positioned.fill(
+                    child: WalkRouteMap(
+                      points: route,
+                      fitWholeRoute: true,
+                      showStartEndMarkers: true,
                     ),
                   ),
+                  if (route.isEmpty)
+                    const Positioned(
+                      bottom: 16,
+                      left: 16,
+                      right: 16,
+                      child: _NoRouteBadge(),
+                    ),
                 ],
               ),
             ),
@@ -61,11 +92,13 @@ class WalkPathDetailScreen extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildMiniStat('2.3 km', '산책 거리'),
+                  _buildMiniStat(
+                      '${(distanceMeters / 1000).toStringAsFixed(2)} km', '산책 거리'),
                   Container(width: 1, height: 30, color: Colors.grey.shade100),
-                  _buildMiniStat('45 분', '산책 시간'),
+                  _buildMiniStat('${durationSeconds ~/ 60} 분', '산책 시간'),
                   Container(width: 1, height: 30, color: Colors.grey.shade100),
-                  _buildMiniStat('142 kcal', '소모 칼로리'),
+                  _buildMiniStat(_paceLabel(distanceMeters, durationSeconds),
+                      '평균 페이스'),
                 ],
               ),
             ),
@@ -163,6 +196,16 @@ class WalkPathDetailScreen extends StatelessWidget {
     );
   }
 
+  /// 1km 당 분'초". 거리·시간이 없으면 --'--".
+  static String _paceLabel(int meters, int seconds) {
+    if (meters < 10 || seconds == 0) return '--\'--"';
+    final secondsPerKm = seconds / (meters / 1000);
+    final m = secondsPerKm ~/ 60;
+    final s = (secondsPerKm % 60).round();
+    return '$m\'${s.toString().padLeft(2, '0')}"';
+  }
+
+  // ignore: unused_element
   Widget _buildMarker(String label, Color color) {
     return Column(
       children: [
@@ -211,4 +254,38 @@ class MapGridPainter extends CustomPainter {
     canvas.drawPath(path, pathPaint);
   }
   @override bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// 저장된 경로가 없을 때 지도 위에 띄우는 안내.
+class _NoRouteBadge extends StatelessWidget {
+  const _NoRouteBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.location_off_outlined, color: Color(0xFFC67C4E), size: 16),
+            SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                '저장된 경로가 없어요',
+                style: TextStyle(
+                    color: Color(0xFF5D4037),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

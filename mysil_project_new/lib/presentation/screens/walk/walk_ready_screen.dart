@@ -8,8 +8,11 @@ class WalkReadyScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F3E7),
+      // 하단 탭바가 있는 셸 안에 들어가면 높이가 부족해 잘렸다(98px 오버플로우).
+      // Spacer 대신 고정 여백을 쓰고 스크롤 가능하게 만들어, 화면이 작아도
+      // '지금 바로 시작하기' 버튼까지 항상 닿을 수 있게 한다.
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Column(
             children: [
@@ -27,10 +30,10 @@ class WalkReadyScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const Spacer(),
+              const SizedBox(height: 24),
               // Character
-              Image.asset('assets/images/mysil_character.png', height: 220),
-              const SizedBox(height: 32),
+              Image.asset('assets/images/mysil_character.png', height: 180),
+              const SizedBox(height: 24),
               const Text(
                 '마실이가\n준비하고 있어요',
                 textAlign: TextAlign.center,
@@ -39,17 +42,17 @@ class WalkReadyScreen extends StatelessWidget {
               const SizedBox(height: 12),
               const Text('거치대에서 분리하면 산책이 시작돼요', style: TextStyle(color: Color(0xFF8D6E63), fontSize: 15)),
               
-              const SizedBox(height: 48),
-              
+              const SizedBox(height: 32),
+
               // Checklist
               _buildCheckItem(Icons.check, '기기 연결 확인', 'MS-2231 온라인', true),
               const SizedBox(height: 12),
               _buildCheckItem(Icons.check, '위치 권한 · GPS', '정확도 높음', true),
               const SizedBox(height: 12),
               _buildCheckItem(Icons.refresh, '배터리 · 저장공간', '76% · 확인 중', false),
-              
-              const Spacer(),
-              
+
+              const SizedBox(height: 28),
+
               // Action Buttons
               SizedBox(
                 width: double.infinity,
@@ -79,7 +82,7 @@ class WalkReadyScreen extends StatelessWidget {
                   child: const Text('제안 취소', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 24),
             ],
           ),
         ),

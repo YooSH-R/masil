@@ -25,14 +25,14 @@ class RobotRepositoryImpl implements RobotRepository {
   Future<RobotPairing> pairRobot({
     required int petId,
     required String qrToken,
-    required String deviceNonce,
   }) async {
     final data = await _client.post(
       ApiEndpoints.robotPairings,
+      // 서버 RobotPairingRequest 는 {petId, qrToken} 만 받는다.
+      // 이전에 함께 보내던 deviceNonce 는 서버에 없는 필드였다.
       data: {
         'petId': petId,
         'qrToken': qrToken,
-        'deviceNonce': deviceNonce,
       },
       idempotencyKey: 'pairing-robot-$qrToken',
     );

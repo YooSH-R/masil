@@ -48,6 +48,10 @@ class AuthViewModel extends BaseViewModel {
   int _resendCooldown = 0;
   int get resendCooldown => _resendCooldown;
 
+  /// 인증번호 유효 만료 시각. 입력칸의 남은 시간 표시에 쓴다.
+  DateTime? _codeExpiresAt;
+  DateTime? get codeExpiresAt => _codeExpiresAt;
+
   // --- 닉네임 중복 확인 상태 ---
   bool _isNicknameChecked = false;
   bool _isNicknameAvailable = false;
@@ -65,6 +69,7 @@ class AuthViewModel extends BaseViewModel {
     _isPhoneVerified = false;
     _verificationToken = null;
     _resendCooldown = result.resendCooldownSeconds;
+    _codeExpiresAt = result.expiresAt;
     safeNotify();
     return true;
   }
@@ -105,6 +110,7 @@ class AuthViewModel extends BaseViewModel {
     _isPhoneVerified = false;
     _verificationToken = null;
     _resendCooldown = 0;
+    _codeExpiresAt = null;
     safeNotify();
   }
 
@@ -260,6 +266,7 @@ class AuthViewModel extends BaseViewModel {
     _isPhoneVerified = false;
     _verificationToken = null;
     _resendCooldown = 0;
+    _codeExpiresAt = null;
     _isNicknameChecked = false;
     _isNicknameAvailable = false;
   }
