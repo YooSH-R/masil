@@ -3,11 +3,11 @@ package com.ssafy.backend.robot.application;
 import com.ssafy.backend.auth.service.TokenHashService;
 import com.ssafy.backend.common.error.BusinessException;
 import com.ssafy.backend.common.error.ErrorCode;
-import com.ssafy.backend.robot.infrastructure.persistence.PetReferenceJpaEntity;
+import com.ssafy.backend.pet.infrastructure.persistence.PetJpaEntity;
+import com.ssafy.backend.pet.infrastructure.persistence.SpringDataPetRepository;
 import com.ssafy.backend.robot.infrastructure.persistence.RobotCredentialJpaEntity;
 import com.ssafy.backend.robot.infrastructure.persistence.RobotJpaEntity;
 import com.ssafy.backend.robot.infrastructure.persistence.RobotPairingJpaEntity;
-import com.ssafy.backend.robot.infrastructure.persistence.SpringDataPetReferenceRepository;
 import com.ssafy.backend.robot.infrastructure.persistence.SpringDataRobotCredentialRepository;
 import com.ssafy.backend.robot.infrastructure.persistence.SpringDataRobotPairingRepository;
 import com.ssafy.backend.robot.infrastructure.persistence.SpringDataRobotRepository;
@@ -23,7 +23,7 @@ import java.util.Optional;
 @Service
 public class RobotPairingService {
 
-    private final SpringDataPetReferenceRepository petRepository;
+    private final SpringDataPetRepository petRepository;
     private final SpringDataRobotRepository robotRepository;
     private final SpringDataRobotCredentialRepository credentialRepository;
     private final SpringDataRobotPairingRepository pairingRepository;
@@ -31,7 +31,7 @@ public class RobotPairingService {
     private final Clock clock;
 
     public RobotPairingService(
-            SpringDataPetReferenceRepository petRepository,
+            SpringDataPetRepository petRepository,
             SpringDataRobotRepository robotRepository,
             SpringDataRobotCredentialRepository credentialRepository,
             SpringDataRobotPairingRepository pairingRepository,
@@ -48,7 +48,7 @@ public class RobotPairingService {
 
     @Transactional
     public RobotPairingResult pair(Long userId, Long petId, String qrToken) {
-        PetReferenceJpaEntity pet = petRepository
+        PetJpaEntity pet = petRepository
                 .findByIdAndUserIdAndDeletedAtIsNull(petId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PET_NOT_FOUND));
 
@@ -105,7 +105,7 @@ public class RobotPairingService {
     private RobotPairingResult toResult(
             RobotPairingJpaEntity pairing,
             RobotJpaEntity robot,
-            PetReferenceJpaEntity pet
+            PetJpaEntity pet
     ) {
         return new RobotPairingResult(
                 pairing.getId(),
