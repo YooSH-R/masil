@@ -21,6 +21,14 @@ dependencies:
   google_sign_in: ^7.2.0
   kakao_flutter_sdk_user: ^2.0.0+1
   google_fonts: ^8.2.0
+  kakao_map_plugin: ^0.4.0
+
+# kakao_map_plugin 0.4.0 은 자기 compileSdk 를 35 로 고정해 두었는데,
+# webview_flutter_android 4.11+ 는 의존하는 쪽에 compileSdk 36 이상을 요구한다.
+# (플러그인 선언은 ^4.7.0 이라 caret 범위가 4.13.0 까지 열려 빌드가 깨진다)
+# 플러그인이 SDK 36 으로 올라오면 이 override 를 지우면 된다.
+dependency_overrides:
+  webview_flutter_android: 4.7.0
 
 dev_dependencies:
   flutter_test:

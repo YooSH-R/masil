@@ -1,7 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- API 호출과 카카오맵 타일 로딩에 필요하다.
+         debug/profile 매니페스트에만 있어서 릴리즈 빌드에서는 네트워크가
+         동작하지 않았다. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
         android:label="mysil_project_new"
         android:name="${applicationName}"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"

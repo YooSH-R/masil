@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:kakao_map_plugin/kakao_map_plugin.dart';
 import 'package:provider/provider.dart';
 
+import 'core/config/map_config.dart';
 import 'core/network/dio_client.dart';
+import 'core/services/place_name_resolver.dart';
+import 'core/services/walk_route_source.dart';
 import 'core/storage/session_cache.dart';
 import 'core/storage/token_storage.dart';
 import 'core/utils/router.dart';
@@ -22,6 +26,16 @@ import 'presentation/viewmodels/walk_view_model.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 카카오맵(JavaScript API) 초기화. 키가 없으면 지도 화면이 안내를 띄운다.
+  if (MapConfig.isKakaoMapConfigured) {
+    AuthRepository.initialize(
+      appKey: MapConfig.kakaoJsAppKey,
+      // baseUrl 을 넘기지 않으면 WebView origin 이 about:blank 가 되어
+      // 카카오 도메인 검사에 걸린다. 콘솔에 등록한 도메인과 같아야 한다.
+      baseUrl: MapConfig.kakaoMapBaseUrl,
+    );
+  }
 
   final tokenStorage = TokenStorage();
   final sessionCache = SessionCache();
@@ -68,11 +82,23 @@ void main() {
         ChangeNotifierProvider.value(value: authViewModel),
         ChangeNotifierProvider(create: (_) => PetViewModel(petRepository)),
         ChangeNotifierProvider(create: (_) => RobotViewModel(robotRepository)),
-        ChangeNotifierProvider(create: (_) => WalkViewModel(walkRepository)),
+        // routeSource: 산책 중 이동경로가 들어오는 입구.
+        // 백엔드가 마실이 디바이스의 GPS 푸시를 붙이면, WalkRouteSource 를
+        // 구현한 클래스(예: MqttWalkRouteSource)로 이 한 줄만 바꾸면 된다.
+        // 화면·폴리라인·시간 표시는 그대로 동작한다.
+        ChangeNotifierProvider(
+          create: (_) => WalkViewModel(
+            walkRepository,
+            routeSource: MockWalkRouteSource(),
+          ),
+        ),
         ChangeNotifierProvider(
             create: (_) => WalkPhotoViewModel(photoRepository)),
+        // placeResolver: 좌표 → 장소명(역지오코딩). 산책 일지의 `산책 장소`에 쓴다.
+        // 백엔드가 장소명을 내려주게 되면 이 인자를 빼면 된다.
         ChangeNotifierProvider(
-            create: (_) => WalkDiaryViewModel(diaryRepository)),
+            create: (_) => WalkDiaryViewModel(diaryRepository,
+                placeResolver: PlaceNameResolver())),
         ChangeNotifierProvider(
           create: (_) => NotificationViewModel(notificationRepository),
         ),
