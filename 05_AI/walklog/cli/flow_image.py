@@ -69,6 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     common.add_connection_args(parser)
     common.add_output_args(parser)
+    common.add_upload_args(parser)
     return parser
 
 
@@ -165,6 +166,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.dump_payload:
         paths["요청 덤프"] = run_dir / config.PAYLOAD_DIRNAME
     common.print_paths(paths)
+    common.upload_if_requested(args, run_dir)
     return common.EXIT_OK
 
 

@@ -52,6 +52,9 @@ __all__ = [
     "FALLBACK_MAX_SIDE",
     "FALLBACK_QUALITY",
     "JPEG_QUALITY_LADDER",
+    "S3_BUCKET",
+    "S3_PREFIX",
+    "AWS_REGION",
     "FONT_ENV",
     "FONT_CANDIDATES",
     "SYSTEM_MODES",
@@ -198,6 +201,18 @@ FALLBACK_QUALITY = 45
 # 재압축 품질 후보. 앞에서부터 시도해 예산에 처음 들어가는 값을 쓴다.
 # 높은 품질을 먼저 시도한다. VLM 인식률이 압축 잡음에 민감하기 때문이다.
 JPEG_QUALITY_LADDER = (90, 80, 70, 60, 50)
+
+
+# ============================================================ S3 업로드
+
+# 버킷 이름은 비밀이 아니므로 GMS_KEY와 달리 지연 평가(get_key 스타일) 없이
+# 모듈 상수로 둔다. 자격증명(액세스 키)은 여기서 다루지 않는다 - boto3의
+# 기본 자격증명 체인(환경변수 -> ~/.aws/credentials -> IAM 역할)에 맡긴다.
+S3_BUCKET = os.environ.get("S3_BUCKET", "walk-picture-s3-483461801092-ap-northeast-2-an")
+# outputs/<날짜>/ 를 그대로 이 프리픽스 아래에 미러링한다.
+# 버킷 콘솔에 미리 만들어 둔 robot-images/outputs/ 폴더와 맞춘 값이다.
+S3_PREFIX = os.environ.get("S3_PREFIX", "robot-images/outputs").strip("/")
+AWS_REGION = os.environ.get("AWS_REGION", "ap-northeast-2")
 
 
 # ============================================================ 폰트 (스토리보드 캡션)
