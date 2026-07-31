@@ -352,3 +352,19 @@ pyrightconfig.json
 
 .claude
 .vscode
+
+# Project-specific
+CLAUDE.md
+
+# ROS2 colcon build artifacts
+install/
+log/
+
+# model weights / large binaries
+*.pt
+*.onnx
+!jetson/petbot_wakeword/petbot_wakeword/models/masila.onnx*
+
+# python venvs
+yolo-env/
+wakeword-env/

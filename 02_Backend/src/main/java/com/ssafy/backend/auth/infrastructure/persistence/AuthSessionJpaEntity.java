@@ -57,7 +57,11 @@ public class AuthSessionJpaEntity {
     }
 
     public void revoke() {
-        this.revokedAt = Instant.now();
+        revoke(Instant.now());
+    }
+
+    public void revoke(Instant revokedAt) {
+        this.revokedAt = revokedAt;
     }
 
     public boolean isUsableAt(Instant now) {
@@ -66,6 +70,10 @@ public class AuthSessionJpaEntity {
 
     public Long getUserId() {
         return userId;
+    }
+
+    public Long getId() {
+        return id;
     }
 
     public String getDeviceId() {

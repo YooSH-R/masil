@@ -5,6 +5,7 @@ workflow:
         $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev"
       changes:
         - 02_Backend/**/*
+        - 06_Infra/postgres/**/*
     - when: never
 
 stages:
@@ -21,8 +22,15 @@ pipeline_context:
 backend_verify:
   stage: verify
   image: eclipse-temurin:17-jdk
+  services:
+    - name: docker:27-dind
+      alias: docker
+      command: ["--tls=false"]
   variables:
     GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
+    DOCKER_HOST: "tcp://docker:2375"
+    DOCKER_TLS_CERTDIR: ""
+    TESTCONTAINERS_HOST_OVERRIDE: "docker"
   before_script:
     - cd 02_Backend
     - chmod +x gradlew
