@@ -4,6 +4,7 @@ import com.ssafy.backend.robot.image.RobotImageController.ImageResponse;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -45,7 +46,8 @@ public class RobotImageStore {
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 id, robotId, objectKey, contentType, expectedSize,
-                capturedAt, expiresAt
+                Timestamp.from(capturedAt),
+                Timestamp.from(expiresAt)
         );
     }
 
@@ -116,7 +118,7 @@ public class RobotImageStore {
                 WHERE id = ?
                 """,
                 actualSize,
-                uploadedAt,
+                Timestamp.from(uploadedAt),
                 imageId
         );
     }
