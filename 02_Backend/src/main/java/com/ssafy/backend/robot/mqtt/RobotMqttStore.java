@@ -307,6 +307,31 @@ public class RobotMqttStore {
         return count != null && count > 0;
     }
 
+    List<BehaviorRequestMessage> findPendingRequests(Instant now) {
+        return jdbcTemplate.query("""
+                SELECT b.request_id, r.serial_number, b.request_type,
+                       b.message, b.created_at, b.expires_at
+                FROM behavior_requests b
+                JOIN robots r ON r.id = b.robot_id
+                WHERE b.status = 'PENDING'
+                  AND (b.expires_at IS NULL OR b.expires_at > ?)
+                ORDER BY b.created_at
+                """,
+                (rs, rowNum) -> new BehaviorRequestMessage(
+                        rs.getObject("request_id", UUID.class),
+                        "1.0",
+                        rs.getString("serial_number"),
+                        BehaviorRequestType.valueOf(
+                                rs.getString("request_type")
+                        ),
+                        rs.getString("message"),
+                        rs.getTimestamp("created_at").toInstant(),
+                        toInstant(rs.getTimestamp("expires_at"))
+                ),
+                Timestamp.from(now)
+        );
+    }
+
     void expireRequests(Instant now) {
         jdbcTemplate.update("""
                 UPDATE behavior_requests

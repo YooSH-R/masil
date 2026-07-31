@@ -22,13 +22,13 @@ import static org.mockito.Mockito.when;
 
 class RobotImageServiceTest {
 
-    private RobotImageStore store;
+    private RobotImagePersistenceService persistenceService;
     private S3Client s3Client;
     private RobotImageService service;
 
     @BeforeEach
     void setUp() {
-        store = mock(RobotImageStore.class);
+        persistenceService = mock(RobotImagePersistenceService.class);
         s3Client = mock(S3Client.class);
         S3Presigner presigner = mock(S3Presigner.class);
         S3StorageProperties properties = new S3StorageProperties(
@@ -39,7 +39,7 @@ class RobotImageServiceTest {
                 10 * 1024 * 1024
         );
         service = new RobotImageService(
-                store,
+                persistenceService,
                 s3Client,
                 presigner,
                 properties
@@ -59,13 +59,26 @@ class RobotImageServiceTest {
                 capturedAt,
                 null
         );
-        when(store.requirePending("device-001", imageId)).thenReturn(image);
+        when(persistenceService.requirePending(
+                "device-001",
+                imageId
+        )).thenReturn(image);
         when(s3Client.headObject(any(HeadObjectRequest.class))).thenReturn(
                 HeadObjectResponse.builder()
                         .contentLength(1024L)
                         .contentType("image/png")
                         .build()
         );
+        when(persistenceService.completeUpload(
+                org.mockito.ArgumentMatchers.eq("device-001"),
+                org.mockito.ArgumentMatchers.eq(imageId),
+                org.mockito.ArgumentMatchers.eq(1024L),
+                org.mockito.ArgumentMatchers.eq("image/png"),
+                any(Instant.class)
+        )).thenAnswer(invocation -> image.toResponse(
+                invocation.getArgument(2),
+                invocation.getArgument(4)
+        ));
 
         var response = service.completeUpload("device-001", imageId);
 
@@ -73,9 +86,11 @@ class RobotImageServiceTest {
         assertEquals(1024L, response.fileSize());
         assertEquals("image/png", response.contentType());
         assertNotNull(response.uploadedAt());
-        verify(store).markUploaded(
+        verify(persistenceService).completeUpload(
+                org.mockito.ArgumentMatchers.eq("device-001"),
                 org.mockito.ArgumentMatchers.eq(imageId),
                 org.mockito.ArgumentMatchers.eq(1024L),
+                org.mockito.ArgumentMatchers.eq("image/png"),
                 any(Instant.class)
         );
     }
@@ -92,7 +107,10 @@ class RobotImageServiceTest {
                 Instant.parse("2026-07-30T00:00:00Z"),
                 null
         );
-        when(store.requirePending("device-001", imageId)).thenReturn(image);
+        when(persistenceService.requirePending(
+                "device-001",
+                imageId
+        )).thenReturn(image);
         when(s3Client.headObject(any(HeadObjectRequest.class))).thenReturn(
                 HeadObjectResponse.builder()
                         .contentLength(512L)
@@ -104,9 +122,11 @@ class RobotImageServiceTest {
                 IllegalArgumentException.class,
                 () -> service.completeUpload("device-001", imageId)
         );
-        verify(store, never()).markUploaded(
+        verify(persistenceService, never()).completeUpload(
+                any(String.class),
                 any(UUID.class),
                 org.mockito.ArgumentMatchers.anyLong(),
+                any(String.class),
                 any(Instant.class)
         );
     }
@@ -123,7 +143,7 @@ class RobotImageServiceTest {
                 IllegalArgumentException.class,
                 () -> service.createUploadUrl("device-001", request)
         );
-        verify(store, never()).requireRobotId(any(String.class));
+        verify(persistenceService, never()).requireRobotId(any(String.class));
     }
 
     @Test
@@ -138,6 +158,6 @@ class RobotImageServiceTest {
                 IllegalArgumentException.class,
                 () -> service.createUploadUrl("device-001", request)
         );
-        verify(store, never()).requireRobotId(any(String.class));
+        verify(persistenceService, never()).requireRobotId(any(String.class));
     }
 }

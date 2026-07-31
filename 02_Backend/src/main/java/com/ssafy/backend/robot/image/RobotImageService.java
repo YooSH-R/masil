@@ -6,7 +6,6 @@ import com.ssafy.backend.robot.image.RobotImageController.UploadUrlRequest;
 import com.ssafy.backend.robot.image.RobotImageController.UploadUrlResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
@@ -36,30 +35,29 @@ public class RobotImageService {
     private static final DateTimeFormatter KEY_DATE =
             DateTimeFormatter.ofPattern("yyyy/MM").withZone(ZoneOffset.UTC);
 
-    private final RobotImageStore store;
+    private final RobotImagePersistenceService persistenceService;
     private final S3Client s3Client;
     private final S3Presigner presigner;
     private final S3StorageProperties properties;
 
     public RobotImageService(
-            RobotImageStore store,
+            RobotImagePersistenceService persistenceService,
             S3Client s3Client,
             S3Presigner presigner,
             S3StorageProperties properties
     ) {
-        this.store = store;
+        this.persistenceService = persistenceService;
         this.s3Client = s3Client;
         this.presigner = presigner;
         this.properties = properties;
     }
 
-    @Transactional
     public UploadUrlResponse createUploadUrl(
             String deviceId,
             UploadUrlRequest request
     ) {
         validateUpload(request);
-        long robotId = store.requireRobotId(deviceId);
+        long robotId = persistenceService.requireRobotId(deviceId);
         UUID imageId = UUID.randomUUID();
         Instant expiresAt = Instant.now().plusSeconds(
                 properties.presignDurationSeconds()
@@ -84,7 +82,7 @@ public class RobotImageService {
                         .build()
         ).url().toString();
 
-        store.createPending(
+        persistenceService.createPending(
                 imageId,
                 robotId,
                 objectKey,
@@ -96,33 +94,33 @@ public class RobotImageService {
         return new UploadUrlResponse(imageId, objectKey, uploadUrl, expiresAt);
     }
 
-    @Transactional
     public ImageResponse completeUpload(String deviceId, UUID imageId) {
-        RobotImageStore.StoredImage image = store.requirePending(deviceId, imageId);
+        RobotImageStore.StoredImage image =
+                persistenceService.requirePending(deviceId, imageId);
         HeadObjectResponse head = s3Client.headObject(
                 HeadObjectRequest.builder()
                         .bucket(properties.bucket())
                         .key(image.objectKey())
                         .build()
         );
-        if (head.contentLength() != image.expectedSize()
-                || !image.contentType().equalsIgnoreCase(head.contentType())) {
-            throw new IllegalArgumentException("업로드된 이미지 정보가 요청과 다릅니다.");
-        }
+        validateMetadata(image, head);
         Instant uploadedAt = Instant.now();
-        store.markUploaded(imageId, head.contentLength(), uploadedAt);
-        return image.toResponse(head.contentLength(), uploadedAt);
+        return persistenceService.completeUpload(
+                deviceId,
+                imageId,
+                head.contentLength(),
+                head.contentType(),
+                uploadedAt
+        );
     }
 
-    @Transactional(readOnly = true)
     public List<ImageResponse> listImages(Long userId, Long petId) {
-        store.requirePetOwnership(userId, petId);
-        return store.findUploadedByPetId(petId);
+        return persistenceService.listImages(userId, petId);
     }
 
-    @Transactional(readOnly = true)
     public DownloadUrlResponse createDownloadUrl(Long userId, UUID imageId) {
-        RobotImageStore.StoredImage image = store.requireUploaded(userId, imageId);
+        RobotImageStore.StoredImage image =
+                persistenceService.requireUploaded(userId, imageId);
         Instant expiresAt = Instant.now().plusSeconds(
                 properties.presignDurationSeconds()
         );
@@ -139,6 +137,18 @@ public class RobotImageService {
                         .build()
         ).url().toString();
         return new DownloadUrlResponse(imageId, url, expiresAt);
+    }
+
+    private void validateMetadata(
+            RobotImageStore.StoredImage image,
+            HeadObjectResponse head
+    ) {
+        if (head.contentLength() != image.expectedSize()
+                || !image.contentType().equalsIgnoreCase(head.contentType())) {
+            throw new IllegalArgumentException(
+                    "업로드된 이미지 정보가 요청과 다릅니다."
+            );
+        }
     }
 
     private void validateUpload(UploadUrlRequest request) {

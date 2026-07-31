@@ -1,11 +1,10 @@
 package com.ssafy.backend.robot.mqtt;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -24,17 +23,14 @@ public class BehaviorRequestScheduler {
     private static final Duration PLAY_INTERVAL = Duration.ofHours(24);
 
     private final RobotMqttStore store;
-    private final RobotMqttPublisher publisher;
-    private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     public BehaviorRequestScheduler(
             RobotMqttStore store,
-            RobotMqttPublisher publisher,
-            ObjectMapper objectMapper
+            ApplicationEventPublisher eventPublisher
     ) {
         this.store = store;
-        this.publisher = publisher;
-        this.objectMapper = objectMapper;
+        this.eventPublisher = eventPublisher;
     }
 
     @Scheduled(
@@ -48,31 +44,33 @@ public class BehaviorRequestScheduler {
     }
 
     List<BehaviorRequestMessage> publishDueRequests(Instant now) {
-        List<BehaviorRequestMessage> published = new ArrayList<>();
         store.expireRequests(now);
+        List<BehaviorRequestMessage> queued = new ArrayList<>(
+                store.findPendingRequests(now)
+        );
         for (RobotMqttStore.RequestCandidate candidate
                 : store.findRequestCandidates()) {
             if (isSleeping(candidate.mode())) {
                 continue;
             }
             addIfDue(
-                    published, candidate, BehaviorRequestType.CARE_REQUEST,
+                    queued, candidate, BehaviorRequestType.CARE_REQUEST,
                     candidate.batteryLevel() != null
                             && candidate.batteryLevel() <= 20,
                     "배터리가 부족해요. 충전과 관리가 필요해요.", now
             );
             addIfDue(
-                    published, candidate, BehaviorRequestType.WALK_REQUEST,
+                    queued, candidate, BehaviorRequestType.WALK_REQUEST,
                     isOlderThan(candidate.lastWalkAt(), WALK_INTERVAL, now),
                     "오랫동안 산책하지 않았어요. 함께 산책해요.", now
             );
             addIfDue(
-                    published, candidate, BehaviorRequestType.PLAY_REQUEST,
+                    queued, candidate, BehaviorRequestType.PLAY_REQUEST,
                     isOlderThan(candidate.lastPlayAt(), PLAY_INTERVAL, now),
                     "오랫동안 놀지 않았어요. 함께 놀아 주세요.", now
             );
             addIfDue(
-                    published,
+                    queued,
                     candidate,
                     BehaviorRequestType.INTERACTION_REQUEST,
                     isOlderThan(
@@ -84,7 +82,12 @@ public class BehaviorRequestScheduler {
                     now
             );
         }
-        return published;
+        for (BehaviorRequestMessage request : queued) {
+            eventPublisher.publishEvent(
+                    new BehaviorRequestPublishEvent(request, now)
+            );
+        }
+        return queued;
     }
 
     Duration interactionInterval(int affinityScore) {
@@ -114,7 +117,7 @@ public class BehaviorRequestScheduler {
     }
 
     private void addIfDue(
-            List<BehaviorRequestMessage> published,
+            List<BehaviorRequestMessage> queued,
             RobotMqttStore.RequestCandidate candidate,
             BehaviorRequestType type,
             boolean due,
@@ -131,20 +134,7 @@ public class BehaviorRequestScheduler {
                 now,
                 now.plus(REQUEST_TTL)
         );
-        try {
-            publisher.publish(
-                    RobotMqttTopics.requests(candidate.deviceId()),
-                    1,
-                    objectMapper.writeValueAsString(request)
-            );
-        } catch (JacksonException exception) {
-            throw new IllegalStateException(
-                    "행동 요청 MQTT 메시지 직렬화에 실패했습니다.",
-                    exception
-            );
-        }
-        store.markRequestPublished(request.requestId(), now);
-        published.add(request);
+        queued.add(request);
     }
 
     private boolean isOlderThan(

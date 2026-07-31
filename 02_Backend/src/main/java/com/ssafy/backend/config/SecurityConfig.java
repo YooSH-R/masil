@@ -42,6 +42,8 @@ public class SecurityConfig {
                         )
                 )
                 .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers("/v1/devices/*/images/**")
+                        .hasRole("DEVICE")
                         .requestMatchers(
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
@@ -54,10 +56,9 @@ public class SecurityConfig {
                                 "/v1/auth/oauth/google",
                                 "/v1/auth/oauth/kakao",
                                 "/v1/auth/oauth/signup",
-                                "/v1/users/nickname-availability",
-                                "/v1/devices/*/images/**"
+                                "/v1/users/nickname-availability"
                         ).permitAll()
-                        .anyRequest().authenticated()
+                        .anyRequest().hasRole("USER")
                 )
                 .addFilterBefore(
                         deviceAuthenticationFilter,

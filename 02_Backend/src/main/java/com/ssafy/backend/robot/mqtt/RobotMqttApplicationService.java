@@ -1,10 +1,9 @@
 package com.ssafy.backend.robot.mqtt;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -14,23 +13,20 @@ import java.util.UUID;
 public class RobotMqttApplicationService {
 
     private final RobotMqttStore store;
-    private final RobotMqttPublisher publisher;
-    private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     public RobotMqttApplicationService(
             RobotMqttStore store,
-            RobotMqttPublisher publisher,
-            ObjectMapper objectMapper
+            ApplicationEventPublisher eventPublisher
     ) {
         this.store = store;
-        this.publisher = publisher;
-        this.objectMapper = objectMapper;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
     public AffectionChangedMessage processEvent(
             RobotEventMessage event
-    ) throws JacksonException {
+    ) {
         validateEnvelope(
                 event.messageId(),
                 event.messageVersion(),
@@ -45,11 +41,7 @@ public class RobotMqttApplicationService {
                 .findEventResult(event.messageId())
                 .orElseGet(() -> createEvent(event));
         AffectionChangedMessage response = toMessage(result);
-        publisher.publish(
-                RobotMqttTopics.affection(event.deviceId()),
-                1,
-                objectMapper.writeValueAsString(response)
-        );
+        eventPublisher.publishEvent(new AffectionPublishEvent(response));
         return response;
     }
 

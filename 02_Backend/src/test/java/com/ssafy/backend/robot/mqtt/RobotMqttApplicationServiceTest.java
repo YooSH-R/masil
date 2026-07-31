@@ -2,7 +2,7 @@ package com.ssafy.backend.robot.mqtt;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import tools.jackson.databind.ObjectMapper;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -19,19 +19,16 @@ import static org.mockito.Mockito.when;
 class RobotMqttApplicationServiceTest {
 
     private RobotMqttStore store;
-    private RobotMqttPublisher publisher;
-    private ObjectMapper objectMapper;
+    private ApplicationEventPublisher eventPublisher;
     private RobotMqttApplicationService service;
 
     @BeforeEach
     void setUp() {
         store = mock(RobotMqttStore.class);
-        publisher = mock(RobotMqttPublisher.class);
-        objectMapper = mock(ObjectMapper.class);
+        eventPublisher = mock(ApplicationEventPublisher.class);
         service = new RobotMqttApplicationService(
                 store,
-                publisher,
-                objectMapper
+                eventPublisher
         );
     }
 
@@ -51,8 +48,6 @@ class RobotMqttApplicationServiceTest {
         when(store.lockAffinity("device-001")).thenReturn(
                 new RobotMqttStore.AffinityContext(1L, 2L, 95)
         );
-        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
-
         AffectionChangedMessage response = service.processEvent(event);
 
         assertEquals(95, response.previousScore());
@@ -75,10 +70,8 @@ class RobotMqttApplicationServiceTest {
                 5,
                 100
         );
-        verify(publisher).publish(
-                eq(RobotMqttTopics.affection("device-001")),
-                eq(1),
-                eq("{}")
+        verify(eventPublisher).publishEvent(
+                new AffectionPublishEvent(response)
         );
     }
 
@@ -98,8 +91,6 @@ class RobotMqttApplicationServiceTest {
         when(store.lockAffinity("device-001")).thenReturn(
                 new RobotMqttStore.AffinityContext(1L, 2L, 10)
         );
-        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
-
         service.processEvent(event);
 
         verify(store).updateAffinity(2L, 9, 1, "WARY", null);
