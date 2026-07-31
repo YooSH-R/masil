@@ -10,6 +10,7 @@ import com.ssafy.backend.user.dto.UpdateMemberRequest;
 import com.ssafy.backend.user.dto.WithdrawMemberRequest;
 import com.ssafy.backend.user.infrastructure.persistence.SpringDataUserRepository;
 import com.ssafy.backend.user.infrastructure.persistence.UserJpaEntity;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -20,6 +21,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 public class MemberService {
@@ -65,7 +67,7 @@ public class MemberService {
             );
         }
 
-        UserJpaEntity user = findActiveUser(userId);
+        UserJpaEntity user = findActiveUserForUpdate(userId);
         updateNickname(user, request.nickname());
         updatePhoneNumber(
                 user,
@@ -76,7 +78,7 @@ public class MemberService {
         try {
             userRepository.flush();
         } catch (DataIntegrityViolationException exception) {
-            throw translateDuplicate(userId, request);
+            throw translateDuplicate(exception);
         }
         return toResponse(user);
     }
@@ -87,7 +89,7 @@ public class MemberService {
             String currentDeviceId,
             ChangePasswordRequest request
     ) {
-        UserJpaEntity user = findActiveUser(userId);
+        UserJpaEntity user = findActiveUserForUpdate(userId);
         if (user.getPasswordHash() == null) {
             throw new ApiException(
                     HttpStatus.CONFLICT,
@@ -114,7 +116,7 @@ public class MemberService {
 
     @Transactional
     public void withdraw(Long userId, WithdrawMemberRequest request) {
-        UserJpaEntity user = findActiveUser(userId);
+        UserJpaEntity user = findActiveUserForUpdate(userId);
         if (!"WITHDRAW".equals(request.confirmation())) {
             throw new ApiException(
                     HttpStatus.BAD_REQUEST,
@@ -203,11 +205,17 @@ public class MemberService {
 
     private UserJpaEntity findActiveUser(Long userId) {
         UserJpaEntity user = userRepository.findById(userId)
-                .orElseThrow(() -> new ApiException(
-                        HttpStatus.NOT_FOUND,
-                        "MEMBER_NOT_FOUND",
-                        "회원을 찾을 수 없습니다."
-                ));
+                .orElseThrow(this::memberNotFound);
+        return requireActive(user);
+    }
+
+    private UserJpaEntity findActiveUserForUpdate(Long userId) {
+        UserJpaEntity user = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(this::memberNotFound);
+        return requireActive(user);
+    }
+
+    private UserJpaEntity requireActive(UserJpaEntity user) {
         if (user.getDeletedAt() != null) {
             throw new ApiException(
                     HttpStatus.CONFLICT,
@@ -216,6 +224,14 @@ public class MemberService {
             );
         }
         return user;
+    }
+
+    private ApiException memberNotFound() {
+        return new ApiException(
+                HttpStatus.NOT_FOUND,
+                "MEMBER_NOT_FOUND",
+                "회원을 찾을 수 없습니다."
+        );
     }
 
     private MemberResponse toResponse(UserJpaEntity user) {
@@ -241,21 +257,15 @@ public class MemberService {
     }
 
     private ApiException translateDuplicate(
-            Long userId,
-            UpdateMemberRequest request
+            DataIntegrityViolationException exception
     ) {
-        if (request.nickname() != null
-                && userRepository.existsByNicknameAndDeletedAtIsNullAndIdNot(
-                        request.nickname(),
-                        userId
-                )) {
+        String constraintName = findConstraintName(exception);
+        if (constraintName.contains("uq_users_nickname")
+                || constraintName.contains("users_nickname_key")) {
             return nicknameAlreadyInUse();
         }
-        if (request.phoneNumber() != null
-                && userRepository.existsByPhoneNumberAndDeletedAtIsNullAndIdNot(
-                        request.phoneNumber(),
-                        userId
-                )) {
+        if (constraintName.contains("uq_users_phone_number")
+                || constraintName.contains("users_phone_number_key")) {
             return phoneNumberAlreadyInUse();
         }
         return new ApiException(
@@ -263,6 +273,22 @@ public class MemberService {
                 "MEMBER_UPDATE_CONFLICT",
                 "회원정보 변경 중 충돌이 발생했습니다."
         );
+    }
+
+    private String findConstraintName(Throwable exception) {
+        Throwable cause = exception;
+        StringBuilder messages = new StringBuilder();
+        while (cause != null) {
+            if (cause instanceof ConstraintViolationException violation
+                    && violation.getConstraintName() != null) {
+                return violation.getConstraintName().toLowerCase(Locale.ROOT);
+            }
+            if (cause.getMessage() != null) {
+                messages.append(' ').append(cause.getMessage());
+            }
+            cause = cause.getCause();
+        }
+        return messages.toString().toLowerCase(Locale.ROOT);
     }
 
     private ApiException nicknameAlreadyInUse() {

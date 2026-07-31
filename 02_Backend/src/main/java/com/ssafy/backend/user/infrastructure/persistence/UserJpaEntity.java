@@ -8,12 +8,25 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "users")
+@Table(
+        name = "users",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uq_users_nickname",
+                        columnNames = "nickname"
+                ),
+                @UniqueConstraint(
+                        name = "uq_users_phone_number",
+                        columnNames = "phone_number"
+                )
+        }
+)
 public class UserJpaEntity {
 
     @Id
@@ -26,10 +39,10 @@ public class UserJpaEntity {
     @Column(name = "password_hash", length = 255)
     private String passwordHash;
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(nullable = false, length = 100)
     private String nickname;
 
-    @Column(name = "phone_number", unique = true, length = 20)
+    @Column(name = "phone_number", length = 20)
     private String phoneNumber;
 
     @Column(name = "phone_verified_at")

@@ -43,7 +43,7 @@ public class PasswordResetService {
                 request.phoneNumber()
         );
         UserJpaEntity user = userRepository
-                .findByPhoneNumberAndDeletedAtIsNull(phoneNumber)
+                .findActiveByPhoneNumberForUpdate(phoneNumber)
                 .orElseThrow(() -> new ApiException(
                         HttpStatus.NOT_FOUND,
                         "MEMBER_NOT_FOUND",

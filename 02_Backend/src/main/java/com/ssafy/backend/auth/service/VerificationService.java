@@ -14,10 +14,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -30,6 +32,7 @@ public class VerificationService {
     private final SmsSender smsSender;
     private final PasswordEncoder passwordEncoder;
     private final TokenHashService tokenHashService;
+    private final TransactionTemplate transactionTemplate;
     private final SecureRandom secureRandom = new SecureRandom();
     private final long codeValiditySeconds;
     private final long tokenValiditySeconds;
@@ -39,6 +42,7 @@ public class VerificationService {
             SmsSender smsSender,
             PasswordEncoder passwordEncoder,
             TokenHashService tokenHashService,
+            TransactionTemplate transactionTemplate,
             @Value("${auth.verification.code-validity-seconds:180}") long codeValiditySeconds,
             @Value("${auth.verification.token-validity-seconds:600}") long tokenValiditySeconds
     ) {
@@ -46,12 +50,45 @@ public class VerificationService {
         this.smsSender = smsSender;
         this.passwordEncoder = passwordEncoder;
         this.tokenHashService = tokenHashService;
+        this.transactionTemplate = transactionTemplate;
         this.codeValiditySeconds = codeValiditySeconds;
         this.tokenValiditySeconds = tokenValiditySeconds;
     }
 
-    @Transactional
     public VerificationSendResponse send(VerificationSendRequest request) {
+        PendingVerification pending = Objects.requireNonNull(
+                transactionTemplate.execute(status ->
+                        createPendingVerification(request)
+                )
+        );
+
+        try {
+            smsSender.sendVerificationCode(
+                    pending.phoneNumber(),
+                    pending.code()
+            );
+        } catch (RuntimeException exception) {
+            transactionTemplate.executeWithoutResult(status ->
+                    repository.deleteByVerificationId(
+                            pending.verificationId()
+                    )
+            );
+            throw new ApiException(
+                    HttpStatus.BAD_GATEWAY,
+                    "SMS_SEND_FAILED",
+                    "인증번호 발송에 실패했습니다."
+            );
+        }
+
+        return new VerificationSendResponse(
+                pending.verificationId(),
+                pending.expiresAt()
+        );
+    }
+
+    private PendingVerification createPendingVerification(
+            VerificationSendRequest request
+    ) {
         String phoneNumber = normalizePhoneNumber(request.phoneNumber());
         if (repository.existsByPhoneNumberAndCreatedAtAfter(
                 phoneNumber,
@@ -78,17 +115,12 @@ public class VerificationService {
                 expiresAt
         ));
 
-        try {
-            smsSender.sendVerificationCode(phoneNumber, code);
-        } catch (RuntimeException exception) {
-            throw new ApiException(
-                    HttpStatus.BAD_GATEWAY,
-                    "SMS_SEND_FAILED",
-                    "인증번호 발송에 실패했습니다."
-            );
-        }
-
-        return new VerificationSendResponse(verificationId, expiresAt);
+        return new PendingVerification(
+                verificationId,
+                phoneNumber,
+                code,
+                expiresAt
+        );
     }
 
     @Transactional(noRollbackFor = ApiException.class)
@@ -184,5 +216,13 @@ public class VerificationService {
                 "VERIFICATION_CODE_INVALID",
                 message
         );
+    }
+
+    private record PendingVerification(
+            UUID verificationId,
+            String phoneNumber,
+            String code,
+            Instant expiresAt
+    ) {
     }
 }
