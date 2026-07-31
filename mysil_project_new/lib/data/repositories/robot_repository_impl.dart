@@ -2,7 +2,6 @@ import '../../core/network/api_client.dart';
 import '../../core/network/api_endpoints.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/storage/session_cache.dart';
-import '../../core/storage/token_storage.dart';
 import '../../core/utils/json_parse.dart';
 import '../../domain/entities/robot.dart';
 import '../../domain/repositories/robot_repository.dart';
@@ -12,14 +11,11 @@ class RobotRepositoryImpl implements RobotRepository {
   RobotRepositoryImpl({
     required ApiClient client,
     required SessionCache sessionCache,
-    required TokenStorage tokenStorage,
   })  : _client = client,
-        _cache = sessionCache,
-        _tokenStorage = tokenStorage;
+        _cache = sessionCache;
 
   final ApiClient _client;
   final SessionCache _cache;
-  final TokenStorage _tokenStorage;
 
   @override
   Future<RobotPairing> pairRobot({
@@ -40,11 +36,8 @@ class RobotRepositoryImpl implements RobotRepository {
     final pairing = RobotPairingModel.fromJson(Json.asMap(data));
     await _cache.saveRobotId(pairing.robotId);
 
-    // Jetson 전용 토큰은 페어링 응답에서만 받을 수 있어 즉시 저장한다.
-    final deviceToken = pairing.deviceAccessToken;
-    if (deviceToken != null) {
-      await _tokenStorage.saveDeviceAccessToken(deviceToken);
-    }
+    // 명세서 2026-07-29 개정으로 등록 응답에서 deviceAccessToken 이 제거됐다.
+    // (정적 QR 방식으로 바뀌면서 기기 토큰은 이 응답으로 내려오지 않는다)
     return pairing;
   }
 

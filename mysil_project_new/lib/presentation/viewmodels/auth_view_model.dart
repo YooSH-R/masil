@@ -1,6 +1,8 @@
 import '../../core/services/google_sign_in_service.dart';
 import '../../core/services/kakao_sign_in_service.dart';
+import '../../data/models/auth_model.dart';
 import '../../data/models/social_auth_model.dart';
+import '../../domain/entities/member_profile.dart';
 import '../../domain/entities/user.dart';
 import '../../domain/repositories/auth_repository.dart';
 import 'base_view_model.dart';
@@ -59,9 +61,15 @@ class AuthViewModel extends BaseViewModel {
   bool get isNicknameAvailable => _isNicknameAvailable;
 
   /// POST /auth/verifications — 휴대전화로 인증번호 발송
-  Future<bool> requestPhoneVerification(String phoneNumber) async {
+  Future<bool> requestPhoneVerification(
+    String phoneNumber, {
+    VerificationPurpose purpose = VerificationPurpose.signUp,
+  }) async {
     final result = await guard(
-      () => _authRepository.requestVerification(phoneNumber: phoneNumber),
+      () => _authRepository.requestVerification(
+        phoneNumber: phoneNumber,
+        purpose: purpose,
+      ),
     );
     if (result == null) return false;
 
@@ -259,6 +267,116 @@ class AuthViewModel extends BaseViewModel {
   void onSessionExpired() {
     _user = null;
     safeNotify();
+  }
+
+  // --- 회원정보 (명세서 "회원 목록 추가") ---
+
+  MemberProfile? _profile;
+  MemberProfile? get profile => _profile;
+
+  /// GET /users/me — 마이페이지 진입 시 호출.
+  Future<void> loadMyProfile({bool silent = false}) async {
+    final profile = await guard(
+      () => _authRepository.getMyProfile(),
+      silent: silent,
+    );
+    if (profile == null) return;
+
+    _profile = profile;
+    safeNotify();
+  }
+
+  /// PATCH /users/me — 닉네임·전화번호 수정. 전달한 값만 변경된다.
+  ///
+  /// 전화번호를 바꿀 때는 휴대전화 인증을 먼저 받아야 한다. 인증이 끝나 있으면
+  /// 뷰모델이 보관 중인 verificationToken 을 자동으로 함께 보낸다.
+  Future<bool> updateMyProfile({
+    String? nickname,
+    String? phoneNumber,
+  }) async {
+    final profile = await guard(() => _authRepository.updateMyProfile(
+          nickname: nickname,
+          phoneNumber: phoneNumber,
+          // 전화번호를 바꿀 때만 인증 토큰이 필요하다.
+          verificationToken: phoneNumber == null ? null : _verificationToken,
+        ));
+    if (profile == null) return false;
+
+    _profile = profile;
+    // 닉네임이 바뀌면 화면이 참조하는 user 도 맞춰준다.
+    final current = _user;
+    if (current != null) {
+      _user = current.copyWith(nickname: profile.nickname);
+    }
+    _resetVerification();
+    safeNotify();
+    return true;
+  }
+
+  /// PATCH /users/me/password — 로그인 상태에서 비밀번호 변경.
+  ///
+  /// 성공해도 이 기기의 세션은 유지된다(서버가 현재 세션만 남긴다).
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await guard(() => _authRepository.changePassword(
+          currentPassword: currentPassword,
+          newPassword: newPassword,
+        ));
+    return !hasError;
+  }
+
+  /// DELETE /users/me — 회원탈퇴.
+  ///
+  /// 일반 회원은 [currentPassword] 가 필요하고 소셜 전용 회원은 생략한다.
+  /// ([MemberProfile.hasPassword] 로 판단할 수 있다)
+  Future<bool> withdraw({String? currentPassword}) async {
+    await guard(() => _authRepository.withdraw(
+          currentPassword: currentPassword,
+        ));
+    if (hasError) return false;
+
+    // 탈퇴가 끝나면 로그인 상태를 완전히 비운다.
+    await _google.signOut();
+    await _kakao.signOut();
+    _user = null;
+    _profile = null;
+    _signupToken = null;
+    _suggestedNickname = null;
+    _resetVerification();
+    safeNotify();
+    return true;
+  }
+
+  /// POST /auth/password/reset — 비밀번호 분실 시 재설정.
+  ///
+  /// 먼저 [requestPhoneVerification] 을 `purpose: passwordReset` 으로 호출하고
+  /// [confirmPhoneVerification] 까지 마쳐야 한다. 그 과정에서 받은
+  /// verificationToken 을 뷰모델이 보관하고 있어 따로 넘기지 않아도 된다.
+  Future<bool> resetPassword({
+    required String phoneNumber,
+    required String newPassword,
+  }) async {
+    final token = _verificationToken;
+    if (token == null) {
+      setError('휴대전화 인증을 먼저 완료해 주세요.');
+      return false;
+    }
+
+    await guard(() => _authRepository.resetPassword(
+          phoneNumber: phoneNumber,
+          verificationToken: token,
+          newPassword: newPassword,
+        ));
+    if (hasError) return false;
+
+    // 서버가 모든 세션을 폐기했다. 다시 로그인해야 한다.
+    _user = null;
+    _profile = null;
+    _resetVerification();
+    safeNotify();
+    return true;
   }
 
   void _resetVerification() {

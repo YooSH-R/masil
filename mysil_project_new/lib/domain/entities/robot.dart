@@ -46,7 +46,6 @@ class RobotPairing {
     this.pairingId,
     this.modelName,
     this.firmwareVersion,
-    this.deviceAccessToken,
     this.pairedAt,
   });
 
@@ -60,7 +59,6 @@ class RobotPairing {
   final String? modelName;
   final String? firmwareVersion;
 
-  final String? deviceAccessToken;
   final DateTime? pairedAt;
 
   bool get isPaired => pairingStatus.toUpperCase() == 'PAIRED';

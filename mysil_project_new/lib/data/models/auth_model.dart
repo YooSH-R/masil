@@ -1,6 +1,26 @@
 import '../../core/utils/json_parse.dart';
 import 'user_model.dart';
 
+/// 인증번호 발송 목적. 명세서 4.1 / 5. 비밀번호 재설정.
+///
+/// 서버는 목적별로 발급한 verificationToken 을 구분해 검증한다.
+/// 목적이 다르면 VERIFICATION_PURPOSE_MISMATCH 오류가 온다.
+enum VerificationPurpose {
+  /// 회원가입 휴대전화 인증.
+  signUp('SIGN_UP'),
+
+  /// 비밀번호 분실 시 재설정.
+  passwordReset('PASSWORD_RESET'),
+
+  /// 로그인 상태에서 전화번호 변경.
+  phoneChange('PHONE_CHANGE');
+
+  const VerificationPurpose(this.wireValue);
+
+  /// 서버에 보내는 값.
+  final String wireValue;
+}
+
 /// 인증번호 발송 응답. (서버 OpenAPI: VerificationSendResponse)
 class VerificationRequestResult {
   const VerificationRequestResult({
