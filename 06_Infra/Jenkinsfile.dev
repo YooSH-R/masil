@@ -261,7 +261,8 @@ pipeline {
                     .tools/kubectl -n "$K8S_NAMESPACE" get ingress backend
                     curl -fsS \
                       "https://i15a203.p.ssafy.io/dev/api/v3/api-docs" \
-                      > /dev/null
+                      | grep -Eq \
+                        '"url"[[:space:]]*:[[:space:]]*"https://i15a203.p.ssafy.io/dev/api"'
                 '''
             }
         }
