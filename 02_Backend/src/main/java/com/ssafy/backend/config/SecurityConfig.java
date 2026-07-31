@@ -47,6 +47,7 @@ public class SecurityConfig {
                                 "/v1/auth/signup",
                                 "/v1/auth/login",
                                 "/v1/auth/refresh",
+                                "/v1/auth/password/reset",
                                 "/v1/auth/verifications",
                                 "/v1/auth/verifications/*/confirm",
                                 "/v1/auth/oauth/google",
