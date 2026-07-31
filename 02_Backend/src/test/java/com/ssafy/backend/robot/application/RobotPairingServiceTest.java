@@ -3,11 +3,11 @@ package com.ssafy.backend.robot.application;
 import com.ssafy.backend.auth.service.TokenHashService;
 import com.ssafy.backend.common.error.BusinessException;
 import com.ssafy.backend.common.error.ErrorCode;
-import com.ssafy.backend.robot.infrastructure.persistence.PetReferenceJpaEntity;
+import com.ssafy.backend.pet.infrastructure.persistence.PetJpaEntity;
+import com.ssafy.backend.pet.infrastructure.persistence.SpringDataPetRepository;
 import com.ssafy.backend.robot.infrastructure.persistence.RobotCredentialJpaEntity;
 import com.ssafy.backend.robot.infrastructure.persistence.RobotJpaEntity;
 import com.ssafy.backend.robot.infrastructure.persistence.RobotPairingJpaEntity;
-import com.ssafy.backend.robot.infrastructure.persistence.SpringDataPetReferenceRepository;
 import com.ssafy.backend.robot.infrastructure.persistence.SpringDataRobotCredentialRepository;
 import com.ssafy.backend.robot.infrastructure.persistence.SpringDataRobotPairingRepository;
 import com.ssafy.backend.robot.infrastructure.persistence.SpringDataRobotRepository;
@@ -36,7 +36,7 @@ class RobotPairingServiceTest {
     private static final Long PET_ID = 201L;
     private static final Long ROBOT_ID = 301L;
 
-    private SpringDataPetReferenceRepository petRepository;
+    private SpringDataPetRepository petRepository;
     private SpringDataRobotRepository robotRepository;
     private SpringDataRobotCredentialRepository credentialRepository;
     private SpringDataRobotPairingRepository pairingRepository;
@@ -45,7 +45,7 @@ class RobotPairingServiceTest {
 
     @BeforeEach
     void setUp() {
-        petRepository = mock(SpringDataPetReferenceRepository.class);
+        petRepository = mock(SpringDataPetRepository.class);
         robotRepository = mock(SpringDataRobotRepository.class);
         credentialRepository = mock(SpringDataRobotCredentialRepository.class);
         pairingRepository = mock(SpringDataRobotPairingRepository.class);
@@ -62,7 +62,7 @@ class RobotPairingServiceTest {
 
     @Test
     void pairsRobotUsingStaticQrToken() {
-        PetReferenceJpaEntity pet = mock(PetReferenceJpaEntity.class);
+        PetJpaEntity pet = mock(PetJpaEntity.class);
         RobotCredentialJpaEntity credential = mock(RobotCredentialJpaEntity.class);
         RobotJpaEntity robot = mock(RobotJpaEntity.class);
         RobotPairingJpaEntity pairing = mock(RobotPairingJpaEntity.class);
@@ -109,7 +109,7 @@ class RobotPairingServiceTest {
 
     @Test
     void rejectsInvalidQrToken() {
-        PetReferenceJpaEntity pet = mock(PetReferenceJpaEntity.class);
+        PetJpaEntity pet = mock(PetJpaEntity.class);
         when(petRepository.findByIdAndUserIdAndDeletedAtIsNull(PET_ID, USER_ID))
                 .thenReturn(Optional.of(pet));
         when(tokenHashService.hash("invalid-token")).thenReturn("invalid-hash");
@@ -126,7 +126,7 @@ class RobotPairingServiceTest {
 
     @Test
     void rejectsExpiredQrToken() {
-        PetReferenceJpaEntity pet = mock(PetReferenceJpaEntity.class);
+        PetJpaEntity pet = mock(PetJpaEntity.class);
         RobotCredentialJpaEntity credential = mock(RobotCredentialJpaEntity.class);
         RobotJpaEntity robot = mock(RobotJpaEntity.class);
         when(petRepository.findByIdAndUserIdAndDeletedAtIsNull(PET_ID, USER_ID))
@@ -148,7 +148,7 @@ class RobotPairingServiceTest {
 
     @Test
     void rejectsRobotWithActivePairing() {
-        PetReferenceJpaEntity pet = mock(PetReferenceJpaEntity.class);
+        PetJpaEntity pet = mock(PetJpaEntity.class);
         RobotCredentialJpaEntity credential = mock(RobotCredentialJpaEntity.class);
         RobotJpaEntity robot = mock(RobotJpaEntity.class);
         when(pet.getId()).thenReturn(PET_ID);
@@ -173,7 +173,7 @@ class RobotPairingServiceTest {
 
     @Test
     void returnsExistingPairingForIdempotentRetry() {
-        PetReferenceJpaEntity pet = mock(PetReferenceJpaEntity.class);
+        PetJpaEntity pet = mock(PetJpaEntity.class);
         RobotCredentialJpaEntity credential = mock(RobotCredentialJpaEntity.class);
         RobotJpaEntity robot = mock(RobotJpaEntity.class);
         RobotPairingJpaEntity pairing = mock(RobotPairingJpaEntity.class);
@@ -203,7 +203,7 @@ class RobotPairingServiceTest {
 
     @Test
     void rejectsRobotOwnedByAnotherUser() {
-        PetReferenceJpaEntity pet = mock(PetReferenceJpaEntity.class);
+        PetJpaEntity pet = mock(PetJpaEntity.class);
         RobotCredentialJpaEntity credential = mock(RobotCredentialJpaEntity.class);
         RobotJpaEntity robot = mock(RobotJpaEntity.class);
         when(credential.getRobotId()).thenReturn(ROBOT_ID);
@@ -226,7 +226,7 @@ class RobotPairingServiceTest {
 
     @Test
     void rejectsPetWithAnotherActiveRobot() {
-        PetReferenceJpaEntity pet = mock(PetReferenceJpaEntity.class);
+        PetJpaEntity pet = mock(PetJpaEntity.class);
         RobotCredentialJpaEntity credential = mock(RobotCredentialJpaEntity.class);
         RobotJpaEntity robot = mock(RobotJpaEntity.class);
         when(pet.getId()).thenReturn(PET_ID);
@@ -251,7 +251,7 @@ class RobotPairingServiceTest {
 
     @Test
     void translatesDatabaseRobotConstraintToBusinessError() {
-        PetReferenceJpaEntity pet = mock(PetReferenceJpaEntity.class);
+        PetJpaEntity pet = mock(PetJpaEntity.class);
         RobotCredentialJpaEntity credential = mock(RobotCredentialJpaEntity.class);
         RobotJpaEntity robot = mock(RobotJpaEntity.class);
         ConstraintViolationException constraint = mock(

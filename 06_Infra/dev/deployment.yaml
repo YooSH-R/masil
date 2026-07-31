@@ -36,6 +36,8 @@ spec:
             - name: http
               containerPort: 8080
           env:
+            - name: SERVER_SERVLET_CONTEXT_PATH
+              value: /dev/api
             - name: DB_URL
               value: jdbc:postgresql://postgres:5432/mysil
             - name: DB_USERNAME
