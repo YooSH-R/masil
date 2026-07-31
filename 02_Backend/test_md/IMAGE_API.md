@@ -466,6 +466,8 @@ $presigned.data | Format-List *
 
 정상이라면 `imageId`, `objectKey`, `uploadUrl`, `expiresAt`이 출력됩니다. PowerShell 표에서 일부 컬럼이 생략되면 반드시 `Format-List *`로 확인합니다.
 
+![Presigned URL 발급 결과](assets/image-api-presigned-result.png)
+
 S3에 사진을 직접 업로드합니다.
 
 ```powershell
@@ -489,6 +491,8 @@ $completed = Invoke-RestMethod `
 
 $completed.data | Format-List *
 ```
+
+![S3 사진 업로드 완료 결과](assets/image-api-upload-complete-result.png)
 
 다음 값이 출력되면 S3 업로드와 완료 처리가 정상입니다.
 

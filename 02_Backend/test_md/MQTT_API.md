@@ -68,7 +68,10 @@ ssh `
   -L 127.0.0.1:11883:127.0.0.1:31883 `
   ubuntu@43.203.247.121
 ```
-### 2.1 로컬 스프링 실행
+
+![MQTT Broker SSH 터널 실행](assets/mqtt-ssh-tunnel.png)
+
+### 2.1 새 터미널에서 로컬 스프링 실행
 ```powershell
 cd C:\Users\SSAFY\Desktop\S15P11A203\02_Backend
 
@@ -94,7 +97,9 @@ $env:MQTT_REQUEST_SCHEDULER_ENABLED = "false"
 Started BackendApplication이 나오면 H2에 device-001 등록과 페어링이 완료된 상태입니다.
 Spring을 종료하면 H2 데이터도 삭제되고, 다시 실행하면 초기 호감도 50점으로 재생성됩니다.
 
-### 2.2 호감도 응답 구독
+![로컬 Spring Backend 실행 완료](assets/mqtt-backend-started.png)
+
+### 2.2 새 터미널에서 호감도 응답 구독
 ```powershell
 $devicePassword = (& ssh `
   -i C:\Users\SSAFY\Downloads\I15A203T.pem `
@@ -112,6 +117,8 @@ $devicePassword = (& ssh `
   -v
 
 ```
+
+![호감도 응답 토픽 구독](assets/mqtt-affection-subscribe.png)
 
 ### 2.3 행동 이벤트 발행
 
@@ -160,6 +167,8 @@ $jsonPath = Join-Path $env:TEMP "mqtt-event.json"
   "mood": "FRIENDLY"
 }
 ```
+
+![호감도 변경 메시지 수신 결과](assets/mqtt-affection-received.png)
 
 
 ### 3. 로컬 MQTT pub/sub
