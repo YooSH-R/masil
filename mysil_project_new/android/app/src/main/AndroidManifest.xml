@@ -4,6 +4,12 @@
          동작하지 않았다. -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- 마실이 기기 밑면의 QR 코드를 스캔한다(기기 등록). -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- 카메라가 없는 기기에도 설치될 수 있게 required=false 로 둔다.
+         (QR 등록만 못 하고 나머지 기능은 동작한다) -->
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+
     <application
         android:label="mysil_project_new"
         android:name="${applicationName}"
