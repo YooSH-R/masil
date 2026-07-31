@@ -85,6 +85,32 @@ jdbc:postgresql://postgres:5432/mysil
 
 DB가 준비된 다음 기존 CI/CD 방식으로 백엔드를 배포합니다.
 
+### 6. 시연용 로봇 QR 프로비저닝
+
+로컬 PostgreSQL 컨테이너가 실행 중인 상태에서 저장소 루트 기준으로
+다음 명령을 실행합니다.
+
+```bash
+cd 06_Infra/postgres
+chmod +x scripts/provision-robot-qr.sh
+./scripts/provision-robot-qr.sh \
+  PETBOT-LOCAL-0001 \
+  "PetBot Local Test" \
+  0.0.1
+```
+
+스크립트는 32바이트 보안 난수로 QR 원문을 생성하고, SHA-256 해시만
+DB에 저장합니다. 기존 소유 로봇도 QR이 아직 없다면 최초 프로비저닝할 수
+있지만, 이미 QR이 발급된 소유 로봇의 QR은 변경하지 않습니다.
+출력되는 `qr_token`은 다시 조회할 수 없으므로 QR 이미지로 만들기 전까지
+안전하게 보관합니다.
+
+QR 유효 기간은 기본 30일이며 필요하면 실행 전에 변경할 수 있습니다.
+
+```bash
+export QR_EXPIRES_DAYS=7
+```
+
 ### 주의
 
 - 초기 SQL은 PVC가 비어 있는 최초 기동에만 자동 실행됩니다.
@@ -93,3 +119,5 @@ DB가 준비된 다음 기존 CI/CD 방식으로 백엔드를 배포합니다.
 - 운영 스키마 변경은 이후 Flyway 같은 마이그레이션 도구로 관리해야 합니다.
 - PostgreSQL Service는 클러스터 내부 전용이며 Ingress나 NodePort로 외부에 노출하지 않습니다.
 - PVC를 삭제하면 DB 데이터가 삭제될 수 있으므로 운영에서는 백업 없이 삭제하지 않습니다.
+- QR 등록 Rate Limit은 현재 단일 백엔드 인스턴스 메모리에서 관리됩니다.
+  백엔드 replica를 2개 이상으로 늘리기 전에 Redis 또는 API Gateway 기반으로 변경해야 합니다.
