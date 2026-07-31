@@ -29,6 +29,7 @@
 from __future__ import annotations
 
 import json
+import random
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -52,6 +53,7 @@ __all__ = [
     "WalkInfo",
     "load_manifest",
     "iter_frames",
+    "sample_time_quantiles",
     "usable",
     "to_json_lines",
     "walk_duration",
@@ -409,6 +411,43 @@ def iter_frames(
 
     metas.sort(key=lambda m: m.sort_key)
     return metas
+
+
+# ============================================================ 표본 추출
+
+def sample_time_quantiles(
+    metas: Sequence[FrameMeta],
+    n: int = 4,
+    *,
+    rng: random.Random | None = None,
+) -> list[FrameMeta]:
+    """시간순 프레임을 n등분해 등분마다 무작위로 1장씩 뽑는다.
+
+    VLM 호출(Stage 1)은 장당 과금되므로, 추출된 프레임 전부를 설명하는 대신
+    산책의 시간 흐름을 대표할 만큼만 골라 그 프레임에만 호출한다. 등분 경계를
+    고정해 매번 같은 순간(예: 정확히 25% 지점)만 뽑지 않고 등분 안에서
+    무작위로 고르는 이유: 그 순간의 프레임이 하필 흐리거나 사람이 시야를
+    가리고 있어도 같은 등분 안의 다른 프레임이 대안이 되기 때문이다.
+
+    metas는 반드시 시간순으로 들어와야 한다(iter_frames의 반환값이 그렇다).
+    등분은 연속 구간이므로 결과도 자동으로 시간순이 되어 재정렬이 필요 없다.
+
+    n이 프레임 수 이상이면 뽑을 게 없으므로 전체를 그대로 반환한다.
+    rng를 주지 않으면 매 호출마다 다른 결과가 나온다(테스트는 고정 시드를 넘긴다).
+    """
+    if n <= 0:
+        raise ValueError(f"n은 1 이상이어야 합니다: {n}")
+    total = len(metas)
+    if total <= n:
+        return list(metas)
+
+    rng = rng or random.Random()
+    picks: list[FrameMeta] = []
+    for i in range(n):
+        start = (i * total) // n
+        end = ((i + 1) * total) // n
+        picks.append(rng.choice(metas[start:end]))
+    return picks
 
 
 # ============================================================ Stage 2/3 입력

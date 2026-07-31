@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import random
 from pathlib import Path
 
 import pytest
@@ -26,6 +27,7 @@ from walklog.records import (
     load_manifest,
     load_records,
     parse_frame_name,
+    sample_time_quantiles,
     to_json_lines,
     usable,
     walk_duration,
@@ -137,6 +139,62 @@ def test_missing_dir_and_empty_dir(tmp_path):
     empty.mkdir()
     with pytest.raises(RecordsError, match="찾지 못했습니다"):
         iter_frames(empty)
+
+
+# ------------------------------------------------------------ 표본 추출
+
+def make_metas(count: int) -> list[FrameMeta]:
+    """오프셋만 0, 1, 2, ...초로 증가하는 더미 메타. 파일은 필요 없다."""
+    return [
+        FrameMeta(path=Path(f"f_{i:04d}.jpg"), index=i, offset_seconds=float(i))
+        for i in range(count)
+    ]
+
+
+def test_sample_time_quantiles_picks_one_per_bucket():
+    metas = make_metas(12)   # 4등분하면 [0-2] [3-5] [6-8] [9-11]
+    picks = sample_time_quantiles(metas, 4, rng=random.Random(0))
+
+    assert len(picks) == 4
+    buckets = [(0, 3), (3, 6), (6, 9), (9, 12)]
+    for pick, (start, end) in zip(picks, buckets):
+        assert start <= pick.offset_seconds < end
+    # 등분이 이미 시간순 연속 구간이므로 결과도 시간순이어야 한다.
+    assert [p.offset_seconds for p in picks] == sorted(p.offset_seconds for p in picks)
+
+
+def test_sample_time_quantiles_uneven_split():
+    """총 개수가 n으로 나누어떨어지지 않아도 등분 경계가 어긋나지 않는다."""
+    metas = make_metas(10)   # 4등분 -> [0-1] [2-4] [5-6] [7-9] (2,3,2,3장)
+    picks = sample_time_quantiles(metas, 4, rng=random.Random(1))
+
+    assert len(picks) == 4
+    buckets = [(0, 2), (2, 5), (5, 7), (7, 10)]
+    for pick, (start, end) in zip(picks, buckets):
+        assert start <= pick.offset_seconds < end
+
+
+def test_sample_time_quantiles_deterministic_with_seed():
+    metas = make_metas(20)
+    first = sample_time_quantiles(metas, 4, rng=random.Random(42))
+    second = sample_time_quantiles(metas, 4, rng=random.Random(42))
+    assert [m.name for m in first] == [m.name for m in second]
+
+
+def test_sample_time_quantiles_no_shrink_when_not_enough_frames():
+    """뽑을 등분 수보다 프레임이 적으면 전부 그대로 돌려준다."""
+    metas = make_metas(3)
+    assert sample_time_quantiles(metas, 4, rng=random.Random(0)) == metas
+
+
+def test_sample_time_quantiles_exact_n_returns_all():
+    metas = make_metas(4)
+    assert sample_time_quantiles(metas, 4, rng=random.Random(0)) == metas
+
+
+def test_sample_time_quantiles_rejects_non_positive_n():
+    with pytest.raises(ValueError, match="1 이상"):
+        sample_time_quantiles(make_metas(5), 0)
 
 
 # ------------------------------------------------------------ 촬영 일시 배선

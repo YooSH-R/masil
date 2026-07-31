@@ -1,6 +1,7 @@
 """산책 일지 생성 CLI.
 
-  Stage 1  프레임 -> 관찰 기록 (VLM)
+  Stage 0  프레임 추출 -> 표본 추출 (시간 등분마다 무작위 1장, API 없음)
+  Stage 1  표본 프레임 -> 관찰 기록 (VLM)
   Stage 2  관찰 기록 -> 산책 일지 (LLM)
 
 사용:
@@ -10,6 +11,8 @@
     python run_walk_log.py --started-at 2026-07-28T08:12:03
     python run_walk_log.py --records outputs/2026-07-28/frame_records.json --no-observe
     python run_walk_log.py --limit 2 --dump-payload    # 2장만, 요청 덤프
+    python run_walk_log.py --quarters 6                 # 6등분, 6장만 VLM 호출
+    python run_walk_log.py --no-sample                  # 표본 추출 없이 전부 처리
 
 [분할 전에서 바뀐 점]
 1. --started-at / --location 이 생겼다. 분할 전에는 shot_datetime이 항상 "불명"이라
@@ -18,11 +21,20 @@
    문체를 비교하려고 API를 다시 부를 필요가 없다.
 3. 결과가 outputs/<날짜>/ 아래에 쌓인다. 실행 위치에 덮어쓰지 않는다.
 4. 실패한 프레임 목록을 마지막에 요약한다.
+
+[표본 추출을 Stage 1 앞에 둔 이유]
+VLM 호출은 장당 과금된다. 추출된 프레임 전부를 설명하면 장수가 늘어날수록
+비용과 실행 시간이 그대로 늘어나므로, 시간 흐름을 대표할 만큼만 골라 그
+프레임에만 호출한다(records.sample_time_quantiles). 장면 선정을 관찰 결과가
+나온 뒤에 하면(illustrate.select_key_scenes처럼) 이미 전부 VLM을 태운 뒤라
+비용을 아낄 수 없으므로, 표본 추출은 반드시 Stage 1 이전, 파일 메타데이터만
+가지고 이뤄진다.
 """
 
 from __future__ import annotations
 
 import argparse
+import random
 from pathlib import Path
 from typing import Sequence
 
@@ -38,6 +50,7 @@ from ..records import (
     dump_records,
     iter_frames,
     load_records,
+    sample_time_quantiles,
     walk_duration,
 )
 from ..stages import ComposeError, compose_walk_log, observe_frames
@@ -67,6 +80,14 @@ def build_parser() -> argparse.ArgumentParser:
                         help="기존 관찰 기록을 읽는다 (--no-observe 와 함께)")
     source.add_argument("--limit", type=int, default=None,
                         help="앞에서 N장만 처리 (동작 확인용)")
+    source.add_argument("--quarters", type=int, default=4,
+                        help="표본 추출 등분 수. 시간순 프레임을 이 수만큼 "
+                             "등분해 등분마다 무작위로 1장씩만 VLM에 보낸다 "
+                             "(기본: 4)")
+    source.add_argument("--no-sample", action="store_true",
+                        help="표본 추출을 건너뛰고 추출된 프레임 전부를 처리한다")
+    source.add_argument("--sample-seed", type=int, default=None,
+                        help="표본 추출 난수 시드 (재현 가능한 결과가 필요할 때)")
 
     stages = parser.add_argument_group("단계 선택")
     stages.add_argument("--no-observe", action="store_true",
@@ -150,6 +171,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             metas = iter_frames(args.frames, manifest=_resolve_manifest(args),
                                 walk=walk)
+            if not args.no_sample:
+                before = len(metas)
+                rng = random.Random(args.sample_seed) \
+                    if args.sample_seed is not None else None
+                metas = sample_time_quantiles(metas, args.quarters, rng=rng)
+                step(f"[표본 추출] {before}개 -> {len(metas)}개 "
+                     f"({args.quarters}등분, 등분마다 무작위 1장)")
             if args.limit:
                 metas = metas[:args.limit]
             step(f"[Stage 1] 프레임 {len(metas)}개 -> 관찰 기록")
