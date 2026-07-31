@@ -36,7 +36,7 @@ public class StandardAuthTokenIssuer implements AuthTokenIssuer {
                 .ifPresent(AuthSessionJpaEntity::revoke);
 
         TokenService.AccessToken accessToken =
-                tokenService.createAccessToken(user.id());
+                tokenService.createAccessToken(user.id(), deviceId);
         TokenService.RefreshToken refreshToken =
                 tokenService.createRefreshToken();
 

@@ -34,16 +34,23 @@ public class TokenService {
     }
 
     public AccessToken createAccessToken(Long userId) {
+        return createAccessToken(userId, null);
+    }
+
+    public AccessToken createAccessToken(Long userId, String deviceId) {
         Instant issuedAt = Instant.now();
         Instant expiresAt = issuedAt.plusSeconds(accessValiditySeconds);
 
-        String value = Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(userId.toString())
                 .claim("tokenType", "ACCESS")
                 .issuedAt(Date.from(issuedAt))
-                .expiration(Date.from(expiresAt))
-                .signWith(secretKey)
-                .compact();
+                .expiration(Date.from(expiresAt));
+        if (deviceId != null) {
+            builder.claim("deviceId", deviceId);
+        }
+
+        String value = builder.signWith(secretKey).compact();
 
         return new AccessToken(value, expiresAt);
     }
@@ -59,6 +66,10 @@ public class TokenService {
     }
 
     public Long parseAccessToken(String token) {
+        return parseAccessTokenPrincipal(token).userId();
+    }
+
+    public AccessTokenPrincipal parseAccessTokenPrincipal(String token) {
         Claims claims = Jwts.parser()
                 .verifyWith(secretKey)
                 .build()
@@ -70,10 +81,16 @@ public class TokenService {
             throw new IllegalArgumentException("Access Token이 아닙니다.");
         }
 
-        return Long.valueOf(claims.getSubject());
+        return new AccessTokenPrincipal(
+                Long.valueOf(claims.getSubject()),
+                claims.get("deviceId", String.class)
+        );
     }
 
     public record AccessToken(String value, Instant expiresAt) {
+    }
+
+    public record AccessTokenPrincipal(Long userId, String deviceId) {
     }
 
     public record RefreshToken(String value, Instant expiresAt) {

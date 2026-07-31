@@ -1,6 +1,7 @@
 package com.ssafy.backend.auth.service;
 
 import com.ssafy.backend.auth.domain.AuthVerification;
+import com.ssafy.backend.auth.domain.VerificationPurpose;
 import com.ssafy.backend.auth.dto.VerificationConfirmRequest;
 import com.ssafy.backend.auth.dto.VerificationConfirmResponse;
 import com.ssafy.backend.auth.dto.VerificationSendRequest;
@@ -70,6 +71,9 @@ public class VerificationService {
         repository.save(AuthVerification.create(
                 verificationId,
                 phoneNumber,
+                request.purpose() == null
+                        ? VerificationPurpose.SIGNUP
+                        : request.purpose(),
                 passwordEncoder.encode(code),
                 expiresAt
         ));
@@ -113,16 +117,52 @@ public class VerificationService {
 
     @Transactional
     public String consumeSignupToken(String token, String phoneNumber) {
+        return consumeToken(token, phoneNumber, VerificationPurpose.SIGNUP);
+    }
+
+    @Transactional
+    public String consumePhoneVerificationToken(String token, String phoneNumber) {
+        return consumeToken(token, phoneNumber, VerificationPurpose.SIGNUP);
+    }
+
+    @Transactional
+    public String consumePasswordResetToken(String token, String phoneNumber) {
+        return consumeToken(
+                token,
+                phoneNumber,
+                VerificationPurpose.PASSWORD_RESET
+        );
+    }
+
+    private String consumeToken(
+            String token,
+            String phoneNumber,
+            VerificationPurpose expectedPurpose
+    ) {
         String normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
         AuthVerification verification = repository
                 .findByTokenHash(tokenHashService.hash(token))
-                .filter(found -> found.getPhoneNumber().equals(normalizedPhoneNumber))
-                .filter(found -> found.canUseTokenAt(Instant.now()))
                 .orElseThrow(() -> new ApiException(
                         HttpStatus.UNAUTHORIZED,
                         "VERIFICATION_TOKEN_INVALID",
                         "휴대전화 인증이 필요합니다."
                 ));
+
+        if (!verification.getPhoneNumber().equals(normalizedPhoneNumber)
+                || !verification.canUseTokenAt(Instant.now())) {
+            throw new ApiException(
+                    HttpStatus.UNAUTHORIZED,
+                    "VERIFICATION_TOKEN_INVALID",
+                    "휴대전화 인증이 필요합니다."
+            );
+        }
+        if (verification.getPurpose() != expectedPurpose) {
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "VERIFICATION_PURPOSE_MISMATCH",
+                    "인증 목적이 올바르지 않습니다."
+            );
+        }
 
         verification.markUsed(Instant.now());
         return normalizedPhoneNumber;

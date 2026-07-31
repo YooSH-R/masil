@@ -123,7 +123,10 @@ public class AuthService {
                 ));
 
         TokenService.AccessToken accessToken =
-                tokenService.createAccessToken(session.getUserId());
+                tokenService.createAccessToken(
+                        session.getUserId(),
+                        session.getDeviceId()
+                );
         TokenService.RefreshToken refreshToken =
                 tokenService.createRefreshToken();
 

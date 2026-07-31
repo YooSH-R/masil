@@ -57,6 +57,11 @@ class StandardAuthTokenIssuerTest {
         IssuedTokens tokens = issuer.issue(user, "device-id");
 
         assertEquals(user.id(), tokenService.parseAccessToken(tokens.accessToken()));
+        assertEquals(
+                "device-id",
+                tokenService.parseAccessTokenPrincipal(tokens.accessToken())
+                        .deviceId()
+        );
         assertFalse(existingSession.isUsableAt(Instant.now()));
         verify(repository).save(any(AuthSessionJpaEntity.class));
     }

@@ -10,6 +10,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name = "users")
@@ -98,5 +99,31 @@ public class UserJpaEntity {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void changeNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
+    public void changePhoneNumber(String phoneNumber, Instant verifiedAt) {
+        this.phoneNumber = phoneNumber;
+        this.phoneVerifiedAt = verifiedAt;
+    }
+
+    public void changePasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public void withdraw(Instant now) {
+        this.email = null;
+        this.passwordHash = null;
+        this.nickname = "withdrawn-" + id + "-" + UUID.randomUUID();
+        this.phoneNumber = null;
+        this.phoneVerifiedAt = null;
+        this.deletedAt = now;
     }
 }

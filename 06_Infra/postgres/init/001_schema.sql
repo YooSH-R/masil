@@ -61,6 +61,8 @@ CREATE TABLE auth_verifications (
     token_expires_at TIMESTAMPTZ,
     used_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT auth_verifications_purpose_check
+        CHECK (purpose IN ('SIGNUP', 'PASSWORD_RESET')),
     CONSTRAINT auth_verifications_attempt_count_check
         CHECK (attempt_count >= 0)
 );
