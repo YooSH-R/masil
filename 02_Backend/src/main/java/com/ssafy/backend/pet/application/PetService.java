@@ -2,10 +2,10 @@ package com.ssafy.backend.pet.application;
 
 import com.ssafy.backend.common.error.BusinessException;
 import com.ssafy.backend.common.error.ErrorCode;
+import com.ssafy.backend.pet.infrastructure.persistence.PetAffinityStateJpaEntity;
 import com.ssafy.backend.pet.infrastructure.persistence.PetCreationRequestJpaEntity;
 import com.ssafy.backend.pet.infrastructure.persistence.PetJpaEntity;
 import com.ssafy.backend.pet.infrastructure.persistence.PetRobotStatusProjection;
-import com.ssafy.backend.pet.infrastructure.persistence.SpringDataPetAffinityStateRepository;
 import com.ssafy.backend.pet.infrastructure.persistence.SpringDataPetCreationRequestRepository;
 import com.ssafy.backend.pet.infrastructure.persistence.SpringDataPetRepository;
 import com.ssafy.backend.user.infrastructure.persistence.SpringDataUserRepository;
@@ -22,20 +22,17 @@ import java.util.HexFormat;
 public class PetService {
 
     private final SpringDataPetRepository petRepository;
-    private final SpringDataPetAffinityStateRepository affinityRepository;
     private final SpringDataPetCreationRequestRepository creationRequestRepository;
     private final SpringDataUserRepository userRepository;
     private final PetCreationTransactionService creationTransactionService;
 
     public PetService(
             SpringDataPetRepository petRepository,
-            SpringDataPetAffinityStateRepository affinityRepository,
             SpringDataPetCreationRequestRepository creationRequestRepository,
             SpringDataUserRepository userRepository,
             PetCreationTransactionService creationTransactionService
     ) {
         this.petRepository = petRepository;
-        this.affinityRepository = affinityRepository;
         this.creationRequestRepository = creationRequestRepository;
         this.userRepository = userRepository;
         this.creationTransactionService = creationTransactionService;
@@ -95,18 +92,17 @@ public class PetService {
             String name
     ) {
         PetJpaEntity pet = petRepository
-                .findOwnedByIdForUpdate(petId, userId)
+                .findOwnedWithAffinity(petId, userId)
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.PET_NOT_FOUND
                 ));
         pet.changeName(normalizeName(name));
-        petRepository.flush();
         return toProfileResult(pet);
     }
 
     private PetJpaEntity findOwnedPet(Long petId, Long userId) {
         return petRepository
-                .findByIdAndUserIdAndDeletedAtIsNull(petId, userId)
+                .findOwnedWithAffinity(petId, userId)
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.PET_NOT_FOUND
                 ));
@@ -139,7 +135,7 @@ public class PetService {
         return new PetCreatedResult(
                 pet.getId(),
                 pet.getName(),
-                findAffinity(pet.getId()),
+                toAffinityResult(pet.getAffinityState()),
                 pet.getCreatedAt()
         );
     }
@@ -153,21 +149,24 @@ public class PetService {
                 pet.getId(),
                 pet.getName(),
                 null,
-                findAffinity(pet.getId()),
+                toAffinityResult(pet.getAffinityState()),
                 robot
         );
     }
 
-    private PetAffinityResult findAffinity(Long petId) {
-        return affinityRepository.findById(petId)
-                .map(state -> new PetAffinityResult(
-                        state.getAffinityScore(),
-                        state.getAffinityLevel(),
-                        state.getMood()
-                ))
-                .orElseThrow(() -> new BusinessException(
-                        ErrorCode.PET_AFFINITY_STATE_NOT_FOUND
-                ));
+    private PetAffinityResult toAffinityResult(
+            PetAffinityStateJpaEntity state
+    ) {
+        if (state == null) {
+            throw new BusinessException(
+                    ErrorCode.PET_AFFINITY_STATE_NOT_FOUND
+            );
+        }
+        return new PetAffinityResult(
+                state.getAffinityScore(),
+                state.getAffinityLevel(),
+                state.getMood()
+        );
     }
 
     private PetRobotResult toRobotResult(PetRobotStatusProjection status) {

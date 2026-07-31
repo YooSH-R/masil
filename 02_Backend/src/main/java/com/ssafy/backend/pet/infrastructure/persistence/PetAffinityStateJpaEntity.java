@@ -2,7 +2,11 @@ package com.ssafy.backend.pet.infrastructure.persistence;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.MapsId;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -16,6 +20,11 @@ public class PetAffinityStateJpaEntity {
     @Id
     @Column(name = "pet_id")
     private Long petId;
+
+    @MapsId
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "pet_id")
+    private PetJpaEntity pet;
 
     @Column(name = "affinity_score", nullable = false)
     private int affinityScore;
@@ -33,19 +42,19 @@ public class PetAffinityStateJpaEntity {
     }
 
     private PetAffinityStateJpaEntity(
-            Long petId,
+            PetJpaEntity pet,
             int affinityScore,
             int affinityLevel,
             String mood
     ) {
-        this.petId = petId;
+        this.pet = pet;
         this.affinityScore = affinityScore;
         this.affinityLevel = affinityLevel;
         this.mood = mood;
     }
 
-    public static PetAffinityStateJpaEntity initial(Long petId) {
-        return new PetAffinityStateJpaEntity(petId, 0, 1, "NEUTRAL");
+    static PetAffinityStateJpaEntity initial(PetJpaEntity pet) {
+        return new PetAffinityStateJpaEntity(pet, 0, 1, "NEUTRAL");
     }
 
     @PrePersist

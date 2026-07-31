@@ -1,9 +1,7 @@
 package com.ssafy.backend.pet.application;
 
-import com.ssafy.backend.pet.infrastructure.persistence.PetAffinityStateJpaEntity;
 import com.ssafy.backend.pet.infrastructure.persistence.PetCreationRequestJpaEntity;
 import com.ssafy.backend.pet.infrastructure.persistence.PetJpaEntity;
-import com.ssafy.backend.pet.infrastructure.persistence.SpringDataPetAffinityStateRepository;
 import com.ssafy.backend.pet.infrastructure.persistence.SpringDataPetCreationRequestRepository;
 import com.ssafy.backend.pet.infrastructure.persistence.SpringDataPetRepository;
 import org.springframework.stereotype.Service;
@@ -13,16 +11,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class PetCreationTransactionService {
 
     private final SpringDataPetRepository petRepository;
-    private final SpringDataPetAffinityStateRepository affinityRepository;
     private final SpringDataPetCreationRequestRepository creationRequestRepository;
 
     public PetCreationTransactionService(
             SpringDataPetRepository petRepository,
-            SpringDataPetAffinityStateRepository affinityRepository,
             SpringDataPetCreationRequestRepository creationRequestRepository
     ) {
         this.petRepository = petRepository;
-        this.affinityRepository = affinityRepository;
         this.creationRequestRepository = creationRequestRepository;
     }
 
@@ -33,13 +28,10 @@ public class PetCreationTransactionService {
             String requestHash,
             String name
     ) {
-        PetJpaEntity pet = petRepository.saveAndFlush(
+        PetJpaEntity pet = petRepository.save(
                 new PetJpaEntity(userId, name)
         );
-        affinityRepository.saveAndFlush(
-                PetAffinityStateJpaEntity.initial(pet.getId())
-        );
-        creationRequestRepository.saveAndFlush(
+        creationRequestRepository.save(
                 new PetCreationRequestJpaEntity(
                         userId,
                         idempotencyKey,

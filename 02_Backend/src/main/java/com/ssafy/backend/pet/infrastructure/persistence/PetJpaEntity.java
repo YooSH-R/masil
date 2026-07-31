@@ -1,10 +1,13 @@
 package com.ssafy.backend.pet.infrastructure.persistence;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -37,12 +40,22 @@ public class PetJpaEntity {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    @OneToOne(
+            mappedBy = "pet",
+            fetch = FetchType.LAZY,
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            optional = false
+    )
+    private PetAffinityStateJpaEntity affinityState;
+
     protected PetJpaEntity() {
     }
 
     public PetJpaEntity(Long userId, String name) {
         this.userId = userId;
         this.name = name;
+        this.affinityState = PetAffinityStateJpaEntity.initial(this);
     }
 
     @PrePersist
@@ -75,6 +88,10 @@ public class PetJpaEntity {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public PetAffinityStateJpaEntity getAffinityState() {
+        return affinityState;
     }
 
     public void changeName(String name) {

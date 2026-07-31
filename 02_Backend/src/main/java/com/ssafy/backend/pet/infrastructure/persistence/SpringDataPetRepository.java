@@ -1,8 +1,6 @@
 package com.ssafy.backend.pet.infrastructure.persistence;
 
-import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -15,15 +13,15 @@ public interface SpringDataPetRepository extends JpaRepository<PetJpaEntity, Lon
             Long userId
     );
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select pet
             from PetJpaEntity pet
+            left join fetch pet.affinityState
             where pet.id = :petId
               and pet.userId = :userId
               and pet.deletedAt is null
             """)
-    Optional<PetJpaEntity> findOwnedByIdForUpdate(
+    Optional<PetJpaEntity> findOwnedWithAffinity(
             @Param("petId") Long petId,
             @Param("userId") Long userId
     );
