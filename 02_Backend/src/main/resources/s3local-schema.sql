@@ -62,9 +62,9 @@ CREATE TABLE robot_photos (
 );
 
 INSERT INTO users (
-    id, nickname, created_at, updated_at
+    id, version, nickname, created_at, updated_at
 ) VALUES (
-    900001, 's3-local-test', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    900001, 0, 's3-local-test', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 );
 
 INSERT INTO pets (id, user_id)

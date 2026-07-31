@@ -32,7 +32,14 @@ class JwtAuthenticationFilterTest {
         request.addHeader("Authorization", "Bearer access-token");
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
-        when(tokenService.parseAccessToken("access-token")).thenReturn(7L);
+        when(tokenService.parseAccessTokenPrincipal("access-token"))
+                .thenReturn(
+                        new TokenService.AccessTokenPrincipal(
+                                7L,
+                                "browser-001",
+                                11L
+                        )
+                );
 
         filter.doFilter(request, response, chain);
 
@@ -43,6 +50,14 @@ class JwtAuthenticationFilterTest {
                 authentication.getPrincipal()
         );
         assertEquals(7L, principal.userId());
+        assertEquals(
+                "browser-001",
+                request.getAttribute("authenticatedDeviceId")
+        );
+        assertEquals(
+                11L,
+                request.getAttribute("authenticatedSessionId")
+        );
         assertTrue(authentication.getAuthorities().stream().anyMatch(
                 authority -> authority.getAuthority().equals("ROLE_USER")
         ));
