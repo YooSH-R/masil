@@ -310,13 +310,31 @@ $deviceTokenHash = -join (
 "Device Token Hash: $deviceTokenHash"
 ```
 
+`$deviceHttpToken`은 이후 API 요청에 사용하므로 현재 PowerShell 창을 유지합니다. 원본 토큰은 DB나 Git에 저장하지 않습니다.
+
 ### 5.2 dev 테스트 디바이스 등록
+
+서버에 접속합니다.
+
+```powershell
+ssh -i C:\Users\SSAFY\Downloads\I15A203T.pem `
+  ubuntu@43.203.247.121
+```
 
 PostgreSQL에 접속합니다.
 
 ```bash
 sudo k3s kubectl -n s15a203-dev exec -it postgres-0 -- \
   psql -U mysil -d mysil
+```
+
+사용할 사용자 ID를 확인합니다. 앱 사진 목록까지 테스트하려면 앱 Access Token이 발급된 본인의 `userId`를 선택해야 합니다.
+
+```sql
+SELECT id, nickname
+FROM users
+WHERE deleted_at IS NULL
+ORDER BY id;
 ```
 
 `<USER_ID>`에는 앱 로그인 사용자의 ID를, `<DEVICE_TOKEN_HASH>`에는 PowerShell에서 생성한 64자리 해시를 넣습니다. 꺾쇠 괄호까지 그대로 입력하면 안 됩니다.
@@ -395,6 +413,26 @@ FROM new_pairing;
 
 출력된 `pet_id`를 앱 사진 목록 테스트에 사용합니다.
 
+등록 상태를 확인합니다.
+
+```sql
+SELECT
+    r.serial_number,
+    rp.pet_id,
+    rp.unpaired_at,
+    c.device_token_hash IS NOT NULL AS token_registered
+FROM robots r
+JOIN robot_credentials c ON c.robot_id = r.id
+JOIN robot_pairings rp ON rp.robot_id = r.id
+WHERE r.serial_number = 'device-photo-001';
+```
+
+`token_registered=true`, `unpaired_at=NULL`이면 정상입니다.
+
+```sql
+\q
+```
+
 ### 5.3 dev S3 업로드 테스트
 
 로컬 PowerShell에서 실행합니다.
@@ -402,8 +440,8 @@ FROM new_pairing;
 ```powershell
 $baseUrl = "http://i15a203.p.ssafy.io/api"
 $deviceId = "device-photo-001"
-$imagePath = "C:\Users\SSAFY\Pictures\photo.jpg"
-$contentType = "image/jpeg"
+$imagePath = "C:\Users\SSAFY\Pictures\Screenshots\test-photo.png"
+$contentType = "image/png"
 
 $imageFile = Get-Item $imagePath
 $deviceHeaders = @{
@@ -424,7 +462,13 @@ $presigned = Invoke-RestMethod `
   -Body $body
 
 $presigned.data | Format-List *
+```
 
+정상이라면 `imageId`, `objectKey`, `uploadUrl`, `expiresAt`이 출력됩니다. PowerShell 표에서 일부 컬럼이 생략되면 반드시 `Format-List *`로 확인합니다.
+
+S3에 사진을 직접 업로드합니다.
+
+```powershell
 $imageId = $presigned.data.imageId
 $uploadUrl = $presigned.data.uploadUrl
 
@@ -433,7 +477,11 @@ curl.exe `
   -H "Content-Type: $contentType" `
   --upload-file "$imagePath" `
   "$uploadUrl"
+```
 
+업로드 완료를 백엔드에 전달합니다.
+
+```powershell
 $completed = Invoke-RestMethod `
   -Method Post `
   -Uri "$baseUrl/v1/devices/$deviceId/images/$imageId/complete" `
@@ -450,7 +498,97 @@ $completed.data | Format-List *
 - `capturedAt`
 - `uploadedAt`
 
-### 5.4 dev 테스트 확인 결과
+### 5.4 Device Token 401 확인
+
+401이 발생하면 현재 PowerShell의 토큰과 헤더부터 확인합니다.
+
+```powershell
+$deviceId
+$deviceHttpToken.Length
+$deviceHeaders.Authorization.StartsWith("Device ")
+$deviceHeaders.Authorization.Length
+```
+
+32바이트 토큰을 위 예시로 생성했다면 정상 결과는 다음과 같습니다.
+
+```text
+device-photo-001
+43
+True
+50
+```
+
+현재 원본 토큰으로 SHA-256 해시를 다시 계산합니다.
+
+```powershell
+$sha256 = [Security.Cryptography.SHA256]::Create()
+$hashBytes = $sha256.ComputeHash(
+  [Text.Encoding]::UTF8.GetBytes($deviceHttpToken.Trim())
+)
+$deviceTokenHash = -join (
+  $hashBytes | ForEach-Object { $_.ToString("x2") }
+)
+
+$deviceTokenHash
+```
+
+PostgreSQL에서 DB 해시와 비교합니다. `<DEVICE_TOKEN_HASH>`는 방금 출력된 실제 64자리 값으로 바꿉니다.
+
+```sql
+SELECT c.device_token_hash = '<DEVICE_TOKEN_HASH>' AS token_matches
+FROM robot_credentials c
+JOIN robots r ON r.id = c.robot_id
+WHERE r.serial_number = 'device-photo-001';
+```
+
+`token_matches=false`인 경우에만 갱신합니다.
+
+```sql
+UPDATE robot_credentials c
+SET device_token_hash = '<DEVICE_TOKEN_HASH>',
+    device_token_expires_at = NULL,
+    updated_at = CURRENT_TIMESTAMP
+FROM robots r
+WHERE c.robot_id = r.id
+  AND r.serial_number = 'device-photo-001';
+```
+
+DB에는 작은따옴표 내부의 해시만 저장되며 작은따옴표 자체는 저장되지 않습니다. `token_matches=true`인데도 실패하면 백엔드 로그에서 실제 내부 오류를 확인합니다.
+
+```bash
+sudo k3s kubectl -n s15a203-dev logs deployment/backend \
+  --since=10m --tail=200
+```
+
+### 5.5 앱 사진 목록 및 다운로드 테스트
+
+디바이스를 등록할 때 선택한 사용자의 Access Token과 출력된 `pet_id`를 사용합니다.
+
+```powershell
+$petId = <등록할 때 출력된 PET_ID>
+$appAccessToken = Read-Host "App Access Token"
+$appHeaders = @{
+  Authorization = "Bearer $appAccessToken"
+}
+
+$images = Invoke-RestMethod `
+  -Method Get `
+  -Uri "$baseUrl/v1/pets/$petId/images" `
+  -Headers $appHeaders
+
+$images.data | Format-Table
+
+$download = Invoke-RestMethod `
+  -Method Get `
+  -Uri "$baseUrl/v1/images/$imageId/download-url" `
+  -Headers $appHeaders
+
+$download.data.downloadUrl
+```
+
+출력된 URL을 브라우저에서 열어 업로드한 사진이 보이면 전체 흐름이 정상입니다.
+
+### 5.6 dev 테스트 확인 결과
 
 - `S3_ENABLED=true`
 - S3 버킷 및 `backend-s3-secret` 연결 확인
