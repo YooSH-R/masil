@@ -33,10 +33,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (authorization != null && authorization.startsWith("Bearer ")) {
             try {
-                Long userId = tokenService.parseAccessToken(
+                TokenService.AccessTokenPrincipal principal =
+                        tokenService.parseAccessTokenPrincipal(
                         authorization.substring(7)
                 );
 
+                request.setAttribute(
+                        "authenticatedDeviceId",
+                        principal.deviceId()
+                );
+                request.setAttribute(
+                        "authenticatedSessionId",
+                        principal.sessionId()
+                );
                 SecurityContextHolder.getContext().setAuthentication(
                         new UsernamePasswordAuthenticationToken(
                                 new UserPrincipal(userId),
