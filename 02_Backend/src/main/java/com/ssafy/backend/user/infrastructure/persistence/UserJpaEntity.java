@@ -8,25 +8,50 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
-@Table(name = "users")
+@Table(
+        name = "users",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uq_users_nickname",
+                        columnNames = "nickname"
+                ),
+                @UniqueConstraint(
+                        name = "uq_users_phone_number",
+                        columnNames = "phone_number"
+                )
+        }
+)
 public class UserJpaEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    @Column(nullable = false)
+    private long version;
+
     @Column(length = 255)
     private String email;
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(name = "password_hash", length = 255)
+    private String passwordHash;
+
+    @Column(nullable = false, length = 100)
     private String nickname;
 
-    @Column(name = "phone_number", unique = true, length = 20)
+    @Column(name = "phone_number", length = 20)
     private String phoneNumber;
+
+    @Column(name = "phone_verified_at")
+    private Instant phoneVerifiedAt;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -40,10 +65,18 @@ public class UserJpaEntity {
     protected UserJpaEntity() {
     }
 
-    public UserJpaEntity(String email, String nickname, String phoneNumber) {
+    public UserJpaEntity(
+            String email,
+            String passwordHash,
+            String nickname,
+            String phoneNumber,
+            Instant phoneVerifiedAt
+    ) {
         this.email = email;
+        this.passwordHash = passwordHash;
         this.nickname = nickname;
         this.phoneNumber = phoneNumber;
+        this.phoneVerifiedAt = phoneVerifiedAt;
     }
 
     @PrePersist
@@ -66,6 +99,10 @@ public class UserJpaEntity {
         return email;
     }
 
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
     public String getNickname() {
         return nickname;
     }
@@ -74,7 +111,37 @@ public class UserJpaEntity {
         return phoneNumber;
     }
 
+    public Instant getPhoneVerifiedAt() {
+        return phoneVerifiedAt;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void changeNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
+    public void changePhoneNumber(String phoneNumber, Instant verifiedAt) {
+        this.phoneNumber = phoneNumber;
+        this.phoneVerifiedAt = verifiedAt;
+    }
+
+    public void changePasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public void withdraw(Instant now) {
+        this.email = null;
+        this.passwordHash = null;
+        this.nickname = "withdrawn-" + id + "-" + UUID.randomUUID();
+        this.phoneNumber = null;
+        this.phoneVerifiedAt = null;
+        this.deletedAt = now;
     }
 }

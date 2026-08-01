@@ -5,6 +5,7 @@ import com.ssafy.backend.auth.domain.SocialPrincipal;
 import com.ssafy.backend.auth.domain.SocialProvider;
 import com.ssafy.backend.common.error.BusinessException;
 import com.ssafy.backend.common.error.ErrorCode;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
@@ -17,7 +18,9 @@ public class GoogleJwtIdTokenVerifier implements GoogleIdTokenVerifier {
 
     private final JwtDecoder googleJwtDecoder;
 
-    public GoogleJwtIdTokenVerifier(JwtDecoder googleJwtDecoder) {
+    public GoogleJwtIdTokenVerifier(
+            @Qualifier("googleJwtDecoder") JwtDecoder googleJwtDecoder
+    ) {
         this.googleJwtDecoder = googleJwtDecoder;
     }
 

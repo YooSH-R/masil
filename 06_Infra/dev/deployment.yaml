@@ -36,6 +36,8 @@ spec:
             - name: http
               containerPort: 8080
           env:
+            - name: SERVER_SERVLET_CONTEXT_PATH
+              value: /dev/api
             - name: DB_URL
               value: jdbc:postgresql://postgres:5432/mysil
             - name: DB_USERNAME
@@ -48,6 +50,26 @@ spec:
                 secretKeyRef:
                   name: postgres-secret
                   key: POSTGRES_PASSWORD
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: backend-auth-secret
+                  key: JWT_SECRET
+            - name: SOLAPI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backend-sms-secret
+                  key: SOLAPI_API_KEY
+            - name: SOLAPI_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backend-sms-secret
+                  key: SOLAPI_SECRET_KEY
+            - name: SOLAPI_SENDER
+              valueFrom:
+                secretKeyRef:
+                  name: backend-sms-secret
+                  key: SOLAPI_SENDER
           resources:
             requests:
               cpu: 200m

@@ -4,6 +4,7 @@ import com.ssafy.backend.auth.domain.SocialProvider;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
+import java.util.List;
 
 public interface SpringDataSocialAccountRepository
         extends JpaRepository<SocialAccountJpaEntity, Long> {
@@ -17,4 +18,8 @@ public interface SpringDataSocialAccountRepository
             SocialProvider provider,
             String providerUserId
     );
+
+    List<SocialAccountJpaEntity> findAllByUserIdOrderByIdAsc(Long userId);
+
+    void deleteByUserId(Long userId);
 }
