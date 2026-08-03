@@ -44,12 +44,34 @@ Copy each job's GitLab webhook URL from Jenkins into a separate GitLab
 webhook. Both webhooks may use the same secret token because branch filters in
 the two Jenkinsfiles restrict which job can deploy each branch.
 
-The development job deploys automatically when `02_Backend/` changes on
-`dev`. Its public API prefix is `/dev/api/v1`.
+The development job deploys automatically when `02_Backend/`, its deployment
+manifests, or `06_Infra/postgres/init/` changes on `dev`. Its public API prefix
+is `/dev/api/v1`.
 
 The production job builds from `master`, waits for a Jenkins user to approve
 the `Approve Production` stage, and then updates the production Deployment.
 Its public API prefix remains `/api/v1`.
+
+When a file under `06_Infra/postgres/init/` changes, each job applies migrations
+`002`, `003`, `004`, `006`, `007`, `008`, `009`, and `010` in that order against the
+existing `postgres-0` PVC before rolling out the application. Every `psql`
+invocation uses `ON_ERROR_STOP=1`; a failed migration stops the pipeline before
+the backend Deployment changes. The production migration runs only after the
+production approval stage.
+
+Apply the development deployer Role before using this migration stage:
+
+```bash
+kubectl apply -f 06_Infra/jenkins/dev-backend-deployer-rbac.yaml
+kubectl -n s15a203-dev auth can-i create pods/exec \
+  --as=system:serviceaccount:jenkins:jenkins
+```
+
+Production cluster authorization is managed externally. The identity used by
+the production Jenkins job must have `create` permission for the core API
+`pods/exec` subresource in `s15a203-prod`, in addition to its existing Pod and
+Deployment read/update permissions. Verify that permission before enabling the
+job; do not grant cluster-wide access solely for database migration.
 
 Do not configure either job to load the other environment's Jenkinsfile.
 Branch validation inside each pipeline stops an incorrectly configured job

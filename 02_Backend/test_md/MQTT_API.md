@@ -216,6 +216,28 @@ kubectl -n s15a203-dev logs deployment/backend --since=5m
 | 서버 → 디바이스 | `robot-pet/v1/devices/{deviceId}/affection` |
 | 서버 → 디바이스 | `robot-pet/v1/devices/{deviceId}/requests` |
 
+## 산책 완료 HTTP 연동
+
+산책 완료는 디바이스가 MQTT `WALK_COMPLETED`와 HTTP 요청을 둘 다 보내는
+방식이 아니라 다음 HTTP 요청 하나로 처리합니다.
+
+```http
+POST /api/v1/walks/{walkId}/end
+Authorization: Device {DEVICE_HTTP_TOKEN}
+Content-Type: application/json
+
+{
+  "endedAt": "2026-08-03T03:00:00Z"
+}
+```
+
+백엔드는 산책 완료, 행동 이벤트 저장, 호감도 +10을 같은 트랜잭션으로 처리하고
+커밋 후 변경 결과만 `/affection`으로 발행합니다. `/events`는 디바이스 → 서버
+전용이므로 백엔드가 해당 토픽으로 완료 이벤트를 되쏘지 않습니다.
+
+> `/walks/{walkId}/end` 호출 후 별도의 `WALK_COMPLETED` MQTT 이벤트를
+> 전송하지 않습니다.
+
 
 
 ## 체크리스트

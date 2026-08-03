@@ -20,6 +20,7 @@ pipeline {
         KUBECTL_VERSION = 'v1.36.2'
         K8S_NAMESPACE = 's15a203-dev'
         MANIFEST_DIR = '06_Infra/dev'
+        MIGRATION_DIR = '06_Infra/postgres/init'
     }
 
     stages {
@@ -65,13 +66,23 @@ pipeline {
                         ).trim()
                     }
 
+                    def migrationChanged = changedFiles
+                        .readLines()
+                        .any {
+                            it.startsWith(
+                                    '06_Infra/postgres/init/'
+                            )
+                        }
+
                     def deploymentChanged = changedFiles
                         .readLines()
                         .any {
                             it.startsWith('02_Backend/') ||
                             it.startsWith("${env.MANIFEST_DIR}/") ||
                             it == '06_Infra/Jenkinsfile.dev'
-                        }
+                        } || migrationChanged
+
+                    env.MIGRATION_CHANGED = migrationChanged.toString()
 
                     env.BACKEND_CHANGED = (
                             params.FORCE_BACKEND_BUILD || deploymentChanged
@@ -80,6 +91,7 @@ pipeline {
                     echo "Changed files:\n${changedFiles ?: '(none)'}"
                     echo "Force backend build: ${params.FORCE_BACKEND_BUILD}"
                     echo "Backend changed: ${env.BACKEND_CHANGED}"
+                    echo "Database migration changed: ${env.MIGRATION_CHANGED}"
                 }
             }
         }
@@ -144,6 +156,36 @@ pipeline {
                         '''
                     }
                 }
+            }
+        }
+
+        stage('Migrate Dev Database') {
+            when {
+                expression { env.MIGRATION_CHANGED == 'true' }
+            }
+            steps {
+                sh '''
+                    set -eu
+
+                    for migration_name in \
+                      002_robot_events.sql \
+                      003_robot_photos.sql \
+                      004_robot_mqtt_runtime.sql \
+                      006_robot_qr_compat.sql \
+                      007_pet_creation_requests_compat.sql \
+                      008_users_version_compat.sql \
+                      009_walk_api.sql \
+                      010_behavior_requests_open_unique.sql
+                    do
+                        migration_path="$MIGRATION_DIR/$migration_name"
+                        test -f "$migration_path"
+                        echo "Applying database migration: $migration_name"
+
+                        .tools/kubectl -n "$K8S_NAMESPACE" exec -i postgres-0 -- \
+                          sh -ec 'exec psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+                          < "$migration_path"
+                    done
+                '''
             }
         }
 

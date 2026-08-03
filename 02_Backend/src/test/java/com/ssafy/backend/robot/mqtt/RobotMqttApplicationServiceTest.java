@@ -97,6 +97,49 @@ class RobotMqttApplicationServiceTest {
     }
 
     @Test
+    void appliesWalkCompletedEventToWalkPairingPet() {
+        UUID messageId = UUID.randomUUID();
+        RobotEventMessage event = new RobotEventMessage(
+                messageId,
+                "1.0",
+                "device-001",
+                Instant.parse("2026-08-03T03:00:00Z"),
+                RobotEventType.WALK_COMPLETED,
+                null
+        );
+        when(store.findEventResult(messageId, 2L))
+                .thenReturn(Optional.empty());
+        when(store.lockAffinity(1L, 2L, "device-001")).thenReturn(
+                new RobotMqttStore.AffinityContext(1L, 2L, 50)
+        );
+
+        AffectionChangedMessage response = service.processWalkCompletedEvent(
+                event,
+                1L,
+                2L
+        );
+
+        assertEquals(50, response.previousScore());
+        assertEquals(10, response.scoreChange());
+        assertEquals(60, response.currentScore());
+        verify(store).updateAffinity(
+                2L,
+                60,
+                4,
+                "FRIENDLY",
+                event.occurredAt()
+        );
+        verify(store).insertEvent(
+                event,
+                1L,
+                "{}",
+                50,
+                10,
+                60
+        );
+    }
+
+    @Test
     void rejectsInvalidHeartbeatBatteryLevel() {
         RobotHeartbeatMessage heartbeat = new RobotHeartbeatMessage(
                 UUID.randomUUID(),

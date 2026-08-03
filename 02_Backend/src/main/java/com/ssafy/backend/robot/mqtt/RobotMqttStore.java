@@ -44,6 +44,31 @@ public class RobotMqttStore {
         ).stream().findFirst();
     }
 
+    Optional<AffectionResult> findEventResult(UUID messageId, long petId) {
+        return jdbcTemplate.query("""
+                SELECT r.serial_number, e.message_id, e.previous_score,
+                       e.score_change, e.current_score, a.affinity_level,
+                       a.mood, e.occurred_at
+                FROM device_events e
+                JOIN robots r ON r.id = e.robot_id
+                JOIN pet_affinity_states a ON a.pet_id = ?
+                WHERE e.message_id = ?
+                """,
+                (rs, rowNum) -> new AffectionResult(
+                        rs.getString("serial_number"),
+                        rs.getObject("message_id", UUID.class),
+                        rs.getInt("previous_score"),
+                        rs.getInt("score_change"),
+                        rs.getInt("current_score"),
+                        rs.getInt("affinity_level"),
+                        rs.getString("mood"),
+                        rs.getTimestamp("occurred_at").toInstant()
+                ),
+                petId,
+                messageId
+        ).stream().findFirst();
+    }
+
     AffinityContext lockAffinity(String deviceId) {
         List<AffinityContext> pairings = jdbcTemplate.query("""
                 SELECT r.id AS robot_id, rp.pet_id, 0 AS affinity_score
@@ -83,6 +108,42 @@ public class RobotMqttStore {
         if (contexts.size() != 1) {
             throw new IllegalArgumentException(
                     "활성 페어링이 없는 deviceId입니다."
+            );
+        }
+        return contexts.get(0);
+    }
+
+    AffinityContext lockAffinity(
+            long robotId,
+            long petId,
+            String deviceId
+    ) {
+        List<AffinityContext> contexts = jdbcTemplate.query("""
+                SELECT r.id AS robot_id, a.pet_id, a.affinity_score
+                FROM robots r
+                JOIN pet_affinity_states a ON a.pet_id = ?
+                WHERE r.id = ?
+                  AND r.serial_number = ?
+                  AND EXISTS (
+                    SELECT 1
+                    FROM robot_pairings rp
+                    WHERE rp.robot_id = r.id
+                      AND rp.pet_id = a.pet_id
+                  )
+                FOR UPDATE
+                """,
+                (rs, rowNum) -> new AffinityContext(
+                        rs.getLong("robot_id"),
+                        rs.getLong("pet_id"),
+                        rs.getInt("affinity_score")
+                ),
+                petId,
+                robotId,
+                deviceId
+        );
+        if (contexts.size() != 1) {
+            throw new IllegalArgumentException(
+                    "산책 페어링과 일치하지 않는 디바이스입니다."
             );
         }
         return contexts.get(0);
@@ -278,6 +339,7 @@ public class RobotMqttStore {
                   ON rp.robot_id = r.id AND rp.unpaired_at IS NULL
                 LEFT JOIN pet_affinity_states a ON a.pet_id = rp.pet_id
                 LEFT JOIN robot_current_states s ON s.robot_id = r.id
+                ORDER BY r.id
                 """,
                 (rs, rowNum) -> new RequestCandidate(
                         rs.getLong("robot_id"),
@@ -303,6 +365,34 @@ public class RobotMqttStore {
                 Integer.class,
                 robotId,
                 requestType.name()
+        );
+        return count != null && count > 0;
+    }
+
+    void lockRequestGeneration(long robotId) {
+        jdbcTemplate.queryForObject(
+                "SELECT id FROM robots WHERE id = ? FOR UPDATE",
+                Long.class,
+                robotId
+        );
+    }
+
+    boolean hasRecentRequest(
+            long robotId,
+            BehaviorRequestType requestType,
+            Instant createdAfter
+    ) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM behavior_requests
+                WHERE robot_id = ?
+                  AND request_type = ?
+                  AND created_at > ?
+                """,
+                Integer.class,
+                robotId,
+                requestType.name(),
+                Timestamp.from(createdAfter)
         );
         return count != null && count > 0;
     }

@@ -1,8 +1,11 @@
 package com.ssafy.backend.robot.mqtt;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +27,9 @@ class RobotMqttStoreIntegrationTest {
 
     @Autowired
     private RobotMqttStore store;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     void storesAffinityEventAndReadsIdempotentResult() {
@@ -113,6 +119,37 @@ class RobotMqttStoreIntegrationTest {
         assertFalse(store.hasOpenRequest(
                 candidate.robotId(),
                 BehaviorRequestType.WALK_REQUEST
+        ));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"REJECTED", "EXPIRED"})
+    void recentWalkRequestCooldownIncludesTerminalStatuses(String status) {
+        RobotMqttStore.RequestCandidate candidate =
+                store.findRequestCandidates().get(0);
+        Instant now = Instant.parse("2026-07-30T00:00:00Z");
+        BehaviorRequestMessage request = store.createRequest(
+                candidate,
+                BehaviorRequestType.WALK_REQUEST,
+                "walk",
+                now,
+                now.plusSeconds(1800)
+        );
+        jdbcTemplate.update(
+                "UPDATE behavior_requests SET status = ? WHERE request_id = ?",
+                status,
+                request.requestId()
+        );
+
+        assertTrue(store.hasRecentRequest(
+                candidate.robotId(),
+                BehaviorRequestType.WALK_REQUEST,
+                now.minusSeconds(10_800)
+        ));
+        assertFalse(store.hasRecentRequest(
+                candidate.robotId(),
+                BehaviorRequestType.WALK_REQUEST,
+                now
         ));
     }
 }
