@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/services/sample_walk_diaries.dart';
 import '../../../domain/entities/walk_diary.dart';
 import '../../viewmodels/walk_diary_view_model.dart';
 
@@ -269,6 +270,37 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     );
   }
 
+  /// 산책 사진. 서버 사진을 우선하고, 없으면 예시 asset, 둘 다 없으면 안내 아이콘.
+  ///
+  /// asset 파일이 빠져 있어도 화면이 깨지지 않게 errorBuilder 로 받아준다.
+  static Widget _buildWalkImage({
+    required String? thumbnailUrl,
+    required String? imageAsset,
+  }) {
+    const placeholder = Center(
+      child: Icon(Icons.image_outlined, size: 48, color: Color(0xFFD7CCC8)),
+    );
+
+    if (thumbnailUrl != null) {
+      return Image.network(
+        thumbnailUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => imageAsset == null
+            ? placeholder
+            : Image.asset(imageAsset,
+                fit: BoxFit.cover, errorBuilder: (_, __, ___) => placeholder),
+      );
+    }
+    if (imageAsset != null) {
+      return Image.asset(
+        imageAsset,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => placeholder,
+      );
+    }
+    return placeholder;
+  }
+
   /// 선택한 날의 요약. 장소는 역지오코딩 결과이고, 아직 못 구했으면 `-`.
   Widget _buildDailySummaryCard(WalkDiaryFeedItem item, String? placeName) {
     final distance = item.distanceMeters == null
@@ -443,7 +475,6 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     final distance = item.distanceMeters == null
         ? '-'
         : '${(item.distanceMeters! / 1000).toStringAsFixed(1)}km';
-    final thumbnailUrl = item.thumbnailUrl;
     return _buildLogPostShell(
       context: context,
       walkId: item.walkId,
@@ -451,7 +482,9 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
       summary: item.summary,
       durationLabel: item.durationLabel,
       distanceLabel: distance,
-      thumbnailUrl: thumbnailUrl,
+      thumbnailUrl: item.thumbnailUrl,
+      // 7월 예시 기록은 서버 사진이 없어 asset 그림을 쓴다.
+      imageAsset: SampleWalkDiaries.imageAssetOf(item.walkId),
     );
   }
 
@@ -463,6 +496,7 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     required String durationLabel,
     required String distanceLabel,
     required String? thumbnailUrl,
+    String? imageAsset,
   }) {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -480,23 +514,16 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
             ),
             child: Stack(
               children: [
-                if (thumbnailUrl == null)
-                  const Center(
-                      child: Icon(Icons.image_outlined,
-                          size: 48, color: Color(0xFFD7CCC8)))
-                else
-                  Positioned.fill(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: Image.network(
-                        thumbnailUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Center(
-                            child: Icon(Icons.broken_image_outlined,
-                                size: 48, color: Color(0xFFD7CCC8))),
-                      ),
+                // 서버 사진(thumbnailUrl)이 있으면 그걸, 없으면 예시 그림을 쓴다.
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: _buildWalkImage(
+                      thumbnailUrl: thumbnailUrl,
+                      imageAsset: imageAsset,
                     ),
                   ),
+                ),
                 Positioned(
                   bottom: 20,
                   right: 20,

@@ -1,4 +1,5 @@
 import '../../core/services/place_name_resolver.dart';
+import '../../core/services/sample_walk_diaries.dart';
 import '../../domain/entities/walk_diary.dart';
 import '../../domain/repositories/walk_diary_repository.dart';
 import 'base_view_model.dart';
@@ -110,6 +111,13 @@ class WalkDiaryViewModel extends BaseViewModel {
   /// 장소명 필드가 서버 응답에 없어서 좌표를 역지오코딩한다. 백엔드가 장소명을
   /// 내려주게 되면 이 두 번째 단계는 지워도 된다.
   Future<void> selectWalk(int walkId) async {
+    // 7월 예시 데이터는 서버에 없다. 상세를 조회하면 401 만 나므로 건너뛴다.
+    // 장소명은 이미 채워져 있다.
+    if (SampleWalkDiaries.isSampleId(walkId)) {
+      safeNotify();
+      return;
+    }
+
     await loadDetail(walkId);
 
     if (_placeNames.containsKey(walkId)) return;
@@ -137,14 +145,52 @@ class WalkDiaryViewModel extends BaseViewModel {
     }
 
     final page = await guard(() => _diaryRepository.getFeed(limit: 20));
-    if (page == null) return;
 
-    _feed
-      ..clear()
-      ..addAll(page.items);
-    _nextCursor = page.nextCursor;
-    _hasNext = page.hasNext;
+    _feed.clear();
+    if (page != null) {
+      _feed.addAll(page.items);
+      _nextCursor = page.nextCursor;
+      _hasNext = page.hasNext;
+    }
+
+    // 서버 기록을 담은 뒤 7월 예시 데이터를 합친다.
+    // 조회가 실패해도(현재 산책 API 미배포) 예시는 보여야 하므로 page == null
+    // 인 경우에도 실행한다.
+    _mergeSamples();
     safeNotify();
+  }
+
+  /// 2026년 7월 예시 데이터를 합친다. 같은 날짜에 서버 기록이 있으면 넣지 않는다.
+  ///
+  /// 실제 산책 기록이 쌓이면 [SampleWalkDiaries.enabled] 를 false 로 바꾸거나
+  /// 이 메서드와 호출부를 지우면 된다.
+  void _mergeSamples() {
+    if (!SampleWalkDiaries.enabled) return;
+
+    final serverDays = _feed
+        .map((e) => e.walkedAt)
+        .whereType<DateTime>()
+        .map((at) => DateTime(at.year, at.month, at.day))
+        .toSet();
+
+    for (final sample in SampleWalkDiaries.items) {
+      final at = sample.walkedAt;
+      if (at == null) continue;
+      // 서버에 그 날 기록이 있으면 실제 데이터를 우선한다.
+      if (serverDays.contains(DateTime(at.year, at.month, at.day))) continue;
+      _feed.add(sample);
+    }
+
+    // 예시 데이터는 좌표가 없어 역지오코딩을 못 하므로 장소명을 미리 채운다.
+    _placeNames.addAll(SampleWalkDiaries.placeNames);
+
+    // 최신순으로 맞춘다(서버 피드도 최신순이다).
+    _feed.sort((a, b) {
+      final at = a.walkedAt;
+      final bt = b.walkedAt;
+      if (at == null || bt == null) return 0;
+      return bt.compareTo(at);
+    });
   }
 
   /// 다음 커서 페이지 추가 로드.
