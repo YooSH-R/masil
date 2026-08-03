@@ -37,10 +37,49 @@ class _DeviceRegistrationQrScreenState
   String? _message;
   bool _isError = false;
 
+  /// 보관해둔 토큰으로 이어서 등록하는 중인지. 매 rebuild 마다 다시 시도하는
+  /// 것을 막는다.
+  bool _resumingPending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 등록에는 petId 가 필요하다. 미리 불러두면 스캔 직후 바로 등록까지 간다.
+    // 펫 API 가 없으면 조용히 실패하고, 스캔은 그대로 동작한다.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<PetViewModel>().loadCurrentPet(silent: true);
+    });
+  }
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  /// petId 를 못 구해 보관해둔 토큰으로 등록을 마무리한다.
+  ///
+  /// 스캔 시점에 펫 정보가 없어 미뤄둔 경우, 펫 정보가 도착하면 사용자가
+  /// QR 을 다시 찍지 않아도 등록이 이어진다.
+  Future<void> _resumePendingPairing(int petId) async {
+    final robotVm = context.read<RobotViewModel>();
+
+    final paired = await robotVm.pairWithPendingToken(petId: petId);
+    if (!mounted) return;
+
+    if (!paired) {
+      // 실패했으면 다시 시도할 수 있게 플래그를 풀어준다.
+      _resumingPending = false;
+      _show(robotVm.errorMessage ?? '기기 등록에 실패했어요. 다시 시도해 주세요.',
+          isError: true);
+      return;
+    }
+
+    _show('기기가 등록됐어요!');
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    if (!mounted) return;
+    context.pop();
   }
 
   Future<void> _onDetect(BarcodeCapture capture) async {
@@ -105,6 +144,19 @@ class _DeviceRegistrationQrScreenState
   @override
   Widget build(BuildContext context) {
     final robotVm = context.watch<RobotViewModel>();
+    final petId = context.watch<PetViewModel>().petId;
+
+    // 스캔은 됐지만 petId 가 없어 미뤄둔 등록이 있고, 이제 petId 가 생겼으면
+    // 사용자가 QR 을 다시 찍지 않아도 이어서 등록한다.
+    if (!_resumingPending &&
+        !_handling &&
+        robotVm.hasPendingToken &&
+        petId != null &&
+        !robotVm.isLoading) {
+      _resumingPending = true;
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _resumePendingPairing(petId));
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFF2D2621),

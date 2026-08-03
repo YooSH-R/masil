@@ -38,8 +38,11 @@ class WalkViewModel extends BaseViewModel {
   Duration _elapsed = Duration.zero;
 
   /// 모아둔 좌표를 서버에 일괄 업로드하는 주기.
+  ///
+  /// 명세서 2.4 "배치 처리 속도" 권장값을 따른다:
+  ///   측정 5초 / 최소 이동 5m / **서버 전송 20~30초마다 묶어서**
   /// 좌표 하나마다 보내면 요청이 너무 잦고, 너무 길면 앱이 죽을 때 손실이 크다.
-  static const Duration _uploadInterval = Duration(seconds: 15);
+  static const Duration _uploadInterval = Duration(seconds: 30);
   Timer? _uploadTimer;
 
   WalkProposal? get proposal => _proposal;
