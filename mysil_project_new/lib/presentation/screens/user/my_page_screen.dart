@@ -4,13 +4,37 @@ import 'package:provider/provider.dart';
 
 import '../../viewmodels/auth_view_model.dart';
 
-class MyPageScreen extends StatelessWidget {
+class MyPageScreen extends StatefulWidget {
   const MyPageScreen({super.key});
+
+  @override
+  State<MyPageScreen> createState() => _MyPageScreenState();
+}
+
+class _MyPageScreenState extends State<MyPageScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // GET /users/me — 로그인 응답은 {userId, nickname} 만 주므로
+    // 이메일·전화번호를 보여주려면 회원정보를 따로 불러와야 한다.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<AuthViewModel>().loadMyProfile(silent: true);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final authViewModel = context.watch<AuthViewModel>();
     final user = authViewModel.user;
+    final profile = authViewModel.profile;
+
+    // 회원정보가 있으면 그걸 쓰고, 없으면 로그인 응답의 값으로 보여준다.
+    final nickname = profile?.nickname ?? user?.nickname;
+    final subtitle = profile?.email ??
+        profile?.formattedPhoneNumber ??
+        user?.email ??
+        '반려견과 함께하는 삶';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F3E7),
@@ -60,7 +84,7 @@ class MyPageScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          user == null ? '로그인이 필요해요' : '${user.nickname} 님',
+                          nickname == null ? '로그인이 필요해요' : '$nickname 님',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -70,7 +94,7 @@ class MyPageScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          user?.email ?? '반려견과 함께하는 삶',
+                          subtitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(

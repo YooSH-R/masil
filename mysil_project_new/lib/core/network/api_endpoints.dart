@@ -15,6 +15,16 @@ class ApiEndpoints {
   /// 서버 구현에만 있는 닉네임 중복 확인 (명세서 PDF에는 없음).
   static const String nicknameAvailability = '/users/nickname-availability';
 
+  // --- 회원정보 (명세서 "회원 목록 추가") ---
+  /// GET 조회 / PATCH 수정(닉네임·전화번호) / DELETE 회원탈퇴
+  static const String me = '/users/me';
+
+  /// PATCH — 로그인 상태에서 비밀번호 변경
+  static const String mePassword = '/users/me/password';
+
+  /// POST — 비밀번호 분실 시 재설정 (VerificationToken 필요)
+  static const String passwordReset = '/auth/password/reset';
+
   // 소셜 로그인 (서버 구현에만 있음)
   static const String googleOAuth = '/auth/oauth/google';
   static const String kakaoOAuth = '/auth/oauth/kakao';

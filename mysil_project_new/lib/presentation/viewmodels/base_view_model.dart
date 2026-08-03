@@ -74,4 +74,15 @@ abstract class BaseViewModel extends ChangeNotifier {
     _error = null;
     safeNotify();
   }
+
+  /// 서버 호출 없이 뷰모델이 직접 실패를 알릴 때 쓴다.
+  ///
+  /// 사전 조건이 안 맞아 요청을 보내지 않는 경우(예: 휴대전화 인증을 아직
+  /// 안 받았는데 비밀번호 재설정을 시도) 화면이 errorMessage 로 이유를
+  /// 보여줄 수 있게 한다.
+  @protected
+  void setError(String message, {String code = ApiErrorCode.unknown}) {
+    _error = ApiException(code: code, message: message);
+    safeNotify();
+  }
 }

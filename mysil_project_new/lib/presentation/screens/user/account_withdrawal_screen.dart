@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
+import '../../viewmodels/auth_view_model.dart';
+
+/// 회원탈퇴. DELETE /users/me
+///
+/// 일반 회원은 비밀번호 재확인이 필요하고, 소셜 전용 회원은 생략한다
+/// (명세서 6. 회원탈퇴). 되돌릴 수 없는 동작이라 확인 다이얼로그를 한 번 거친다.
 class AccountWithdrawalScreen extends StatefulWidget {
   const AccountWithdrawalScreen({super.key});
 
@@ -10,9 +17,98 @@ class AccountWithdrawalScreen extends StatefulWidget {
 
 class _AccountWithdrawalScreenState extends State<AccountWithdrawalScreen> {
   int _selectedReason = 0;
+  final _passwordController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // 소셜 전용 회원인지 알아야 비밀번호 입력칸을 띄울지 정할 수 있다.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<AuthViewModel>().loadMyProfile(silent: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  /// 탈퇴 실행. 성공하면 로그인 화면으로 되돌린다.
+  Future<void> _withdraw({required bool needsPassword}) async {
+    final authViewModel = context.read<AuthViewModel>();
+
+    if (needsPassword && _passwordController.text.isEmpty) {
+      _showMessage('비밀번호를 입력해 주세요.', isError: true);
+      return;
+    }
+
+    final confirmed = await _confirmOnce();
+    if (!confirmed || !mounted) return;
+
+    final done = await authViewModel.withdraw(
+      currentPassword: needsPassword ? _passwordController.text : null,
+    );
+    if (!mounted) return;
+
+    if (!done) {
+      _showMessage(authViewModel.errorMessage ?? '탈퇴 처리에 실패했어요.',
+          isError: true);
+      return;
+    }
+
+    _showMessage('탈퇴가 완료됐어요. 그동안 이용해 주셔서 감사합니다.');
+    context.go('/login');
+  }
+
+  /// 되돌릴 수 없는 동작이라 한 번 더 묻는다.
+  Future<bool> _confirmOnce() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('정말 탈퇴하시겠어요?',
+            style: TextStyle(
+                fontWeight: FontWeight.bold, color: Color(0xFF5D4037))),
+        content: const Text(
+          '탈퇴하면 마실이와의 기록이 사라지고 되돌릴 수 없어요.',
+          style: TextStyle(color: Color(0xFF8D6E63), height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('취소', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () => context.pop(true),
+            child: const Text('탈퇴하기',
+                style: TextStyle(
+                    color: Color(0xFFD32F2F), fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  void _showMessage(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message),
+      backgroundColor: isError ? Colors.redAccent : Colors.brown,
+    ));
+  }
 
   @override
   Widget build(BuildContext context) {
+    final authViewModel = context.watch<AuthViewModel>();
+
+    // 프로필을 아직 못 받았으면(서버 미배포 등) 일반 회원으로 보고 비밀번호를
+    // 받는다. 소셜 전용 회원이면 서버가 비밀번호를 무시한다.
+    final needsPassword = authViewModel.profile?.hasPassword ?? true;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9F3E7),
       appBar: AppBar(
@@ -81,22 +177,54 @@ class _AccountWithdrawalScreenState extends State<AccountWithdrawalScreen> {
             _buildReasonTile(2, '기타'),
             
             const SizedBox(height: 32),
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.lock_outline, size: 14, color: Colors.grey),
-                SizedBox(width: 6),
-                Text('탈퇴 진행 시 비밀번호 재인증이 필요해요', style: TextStyle(color: Colors.grey, fontSize: 12)),
-              ],
-            ),
+
+            // 비밀번호 재확인 — 일반 회원(LOCAL)만.
+            // 소셜 전용 회원은 비밀번호가 없어 서버도 요구하지 않는다.
+            if (needsPassword) ...[
+              TextField(
+                controller: _passwordController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  hintText: '비밀번호를 입력해 주세요',
+                  prefixIcon: const Icon(Icons.lock_outline,
+                      color: Color(0xFFC67C4E), size: 20),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(15),
+                      borderSide: BorderSide.none),
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.lock_outline, size: 14, color: Colors.grey),
+                  SizedBox(width: 6),
+                  Text('탈퇴 진행 시 비밀번호 재인증이 필요해요',
+                      style: TextStyle(color: Colors.grey, fontSize: 12)),
+                ],
+              ),
+            ] else
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.info_outline, size: 14, color: Colors.grey),
+                  SizedBox(width: 6),
+                  Text('소셜 계정으로 가입해 비밀번호 확인 없이 진행돼요',
+                      style: TextStyle(color: Colors.grey, fontSize: 12)),
+                ],
+              ),
             const SizedBox(height: 16),
-            
+
             // Buttons
             SizedBox(
               width: double.infinity,
               height: 60,
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: authViewModel.isLoading
+                    ? null
+                    : () => _withdraw(needsPassword: needsPassword),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFD32F2F),
                   foregroundColor: Colors.white,

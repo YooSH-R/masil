@@ -4,9 +4,11 @@ import '../../core/network/api_exception.dart';
 import '../../core/storage/session_cache.dart';
 import '../../core/storage/token_storage.dart';
 import '../../core/utils/json_parse.dart';
+import '../../domain/entities/member_profile.dart';
 import '../../domain/entities/user.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../models/auth_model.dart';
+import '../models/member_profile_model.dart';
 import '../models/social_auth_model.dart';
 import '../models/user_model.dart';
 
@@ -26,11 +28,17 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<VerificationRequestResult> requestVerification({
     required String phoneNumber,
+    VerificationPurpose purpose = VerificationPurpose.signUp,
   }) async {
     final data = await _client.post(
       ApiEndpoints.verifications,
-      // 서버는 하이픈 없는 번호만 받는다(pattern: ^01[016789][0-9]{7,8}$).
-      data: {'phoneNumber': phoneNumber.replaceAll(RegExp(r'[^0-9]'), '')},
+      data: {
+        // 서버는 하이픈 없는 번호만 받는다(pattern: ^01[016789][0-9]{7,8}$).
+        'phoneNumber': phoneNumber.replaceAll(RegExp(r'[^0-9]'), ''),
+        // 목적별로 verificationToken 이 구분된다. 회원가입용 토큰으로
+        // 비밀번호 재설정을 시도하면 VERIFICATION_PURPOSE_MISMATCH 가 온다.
+        'purpose': purpose.wireValue,
+      },
     );
     return VerificationRequestResult.fromJson(Json.asMap(data));
   }
@@ -262,5 +270,95 @@ class AuthRepositoryImpl implements AuthRepository {
     final json = await _cache.readUser();
     if (json == null) return null;
     return UserModel.fromJson(json);
+  }
+
+  // --- 회원정보 (명세서 "회원 목록 추가") ---
+
+  @override
+  Future<MemberProfile> getMyProfile() async {
+    final data = await _client.get(ApiEndpoints.me);
+    return MemberProfileModel.fromJson(Json.asMap(data));
+  }
+
+  @override
+  Future<MemberProfile> updateMyProfile({
+    String? nickname,
+    String? phoneNumber,
+    String? verificationToken,
+  }) async {
+    // 서버는 "전달된 필드만 변경"한다. null 을 보내면 값을 지우는 것으로
+    // 해석될 수 있어 넣지 않는다.
+    final body = <String, dynamic>{
+      if (nickname != null) 'nickname': nickname,
+      if (phoneNumber != null)
+        'phoneNumber': phoneNumber.replaceAll(RegExp(r'[^0-9]'), ''),
+      if (verificationToken != null) 'verificationToken': verificationToken,
+    };
+
+    final data = await _client.patch(ApiEndpoints.me, data: body);
+    final profile = MemberProfileModel.fromJson(Json.asMap(data));
+
+    // 닉네임이 바뀌면 캐시된 사용자 정보도 맞춰준다.
+    // (홈·마이페이지가 캐시를 읽어 이름을 보여준다)
+    final cached = await _cache.readUser();
+    if (cached != null) {
+      cached['nickname'] = profile.nickname;
+      await _cache.saveUser(cached);
+    }
+    return profile;
+  }
+
+  @override
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    // 204 No Content. 서버가 현재 세션을 뺀 다른 세션을 폐기하므로
+    // 이 기기의 토큰은 그대로 쓸 수 있다.
+    await _client.patch(
+      ApiEndpoints.mePassword,
+      data: {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      },
+    );
+  }
+
+  @override
+  Future<void> withdraw({String? currentPassword}) async {
+    try {
+      await _client.delete(
+        ApiEndpoints.me,
+        // 소셜 전용 회원은 비밀번호가 없어 confirmation 만 보낸다.
+        data: {
+          if (currentPassword != null) 'currentPassword': currentPassword,
+          'confirmation': 'WITHDRAW',
+        },
+      );
+    } finally {
+      // 탈퇴가 성공하면 서버 세션이 사라진다. 실패했더라도 남은 토큰으로
+      // 계속 요청하는 것보다 정리하는 편이 안전하다.
+      await _tokenStorage.clearTokens();
+      await _cache.clear();
+    }
+  }
+
+  @override
+  Future<void> resetPassword({
+    required String phoneNumber,
+    required String verificationToken,
+    required String newPassword,
+  }) async {
+    await _client.post(
+      ApiEndpoints.passwordReset,
+      data: {
+        'phoneNumber': phoneNumber.replaceAll(RegExp(r'[^0-9]'), ''),
+        'verificationToken': verificationToken,
+        'newPassword': newPassword,
+      },
+    );
+    // 서버가 모든 Refresh Token 을 폐기한다. 남은 토큰은 무효라서 지운다.
+    await _tokenStorage.clearTokens();
+    await _cache.clear();
   }
 }

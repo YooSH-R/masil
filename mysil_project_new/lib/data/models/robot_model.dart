@@ -45,7 +45,6 @@ class RobotPairingModel extends RobotPairing {
     super.pairingId,
     super.modelName,
     super.firmwareVersion,
-    super.deviceAccessToken,
     super.pairedAt,
   });
 
@@ -58,7 +57,6 @@ class RobotPairingModel extends RobotPairing {
       pairingId: Json.asIntOrNull(json['pairingId']),
       modelName: Json.asStringOrNull(json['modelName']),
       firmwareVersion: Json.asStringOrNull(json['firmwareVersion']),
-      deviceAccessToken: Json.asStringOrNull(json['deviceAccessToken']),
       pairedAt: Json.asDateTime(json['pairedAt']),
     );
   }

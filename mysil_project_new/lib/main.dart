@@ -64,7 +64,6 @@ void main() {
   final robotRepository = RobotRepositoryImpl(
     client: apiClient,
     sessionCache: sessionCache,
-    tokenStorage: tokenStorage,
   );
   final walkRepository = WalkRepositoryImpl(client: apiClient);
   final photoRepository = WalkPhotoRepositoryImpl(client: apiClient);
