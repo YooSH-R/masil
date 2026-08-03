@@ -1,5 +1,6 @@
 package com.ssafy.backend.robot.presentation;
 
+import com.ssafy.backend.auth.security.UserPrincipal;
 import com.ssafy.backend.common.ApiResponse;
 import com.ssafy.backend.robot.application.RobotPairingRateLimiter;
 import com.ssafy.backend.robot.application.RobotPairingResult;
@@ -41,9 +42,10 @@ public class RobotPairingController {
     @SecurityRequirement(name = "bearerAuth")
     @PostMapping("/pairings")
     public ResponseEntity<ApiResponse<RobotPairingResponse>> pair(
-            @AuthenticationPrincipal Long userId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody RobotPairingRequest request
     ) {
+        Long userId = principal.userId();
         rateLimiter.checkAllowed(userId);
         RobotPairingResult result = pairingService.pair(
                 userId,
