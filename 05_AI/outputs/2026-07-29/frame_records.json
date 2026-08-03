@@ -1,0 +1,443 @@
+{
+  "schema": 1,
+  "generated_at": "2026-07-29T20:45:30",
+  "frame_count": 11,
+  "prompt_version": "2026-07-29",
+  "walk": {
+    "date": "불명",
+    "started_at": "2026-07-28T08:12:03",
+    "location": "SSAFY 사무실"
+  },
+  "records": [
+    {
+      "file": "f_0000128_t000m08.53s.jpg",
+      "segment": "불명",
+      "index": 128,
+      "offset_seconds": 8.53,
+      "elapsed": "0분 9초",
+      "shot_datetime": "2026-07-28 08:12:11",
+      "location": "SSAFY 사무실",
+      "observation": {
+        "scene": "실내 천장에 설치된 여러 개의 밝은 라인 조명과 스포트라이트가 보이며 화면 아래쪽에 사람들의 머리 윗부분과 모니터가 일부 보입니다.",
+        "location_type": "실내",
+        "time_of_day": "아침",
+        "weather": "불명",
+        "people": "2~5",
+        "atmosphere": [
+          "인공적임",
+          "차분함",
+          "현대적임"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 1.0,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "천장에 매달려 있는 모니터와 평행하게 늘어선 라인 조명들",
+        "objects": [
+          "라인 조명",
+          "스포트라이트",
+          "모니터"
+        ],
+        "plants": [],
+        "season_hint": "불명",
+        "surface": "불명",
+        "time_evidence": "촬영 일시(08:12:11)에 근거함",
+        "weather_evidence": "실내 촬영으로 인해 외부 날씨 확인 불가"
+      }
+    },
+    {
+      "file": "f_0000160_t000m10.67s.jpg",
+      "segment": "불명",
+      "index": 160,
+      "offset_seconds": 10.67,
+      "elapsed": "0분 11초",
+      "shot_datetime": "2026-07-28 08:12:13",
+      "location": "SSAFY 사무실",
+      "observation": {
+        "scene": "긴 선형 LED 조명과 원형 스포트라이트가 켜져 있는 실내 천장 아래로 사람들의 머리 부분이 일부 보입니다.",
+        "location_type": "실내",
+        "time_of_day": "아침",
+        "weather": "불명",
+        "people": "2~5",
+        "atmosphere": [
+          "차분함",
+          "현대적",
+          "인공적"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 1.0,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "천장에 길게 늘어선 밝은 라인 조명들",
+        "objects": [
+          "LED 조명",
+          "스포트라이트"
+        ],
+        "plants": [],
+        "season_hint": "불명",
+        "surface": "불명",
+        "time_evidence": "촬영 일시(08:12:13) 기록 기준",
+        "weather_evidence": "실내 공간으로 외부 날씨 확인 불가"
+      }
+    },
+    {
+      "file": "f_0000448_t000m29.87s.jpg",
+      "segment": "불명",
+      "index": 448,
+      "offset_seconds": 29.87,
+      "elapsed": "0분 30초",
+      "shot_datetime": "2026-07-28 08:12:32",
+      "location": "SSAFY 사무실",
+      "observation": {
+        "scene": "실내 사무실 공간에서 한 인물이 정면을 응시하고 있으며 뒤편 창문 너머로 고층 빌딩들이 보입니다.",
+        "location_type": "실내",
+        "time_of_day": "아침",
+        "weather": "불명",
+        "people": "1",
+        "atmosphere": [
+          "차분함",
+          "실내",
+          "정적인"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 1.0,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "창문 너머로 맞은편 고층 빌딩의 외관이 보임",
+        "objects": [
+          "창문",
+          "천장 조명",
+          "사원증"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시가 오전 8시 12분으로 기록됨",
+        "weather_evidence": "창밖으로 건물만 보이고 하늘이 명확히 보이지 않아 판별 불가"
+      }
+    },
+    {
+      "file": "f_0000540_t000m36.00s.jpg",
+      "segment": "불명",
+      "index": 540,
+      "offset_seconds": 36.0,
+      "elapsed": "0분 36초",
+      "shot_datetime": "2026-07-28 08:12:39",
+      "location": "SSAFY 사무실",
+      "observation": {
+        "scene": "실내 사무실에서 한 사람이 투명한 플라스틱 생수병을 세워 쥔 채 얼굴 앞을 가리고 있다.",
+        "location_type": "실내",
+        "time_of_day": "아침",
+        "weather": "맑음",
+        "people": "1",
+        "atmosphere": [
+          "차분함",
+          "실내",
+          "정적인"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 1.0,
+          "weather": 0.7
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "생수병을 세로로 들어 얼굴 중앙 부분을 가리고 있음",
+        "objects": [
+          "생수병",
+          "창문",
+          "천장 조명"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "제공된 촬영 일시가 오전 8시 12분임",
+        "weather_evidence": "창밖으로 보이는 맞은편 건물 외벽과 실외 전경이 밝음"
+      }
+    },
+    {
+      "file": "f_0000686_t000m45.73s.jpg",
+      "segment": "불명",
+      "index": 686,
+      "offset_seconds": 45.73,
+      "elapsed": "0분 46초",
+      "shot_datetime": "2026-07-28 08:12:48",
+      "location": "SSAFY 사무실",
+      "observation": {
+        "scene": "실내 사무실 공간에서 한 사람이 페트병에 담긴 물을 마시고 있다.",
+        "location_type": "실내",
+        "time_of_day": "아침",
+        "weather": "불명",
+        "people": "1",
+        "atmosphere": [
+          "일상적인",
+          "차분함",
+          "실내"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 1.0,
+          "weather": 0.3
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "페트병의 물을 마시는 동작이 근접 촬영됨",
+        "objects": [
+          "페트병",
+          "사원증 목걸이",
+          "무선 이어폰",
+          "천장 조명"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시에 기록된 오전 8시 12분 경",
+        "weather_evidence": "실내 촬영으로 인해 외부 날씨 판별 불가"
+      }
+    },
+    {
+      "file": "f_0000870_t000m58.00s.jpg",
+      "segment": "불명",
+      "index": 870,
+      "offset_seconds": 58.0,
+      "elapsed": "0분 58초",
+      "shot_datetime": "2026-07-28 08:13:01",
+      "location": "SSAFY 사무실",
+      "observation": {
+        "scene": "실내 사무실 공간에서 한 인물이 아래를 내려다보고 있으며, 천장에는 라인 조명이 켜져 있다.",
+        "location_type": "실내",
+        "time_of_day": "아침",
+        "weather": "불명",
+        "people": "1",
+        "atmosphere": [
+          "차분함",
+          "정적인",
+          "실내"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 1.0,
+          "weather": 0.5
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "목에 SSAFY 문구가 적힌 목걸이를 착용하고 있음",
+        "objects": [
+          "천장 조명",
+          "사원증 목걸이",
+          "벽시계",
+          "블라인드"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시에 기록된 오전 8시 13분",
+        "weather_evidence": "실내에서 촬영되어 외부 날씨를 명확히 판별하기 어려움"
+      }
+    },
+    {
+      "file": "f_0000960_t001m04.00s.jpg",
+      "segment": "불명",
+      "index": 960,
+      "offset_seconds": 64.0,
+      "elapsed": "1분 4초",
+      "shot_datetime": "2026-07-28 08:13:07",
+      "location": "SSAFY 사무실",
+      "observation": {
+        "scene": "실내 사무실 공간에서 한 인물이 아래를 내려다보고 있으며, 배경에는 노출 콘크리트 천장과 일자형 조명, 기둥에 걸린 시계가 보인다.",
+        "location_type": "실내",
+        "time_of_day": "아침",
+        "weather": "맑음",
+        "people": "1",
+        "atmosphere": [
+          "차분함",
+          "집중함",
+          "정적인"
+        ],
+        "confidence": {
+          "location_type": 0.9,
+          "time_of_day": 1.0,
+          "weather": 0.5
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "인물이 SSAFY 문구가 적힌 보라색 목걸이를 착용하고 있음",
+        "objects": [
+          "천장 조명",
+          "벽시계",
+          "목걸이"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시 정보(오전 8시 13분)에 근거함",
+        "weather_evidence": "창밖으로 밝은 빛이 들어오는 상태"
+      }
+    },
+    {
+      "file": "f_0001125_t001m15.00s.jpg",
+      "segment": "불명",
+      "index": 1125,
+      "offset_seconds": 75.0,
+      "elapsed": "1분 15초",
+      "shot_datetime": "2026-07-28 08:13:18",
+      "location": "SSAFY 사무실",
+      "observation": {
+        "scene": "실내 사무실 환경에서 한 명의 인물이 카메라를 정면으로 응시하고 있으며, 배경으로 창문과 천장 조명이 보인다.",
+        "location_type": "실내",
+        "time_of_day": "아침",
+        "weather": "불명",
+        "people": "1",
+        "atmosphere": [
+          "차분함",
+          "정적인",
+          "실내"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 1.0,
+          "weather": 0.5
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "실내 사무실에서 촬영된 인물의 상반신 모습",
+        "objects": [
+          "천장 조명",
+          "창문",
+          "사원증 목걸이"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시에 기록된 오전 8시 13분 정보",
+        "weather_evidence": "실내에서 창밖의 건물만 보이고 하늘 상태가 명확히 보이지 않음"
+      }
+    },
+    {
+      "file": "f_0001347_t001m29.80s.jpg",
+      "segment": "불명",
+      "index": 1347,
+      "offset_seconds": 89.8,
+      "elapsed": "1분 30초",
+      "shot_datetime": "2026-07-28 08:13:32",
+      "location": "SSAFY 사무실",
+      "observation": {
+        "scene": "노출 천장에 일렬로 늘어선 LED 조명이 켜져 있고 사람들이 모니터 앞에 앉아 있는 실내 사무실 전경이다.",
+        "location_type": "실내",
+        "time_of_day": "아침",
+        "weather": "불명",
+        "people": "2~5",
+        "atmosphere": [
+          "차분함",
+          "실내",
+          "현대적"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 1.0,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "배관과 배선이 노출된 검은색 천장 인테리어",
+        "objects": [
+          "모니터",
+          "조명",
+          "천장 파이프"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시가 08:13:32로 기록되어 있음",
+        "weather_evidence": "실내 공간으로 외부 날씨를 관찰할 수 없음"
+      }
+    },
+    {
+      "file": "f_0001351_t001m30.07s.jpg",
+      "segment": "불명",
+      "index": 1351,
+      "offset_seconds": 90.07,
+      "elapsed": "1분 30초",
+      "shot_datetime": "2026-07-28 08:13:33",
+      "location": "SSAFY 사무실",
+      "observation": {
+        "scene": "노출형 천장에 여러 개의 일자형 LED 조명과 배관, 그리고 천장형 모니터가 설치되어 있는 실내 전경이다.",
+        "location_type": "실내",
+        "time_of_day": "아침",
+        "weather": "불명",
+        "people": "없음",
+        "atmosphere": [
+          "인공적임",
+          "차분함",
+          "정돈됨"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 1.0,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "천장에 매달려 있는 모니터의 뒷면과 복잡한 배관 구조가 노출되어 있음",
+        "objects": [
+          "조명",
+          "배관",
+          "모니터"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "제공된 촬영 일시(08:13:33)에 근거함",
+        "weather_evidence": "실내 천장만 촬영되어 외부 날씨를 확인할 수 없음"
+      }
+    },
+    {
+      "file": "f_0001605_t001m47.00s.jpg",
+      "segment": "불명",
+      "index": 1605,
+      "offset_seconds": 107.0,
+      "elapsed": "1분 47초",
+      "shot_datetime": "2026-07-28 08:13:50",
+      "location": "SSAFY 사무실",
+      "observation": {
+        "scene": "실내 사무실 창가에 한 인물이 앉아 있으며 창밖으로 맞은편 고층 빌딩이 보입니다.",
+        "location_type": "실내",
+        "time_of_day": "아침",
+        "weather": "맑음",
+        "people": "1",
+        "atmosphere": [
+          "차분함",
+          "정적인",
+          "현대적인"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 1.0,
+          "weather": 0.5
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "인물이 귀에 무선 이어폰을 착용하고 있음",
+        "objects": [
+          "창문",
+          "조명",
+          "무선 이어폰"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시가 08:13:50으로 기록되어 있음",
+        "weather_evidence": "창밖 맞은편 빌딩 외벽에 밝은 빛이 반사되어 보임"
+      }
+    }
+  ]
+}
