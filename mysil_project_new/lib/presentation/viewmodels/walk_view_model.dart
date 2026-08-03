@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../../core/services/sample_walk_diaries.dart';
 import '../../core/services/walk_route_source.dart';
 import '../../core/utils/geo.dart';
 import '../../domain/entities/walk.dart';
@@ -273,6 +274,18 @@ class WalkViewModel extends BaseViewModel {
 
   /// GET /walks/{walkId}/summary
   Future<void> loadSummary(int walkId) async {
+    // 7월 예시 기록은 서버에 없다. 조회하면 401 만 나므로 만들어 넣은 경로를 쓴다.
+    // (SampleWalkDiaries.enabled 를 false 로 하면 이 분기는 타지 않는다)
+    if (SampleWalkDiaries.enabled && SampleWalkDiaries.isSampleId(walkId)) {
+      final sample = SampleWalkDiaries.summaryFor(walkId);
+      if (sample != null) {
+        _summary = sample;
+        clearError();
+        safeNotify();
+      }
+      return;
+    }
+
     final summary = await guard(() => _walkRepository.getSummary(walkId));
     if (summary == null) return;
 

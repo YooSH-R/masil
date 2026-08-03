@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/services/sample_walk_diaries.dart';
 import '../../viewmodels/walk_view_model.dart';
 import '../../widgets/walk_route_map.dart';
 
@@ -41,6 +42,12 @@ class _WalkPathDetailScreenState extends State<WalkPathDetailScreen> {
     final distanceMeters = summary?.distanceMeters ?? walkVm.distanceMeters;
     final durationSeconds =
         summary?.durationSeconds ?? walkVm.elapsed.inSeconds;
+
+    // 어떤 산책을 보고 있는지. extra 로 안 넘어오면 진행/최근 산책.
+    final shownWalkId = widget.walkId ?? walkVm.currentWalk?.walkId;
+    final sampleImage = shownWalkId == null
+        ? null
+        : SampleWalkDiaries.imageAssetOf(shownWalkId);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F3E7),
@@ -158,12 +165,25 @@ class _WalkPathDetailScreenState extends State<WalkPathDetailScreen> {
                   Container(
                     height: 180,
                     width: double.infinity,
+                    clipBehavior: Clip.antiAlias,
                     decoration: BoxDecoration(
                       color: const Color(0xFFFDF7F0),
                       borderRadius: BorderRadius.circular(15),
                       border: Border.all(color: const Color(0xFFF0E0D0)),
                     ),
-                    child: const Center(child: Icon(Icons.image_outlined, size: 40, color: Color(0xFFD7CCC8))),
+                    // 7월 예시 기록은 asset 그림을 보여준다. 실제 기록은 서버가
+                    // GPT 처리한 사진을 내려주면 그때 연결한다(명세서 2.5).
+                    child: sampleImage == null
+                        ? const Center(
+                            child: Icon(Icons.image_outlined,
+                                size: 40, color: Color(0xFFD7CCC8)))
+                        : Image.asset(
+                            sampleImage,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Center(
+                                child: Icon(Icons.broken_image_outlined,
+                                    size: 40, color: Color(0xFFD7CCC8))),
+                          ),
                   ),
                   const SizedBox(height: 24),
                   SizedBox(

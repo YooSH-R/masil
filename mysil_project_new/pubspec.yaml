@@ -42,3 +42,6 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    # 하위 폴더는 자동 포함되지 않아 따로 적어야 한다.
+    # 7월 산책 일지 예시용 감성 사진 (SampleWalkDiaries 참고).
+    - assets/images/samples/
