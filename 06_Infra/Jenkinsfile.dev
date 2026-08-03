@@ -1,9 +1,18 @@
+def gitlabWebhookToken = System.getenv('GITLAB_WEBHOOK_TOKEN')
+
+if (!gitlabWebhookToken?.trim()) {
+    throw new IllegalStateException(
+        'GITLAB_WEBHOOK_TOKEN is not configured on the Jenkins controller.'
+    )
+}
+
 pipeline {
     agent any
 
     options {
-        disableConcurrentBuilds()
+        disableConcurrentBuilds(abortPrevious: true)
         timestamps()
+        timeout(time: 30, unit: 'MINUTES')
     }
 
     triggers {
@@ -12,7 +21,8 @@ pipeline {
             triggerOnMergeRequest: false,
             branchFilterType: 'NameBasedFilter',
             includeBranchesSpec: 'dev',
-            excludeBranchesSpec: ''
+            excludeBranchesSpec: '',
+            secretToken: gitlabWebhookToken
         )
     }
 
@@ -25,11 +35,28 @@ pipeline {
     }
 
     environment {
+        TARGET_BRANCH = 'dev'
         KUBECTL_VERSION = 'v1.36.2'
         K8S_NAMESPACE = 's15a203-dev'
+        MANIFEST_DIR = '06_Infra/dev'
     }
 
     stages {
+        stage('Validate Branch') {
+            steps {
+                script {
+                    def branch = env.gitlabBranch ?:
+                            env.GIT_BRANCH?.replaceFirst(/^origin\//, '')
+                    if (branch && branch != env.TARGET_BRANCH) {
+                        error(
+                                "개발 파이프라인은 ${env.TARGET_BRANCH} " +
+                                "브랜치만 배포할 수 있습니다. 현재 브랜치: ${branch}"
+                        )
+                    }
+                }
+            }
+        }
+
         stage('Detect Backend Changes') {
             steps {
                 script {
@@ -57,11 +84,17 @@ pipeline {
                         ).trim()
                     }
 
-                    def backendChanged = changedFiles
+                    def deploymentChanged = changedFiles
                         .readLines()
-                        .any { it.startsWith('02_Backend/') }
+                        .any {
+                            it.startsWith('02_Backend/') ||
+                            it.startsWith("${env.MANIFEST_DIR}/") ||
+                            it == '06_Infra/Jenkinsfile.dev'
+                        }
 
-                    env.BACKEND_CHANGED = (params.FORCE_BACKEND_BUILD || backendChanged).toString()
+                    env.BACKEND_CHANGED = (
+                            params.FORCE_BACKEND_BUILD || deploymentChanged
+                    ).toString()
 
                     echo "Changed files:\n${changedFiles ?: '(none)'}"
                     echo "Force backend build: ${params.FORCE_BACKEND_BUILD}"
@@ -133,7 +166,7 @@ pipeline {
             }
         }
 
-        stage('Deploy to AWS k3s') {
+        stage('Deploy Dev') {
             when {
                 expression { env.BACKEND_CHANGED == 'true' }
             }
@@ -202,12 +235,12 @@ pipeline {
                         sed \
                           -e "s|__BACKEND_IMAGE__|$BACKEND_IMAGE|g" \
                           -e "s|__BACKEND_SECRET_CHECKSUM__|$BACKEND_SECRET_CHECKSUM|g" \
-                          06_Infra/dev/deployment.yaml \
+                          "$MANIFEST_DIR/deployment.yaml" \
                           | .tools/kubectl -n "$K8S_NAMESPACE" apply -f -
 
                         .tools/kubectl -n "$K8S_NAMESPACE" apply \
-                          -f 06_Infra/dev/service.yaml \
-                          -f 06_Infra/dev/ingress.yaml
+                          -f "$MANIFEST_DIR/service.yaml" \
+                          -f "$MANIFEST_DIR/ingress.yaml"
 
                         .tools/kubectl -n "$K8S_NAMESPACE" rollout status \
                           deployment/backend --timeout=180s
@@ -216,7 +249,7 @@ pipeline {
             }
         }
 
-        stage('Verify') {
+        stage('Verify Dev') {
             when {
                 expression { env.BACKEND_CHANGED == 'true' }
             }
@@ -226,6 +259,10 @@ pipeline {
                     .tools/kubectl -n "$K8S_NAMESPACE" get pods -l app=backend -o wide
                     .tools/kubectl -n "$K8S_NAMESPACE" get service backend
                     .tools/kubectl -n "$K8S_NAMESPACE" get ingress backend
+                    curl -fsS \
+                      "https://i15a203.p.ssafy.io/dev/api/v3/api-docs" \
+                      | grep -Eq \
+                        '"url"[[:space:]]*:[[:space:]]*"https://i15a203.p.ssafy.io/dev/api"'
                 '''
             }
         }
@@ -235,14 +272,14 @@ pipeline {
         success {
             script {
                 if (env.BACKEND_CHANGED == 'true') {
-                    echo "AWS k3s development deployment succeeded: ${env.BACKEND_IMAGE}"
+                    echo "개발 환경 배포 성공: ${env.BACKEND_IMAGE}"
                 } else {
-                    echo 'No 02_Backend changes. Backend pipeline skipped.'
+                    echo '02_Backend 변경이 없어 개발 배포를 건너뜁니다.'
                 }
             }
         }
         failure {
-            echo 'Backend build or AWS k3s deployment failed.'
+            echo '개발 백엔드 빌드 또는 배포에 실패했습니다.'
         }
     }
 }
