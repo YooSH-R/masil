@@ -1,22 +1,26 @@
 """outputs/ 산출물을 S3에 업로드.
 
 [이 파일의 역할]
-run_walk_log.py / run_flow_image.py가 만든 outputs/<날짜>/ 아래 파일들
-(관찰 기록, 일지, 삽화, 스토리보드)을 S3에 올린다.
+run_walk_log.py / run_flow_image.py가 만든 outputs/<날짜>/session<N>/ 안에서
+"AI 최종 결과물"만 S3에 올린다: 일지(walk_log.md)와 감성 이미지(story_image.png).
+
+[왜 허용 목록인가]
+전에는 payload/ 폴더만 빼고 세션 폴더 아래 전부(rglob)를 올렸다. 그러면
+run.py --storyboard 처럼 같은 세션에 스토리보드(walk_flow.png, flow_panels/)나
+원자재(frame_records.json)가 함께 쌓이는 순간 그것들까지 그대로 올라갔다.
+"제외 목록"은 새 파일이 생길 때마다 빠뜨리기 쉽지만, "허용 목록"은 여기
+추가하지 않는 한 아무리 세션 폴더에 파일이 늘어도 새지 않는다.
 
 [자격증명]
 GMS_KEY와 달리 이 파일은 자격증명을 직접 읽지 않는다. boto3의 기본
 자격증명 체인(환경변수 -> ~/.aws/credentials -> IAM 역할)에 맡긴다.
 버킷 이름/프리픽스/리전만 config.py가 소유한다.
-
-[업로드 범위]
-payload/ (요청 덤프, --dump-payload로 생성) 는 내부 디버깅용이라 제외한다.
-그 외 run_dir 아래 파일은 전부 올린다.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Sequence
 
 from . import config
 
@@ -35,8 +39,18 @@ CONTENT_TYPES = {
     ".jpeg": "image/jpeg",
 }
 
-# 이 이름의 하위 폴더는 업로드하지 않는다.
-_EXCLUDED_DIRNAMES = {config.PAYLOAD_DIRNAME}
+
+def _run_key_prefix(run_dir: Path) -> str:
+    """S3 키에 쓸 "<날짜>/session<N>" 조각.
+
+    run_dir은 이제 outputs/<날짜>/session<N> 형태라 run_dir.name만 쓰면
+    "session2"만 남고 날짜가 사라진다(--out-dir로 outputs/ 바깥 임의 경로를
+    줬을 때는 이 상대경로 계산이 안 통하므로 폴더 이름으로 물러난다).
+    """
+    try:
+        return run_dir.relative_to(config.OUTPUTS_DIR).as_posix()
+    except ValueError:
+        return run_dir.name
 
 
 def _client():
@@ -79,25 +93,28 @@ def upload_outputs(
     *,
     bucket: str = config.S3_BUCKET,
     prefix: str = config.S3_PREFIX,
+    files: Sequence[str] = config.S3_UPLOAD_FILES,
 ) -> dict[str, str]:
-    """run_dir(outputs/<날짜>) 아래 파일을 전부 올리고 {상대경로: s3 URI}를 반환한다.
+    """run_dir(outputs/<날짜>/session<N>) 안에서 files로 지정한 파일만 올리고
+    {파일명: s3 URI}를 반환한다. 세션 폴더에 다른 파일이 아무리 많아도 무시한다.
 
-    키는 <prefix>/<run_dir 이름>/<run_dir 기준 상대경로> 형태다.
-    예: outputs/2026-07-31/walk_flow.png
-        -> s3://<bucket>/robot-images/outputs/2026-07-31/walk_flow.png
+    파일이 없으면(예: --no-diary로 일지를 안 만들었거나 --story-image 없이
+    감성 이미지가 없는 경우) 조용히 건너뛴다 - 부분 완료도 정상 상태다.
+
+    키는 <prefix>/<날짜>/session<N>/<파일명> 형태다.
+    예: outputs/2026-07-31/session2/walk_log.md
+        -> s3://<bucket>/robot-images/device-001/2026-07-31/session2/walk_log.md
     """
     run_dir = Path(run_dir)
     if not run_dir.is_dir():
         raise S3UploadError(f"업로드할 폴더가 없습니다: {run_dir}")
 
+    run_key = _run_key_prefix(run_dir)
     uploaded: dict[str, str] = {}
-    for path in sorted(run_dir.rglob("*")):
+    for name in files:
+        path = run_dir / name
         if not path.is_file():
             continue
-        rel_parts = path.relative_to(run_dir).parts
-        if _EXCLUDED_DIRNAMES & set(rel_parts[:-1]):
-            continue
-        rel = "/".join(rel_parts)
-        key = f"{prefix}/{run_dir.name}/{rel}" if prefix else f"{run_dir.name}/{rel}"
-        uploaded[rel] = upload_file(path, key, bucket=bucket)
+        key = f"{prefix}/{run_key}/{name}" if prefix else f"{run_key}/{name}"
+        uploaded[name] = upload_file(path, key, bucket=bucket)
     return uploaded

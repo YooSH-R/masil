@@ -68,7 +68,7 @@ VLM 호출(Stage 1)은 장당 과금된다. 추출된 프레임 전부를 설명
 │   ├── stages/              # observe(Stage1) / compose(Stage2) / illustrate(Stage3)
 │   └── cli/                 # 두 CLI의 실제 argparse + main 로직
 ├── data/sample_image/       # 샘플 프레임 + manifest.json
-├── outputs/<날짜>/          # 실행 결과 (frame_records.json, walk_log.md, 삽화 등)
+├── outputs/<날짜>/session<N>/   # 실행 결과 (frame_records.json, walk_log.md, 삽화 등)
 ├── tests/                   # pytest 테스트
 └── docs/프롬프트_전략.md    # 프롬프트 설계 메모
 ```
@@ -97,11 +97,19 @@ python run_walk_log.py --sample-seed 42               # 표본 추출 결과를 
 python run_walk_log.py --style emotional              # 일지 문체 변경 (plain/emotional/workout/pet)
 python run_walk_log.py --started-at 2026-07-28T08:12:03   # 촬영 일시 기반 시간대 추정
 python run_walk_log.py --limit 2 --dump-payload       # 앞 2장만, 실제 요청을 payload/에 덤프
-python run_walk_log.py --records outputs/2026-07-28/frame_records.json --no-observe
+python run_walk_log.py --records outputs/2026-07-28/session1/frame_records.json --no-observe
                                                        # Stage 1 재호출 없이 저장된 기록으로 일지만 다시 작성
+python run_walk_log.py --session 2                    # 세션 번호를 직접 지정
 ```
 
-결과는 `outputs/<날짜>/`에 쌓인다: `frame_records.json`(관찰 기록), `walk_log.md`(일지).
+결과는 `outputs/<날짜>/session<N>/`에 쌓인다: `frame_records.json`(관찰 기록), `walk_log.md`(일지).
+
+**세션 폴더**: 하루에 산책을 여러 번 다녀올 수 있다. `outputs/<날짜>/`에 바로
+쓰면 두 번째 산책이 첫 번째 기록을 덮어쓰므로, 실행마다 그날의 세션 번호를
+하나씩 올려 `session1`, `session2`, ...로 나눈다(`--session`으로 직접
+지정하지 않는 한). `run_flow_image.py`는 반대로 새 세션을 만들지 않고
+**가장 최근 세션**을 그대로 읽는다 - 방금 만든 관찰 기록으로 삽화를
+만드는 게 목적이라 새 세션이 생기면 안 되기 때문이다.
 
 ### Stage 3: 산책 흐름 삽화
 
@@ -115,7 +123,7 @@ python run_flow_image.py --no-ref --layout grid  # 원본 프레임 참조 없�
 이미지 스타일 프리셋: `watercolor`(기본), `storybook`, `lineart`, `photoreal`, `pixel`
 (`walklog/prompts/image.py`에서 추가/수정).
 
-결과는 `outputs/<날짜>/walk_flow.png`(스토리보드)와 `flow_panels/`(칸별 원본 삽화)에 쌓인다.
+결과는 `outputs/<날짜>/session<N>/walk_flow.png`(스토리보드)와 `flow_panels/`(칸별 원본 삽화)에 쌓인다(기본적으로 가장 최근 세션).
 
 ## 테스트
 

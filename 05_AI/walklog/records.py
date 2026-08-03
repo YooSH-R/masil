@@ -420,34 +420,75 @@ def sample_time_quantiles(
     n: int = 4,
     *,
     rng: random.Random | None = None,
+    band_ratio: float = 0.5,
 ) -> list[FrameMeta]:
-    """시간순 프레임을 n등분해 등분마다 무작위로 1장씩 뽑는다.
+    """산책 시간을 n등분한 각 구간의 중앙 밴드에서 1장씩 뽑는다.
 
-    VLM 호출(Stage 1)은 장당 과금되므로, 추출된 프레임 전부를 설명하는 대신
-    산책의 시간 흐름을 대표할 만큼만 골라 그 프레임에만 호출한다. 등분 경계를
-    고정해 매번 같은 순간(예: 정확히 25% 지점)만 뽑지 않고 등분 안에서
-    무작위로 고르는 이유: 그 순간의 프레임이 하필 흐리거나 사람이 시야를
-    가리고 있어도 같은 등분 안의 다른 프레임이 대안이 되기 때문이다.
+    [개수 등분 + 완전 무작위에서 바뀐 점]
+    1. 등분 기준이 프레임 개수가 아니라 경과 시간이다. 선명도 필터를 거친
+       프레임은 시간축에 불균등해서, 개수 등분은 밀집 구간에 표본을 쏠리게 했다.
+    2. 각 구간의 중앙 band_ratio 폭 안에서만 무작위로 뽑는다. 구간 전체에서
+       뽑으면 1구간 끝 + 2구간 시작처럼 인접 표본이 같은 순간에 몰릴 수 있다.
+       중앙 밴드로 제한하면 인접 표본 간 최소 (1-band_ratio)*구간폭 의 시간
+       간격이 보장된다.
+    3. 밴드가 비면 앵커에서 가장 가까운 미선택 프레임으로 폴백한다.
 
-    metas는 반드시 시간순으로 들어와야 한다(iter_frames의 반환값이 그렇다).
-    등분은 연속 구간이므로 결과도 자동으로 시간순이 되어 재정렬이 필요 없다.
+    무작위성을 남긴 이유는 이전과 같다: 앵커 지점을 고정 선택하면 그 순간의
+    프레임이 하필 흐리거나 가려져 있을 때 대안이 없다.
 
-    n이 프레임 수 이상이면 뽑을 게 없으므로 전체를 그대로 반환한다.
-    rng를 주지 않으면 매 호출마다 다른 결과가 나온다(테스트는 고정 시드를 넘긴다).
+    경과 시각(offset_seconds)이 없는 프레임이 있으면 시간 등분이 불가능하므로
+    경고 후 기존 방식(개수 등분 + 등분 내 무작위)으로 폴백한다.
     """
     if n <= 0:
         raise ValueError(f"n은 1 이상이어야 합니다: {n}")
+    if not 0.0 < band_ratio <= 1.0:
+        raise ValueError(f"band_ratio는 (0, 1] 범위여야 합니다: {band_ratio}")
     total = len(metas)
     if total <= n:
         return list(metas)
 
     rng = rng or random.Random()
-    picks: list[FrameMeta] = []
+
+    timed = [m for m in metas if m.offset_seconds is not None]
+    if len(timed) < total:
+        warn(f"경과 시각이 없는 프레임 {total - len(timed)}개 때문에 "
+             f"시간 등분 대신 개수 등분으로 표본을 뽑습니다")
+        picks = []
+        for i in range(n):
+            start = (i * total) // n
+            end = ((i + 1) * total) // n
+            picks.append(rng.choice(metas[start:end]))
+        return picks
+
+    t_min = timed[0].offset_seconds
+    t_max = timed[-1].offset_seconds
+    span = t_max - t_min
+    if span <= 0:
+        # 모든 프레임이 같은 시각. 등분이 무의미하므로 앞에서 n장.
+        return list(metas[:n])
+
+    seg = span / n
+    half_band = band_ratio * seg / 2
+    chosen: list[FrameMeta] = []
+    chosen_ids: set[int] = set()
+
     for i in range(n):
-        start = (i * total) // n
-        end = ((i + 1) * total) // n
-        picks.append(rng.choice(metas[start:end]))
-    return picks
+        anchor = t_min + (i + 0.5) * seg
+        band = [m for m in timed
+                if id(m) not in chosen_ids
+                and abs(m.offset_seconds - anchor) <= half_band]
+        if band:
+            pick = rng.choice(band)
+        else:
+            remaining = [m for m in timed if id(m) not in chosen_ids]
+            if not remaining:
+                break
+            pick = min(remaining, key=lambda m: abs(m.offset_seconds - anchor))
+        chosen.append(pick)
+        chosen_ids.add(id(pick))
+
+    chosen.sort(key=lambda m: m.sort_key)
+    return chosen
 
 
 # ============================================================ Stage 2/3 입력

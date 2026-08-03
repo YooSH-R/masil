@@ -15,6 +15,7 @@ from .illustrate import (
     IllustrateError,
     KeyScene,
     build_single_image,
+    build_story_image,
     build_storyboard,
     compose_storyboard,
     scene_changed,
@@ -33,6 +34,7 @@ __all__ = [
     "KeyScene",
     "build_storyboard",
     "build_single_image",
+    "build_story_image",
     "compose_storyboard",
     "IllustrateError",
 ]

@@ -144,6 +144,13 @@ class GenResult:
             raise GMSEmptyResponse(
                 f"응답에 텍스트가 없습니다 (finishReason={self.finish_reason}){hint}"
             )
+        
+        if self.finish_reason == "MAX_TOKENS":
+            raise GMSEmptyResponse(
+                f"응답이 토큰 한도에서 잘렸습니다 (출력 {self.output_tokens}토큰). "
+                "max_output_tokens를 늘리거나 thinking_budget을 제한하세요. "
+                f"잘린 앞부분: {self.text[:80]!r}"
+            )
         return self.text
 
     def require_image(self) -> bytes:

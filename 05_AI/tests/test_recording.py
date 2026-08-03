@@ -151,27 +151,12 @@ def make_metas(count: int) -> list[FrameMeta]:
     ]
 
 
-def test_sample_time_quantiles_picks_one_per_bucket():
-    metas = make_metas(12)   # 4등분하면 [0-2] [3-5] [6-8] [9-11]
-    picks = sample_time_quantiles(metas, 4, rng=random.Random(0))
-
-    assert len(picks) == 4
-    buckets = [(0, 3), (3, 6), (6, 9), (9, 12)]
-    for pick, (start, end) in zip(picks, buckets):
-        assert start <= pick.offset_seconds < end
-    # 등분이 이미 시간순 연속 구간이므로 결과도 시간순이어야 한다.
-    assert [p.offset_seconds for p in picks] == sorted(p.offset_seconds for p in picks)
-
-
-def test_sample_time_quantiles_uneven_split():
-    """총 개수가 n으로 나누어떨어지지 않아도 등분 경계가 어긋나지 않는다."""
-    metas = make_metas(10)   # 4등분 -> [0-1] [2-4] [5-6] [7-9] (2,3,2,3장)
-    picks = sample_time_quantiles(metas, 4, rng=random.Random(1))
-
-    assert len(picks) == 4
-    buckets = [(0, 2), (2, 5), (5, 7), (7, 10)]
-    for pick, (start, end) in zip(picks, buckets):
-        assert start <= pick.offset_seconds < end
+def make_timed_metas(offsets) -> list[FrameMeta]:
+    """지정한 경과 초 목록으로 더미 메타를 만든다. 시간 불균등 분포를 흉내낼 때 쓴다."""
+    return [
+        FrameMeta(path=Path(f"f_{i:04d}.jpg"), index=i, offset_seconds=float(o))
+        for i, o in enumerate(offsets)
+    ]
 
 
 def test_sample_time_quantiles_deterministic_with_seed():
@@ -195,6 +180,79 @@ def test_sample_time_quantiles_exact_n_returns_all():
 def test_sample_time_quantiles_rejects_non_positive_n():
     with pytest.raises(ValueError, match="1 이상"):
         sample_time_quantiles(make_metas(5), 0)
+
+
+def test_sample_time_quantiles_rejects_bad_band_ratio():
+    with pytest.raises(ValueError, match="band_ratio"):
+        sample_time_quantiles(make_metas(5), 2, band_ratio=0.0)
+    with pytest.raises(ValueError, match="band_ratio"):
+        sample_time_quantiles(make_metas(5), 2, band_ratio=1.5)
+
+
+def test_sample_time_quantiles_minimum_gap_guaranteed():
+    """band_ratio=0.5, n=4, 240초 산책이면 인접 표본 간 최소 30초 간격이 보장된다.
+
+    (1 - band_ratio) * span / n = 0.5 * 240 / 4 = 30초.
+    시드를 여러 개 돌려 우연히 통과하는 게 아님을 확인한다.
+    """
+    offsets = [i * 240 / 39 for i in range(40)]   # 0~240초에 균등 분포
+    metas = make_timed_metas(offsets)
+
+    for seed in range(20):
+        picks = sample_time_quantiles(metas, 4, rng=random.Random(seed))
+        assert len(picks) == 4
+        vals = sorted(p.offset_seconds for p in picks)
+        gaps = [b - a for a, b in zip(vals, vals[1:])]
+        assert all(gap >= 30 - 1e-9 for gap in gaps), (seed, gaps)
+
+
+def test_sample_time_quantiles_avoids_boundary_clustering():
+    """구간 경계 근처(59~61초, 119~121초, 179~181초)에 프레임이 몰려 있어도,
+    등분 경계를 사이에 둔 두 표본이 거의 같은 순간으로 뽑히지 않는다.
+
+    개수 등분 + 완전 무작위였던 이전 로직의 핵심 결함(경계 몰림)에 대한
+    회귀 테스트다. 배경으로 20초 간격 프레임도 섞어 둔다 - 실제 영상에서도
+    특정 순간에만 프레임이 몰리고 나머지 구간이 완전히 비어 있지는 않다.
+    """
+    background = list(range(0, 241, 20))
+    clusters = [59, 60, 61, 119, 120, 121, 179, 180, 181]
+    metas = make_timed_metas(sorted(set(background + clusters)))
+
+    for seed in range(30):
+        picks = sample_time_quantiles(metas, 4, rng=random.Random(seed))
+        vals = sorted(p.offset_seconds for p in picks)
+        gaps = [b - a for a, b in zip(vals, vals[1:])]
+        assert all(gap >= 5 for gap in gaps), (seed, vals, gaps)
+
+
+def test_sample_time_quantiles_covers_sparse_tail():
+    """앞쪽에 프레임이 밀집돼 있어도 표본이 앞쪽에만 쏠리지 않는다.
+
+    프레임 30개가 0~60초에, 10개가 60~240초에 있다(선명도 필터가 초반에만
+    프레임을 많이 남긴 상황을 흉내낸다). 개수 등분이었다면 30개 대 10개
+    비중 때문에 표본 대부분이 앞 60초에 몰렸을 것이다.
+    """
+    front = [i * 60 / 29 for i in range(30)]
+    back = [60 + i * 180 / 9 for i in range(10)]
+    metas = make_timed_metas(front + back)
+
+    for seed in range(10):
+        picks = sample_time_quantiles(metas, 4, rng=random.Random(seed))
+        back_count = sum(1 for p in picks if p.offset_seconds >= 60)
+        assert back_count >= 2, (seed, [p.offset_seconds for p in picks])
+
+
+def test_sample_time_quantiles_falls_back_without_offsets(capsys):
+    """경과 시각을 모르는 프레임이 섞이면 시간 등분을 포기하고 경고 후
+    개수 등분(폴백)으로도 n장을 채운다.
+    """
+    metas = make_metas(12)
+    metas[5] = FrameMeta(path=metas[5].path, index=5, offset_seconds=None)
+
+    picks = sample_time_quantiles(metas, 4, rng=random.Random(0))
+
+    assert len(picks) == 4
+    assert "경과 시각이 없는 프레임" in capsys.readouterr().err
 
 
 # ------------------------------------------------------------ 촬영 일시 배선

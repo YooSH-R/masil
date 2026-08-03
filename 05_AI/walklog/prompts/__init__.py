@@ -36,6 +36,7 @@ from .image import (
     IMAGE_STYLES,
     IMAGE_SUFFIX,
     PANEL_CAPTION_WRITER,
+    STORY_IMAGE_WRITER,
     build_image_prompt,
     build_image_request,
 )
@@ -57,6 +58,7 @@ __all__ = [
     "diary_spec",
     "IMAGE_PROMPT_WRITER",
     "FLOW_IMAGE_WRITER",
+    "STORY_IMAGE_WRITER",
     "PANEL_CAPTION_WRITER",
     "IMAGE_STYLES",
     "DEFAULT_IMAGE_STYLE",
@@ -78,6 +80,7 @@ _FACTORIES: dict[str, Callable[..., PromptSpec]] = {
     "diary": diary_spec,
     "image_prompt_writer": lambda: IMAGE_PROMPT_WRITER,
     "flow_image_writer": lambda: FLOW_IMAGE_WRITER,
+    "story_image_writer": lambda: STORY_IMAGE_WRITER,
     "panel_caption_writer": lambda: PANEL_CAPTION_WRITER,
 }
 

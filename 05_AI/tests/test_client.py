@@ -166,6 +166,18 @@ def test_max_tokens_hint():
             P.FRAME_EXTRACT, images=[("A", "image/jpeg")], **FRAME_VARS)
 
 
+def test_max_tokens_with_partial_text_raises():
+    """본문이 일부 나왔어도 MAX_TOKENS로 잘렸으면 조용히 반환하지 않는다.
+
+    require_text()가 비어있지 않은 텍스트를 그냥 통과시키면, 사고 토큰이
+    본문 도중에 예산을 소진했을 때 잘린 JSON/일지가 에러 없이 저장된다.
+    """
+    session = FakeSession(observation('{"scene":"공원","objects":[', finish="MAX_TOKENS"))
+    with pytest.raises(GMSEmptyResponse, match="잘렸습니다"):
+        GMSClient(key="k", session=session).generate_text(
+            P.FRAME_EXTRACT, images=[("A", "image/jpeg")], **FRAME_VARS)
+
+
 def test_blocked_prompt():
     session = FakeSession(FakeResponse({"promptFeedback": {"blockReason": "SAFETY"}}))
     with pytest.raises(GMSEmptyResponse, match="SAFETY"):

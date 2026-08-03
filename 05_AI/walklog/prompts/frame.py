@@ -153,6 +153,6 @@ FRAME_EXTRACT = PromptSpec(
 """,
 
     temperature=0.1,                # 환각 억제, 온도를 올리면 없는 사물이 등장한다.
-    max_output_tokens=2048,         # thinking 모델이 사고 토큰을 먼저 쓰므로 넉넉히.
+    max_output_tokens=4096,         # thinking 모델이 사고 토큰을 먼저 쓰므로 넉넉히.
     response_schema=FRAME_SCHEMA,
 )

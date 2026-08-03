@@ -14,7 +14,13 @@
 [분할 전에서 바뀐 점]
 1. 기록 형식을 추측하지 않는다. records.load_records 가 형식을 소유한다.
 2. sys.exit 대신 종료 코드를 반환한다.
-3. 기본 기록 경로가 outputs/<날짜>/frame_records.json 이다.
+3. 기본 기록 경로가 outputs/<날짜>/session<N>/frame_records.json 이다.
+
+[세션 폴더]
+하루에 산책을 여러 번 다녀와 run_walk_log.py를 여러 번 돌리면
+outputs/<날짜>/session1, session2, ... 로 나뉜다. 이 스크립트는 (--out-dir나
+--session을 안 주면) 그중 가장 최근 세션을 읽는다 - 방금 만든 관찰 기록을
+이어받아 삽화를 만드는 게 목적이라 새 세션을 만들면 안 되기 때문이다.
 """
 
 from __future__ import annotations
@@ -94,7 +100,7 @@ def _print_dry_run(records, count: int) -> int:
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
-    run_dir = common.resolve_run_dir(args, create=not args.dry_run)
+    run_dir = common.resolve_run_dir(args, create=not args.dry_run, new_session=False)
     records_path = args.records or (run_dir / config.RECORDS_NAME)
     out_path = args.out or (run_dir / config.FLOW_IMAGE_NAME)
 

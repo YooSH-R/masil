@@ -163,6 +163,32 @@ def test_image_prompt_writer(legacy):
                 json_lines='{"scene":"테스트"}', focus="the most representative scene")
 
 
+def test_story_image_writer_assembles():
+    """STORY_IMAGE_WRITER: story + json_lines 두 변수만으로 KeyError 없이 조립된다.
+
+    분할 전 파일에 없던 신규 스펙이라 legacy 대조 없이 조립 자체만 검증한다.
+    """
+    from walklog import prompts as P
+    from walklog.gms import payload_from_spec
+
+    body = payload_from_spec(
+        P.STORY_IMAGE_WRITER,
+        story="비 온 뒤 골목을 걸었다.",
+        json_lines='{"scene":"테스트"}',
+    )
+    user_text = body["contents"][0]["parts"][0]["text"]
+    assert "비 온 뒤 골목을 걸었다." in user_text
+    assert '{"scene":"테스트"}' in user_text
+
+
+def test_story_image_writer_missing_variable_raises():
+    from walklog import prompts as P
+    from walklog.gms import payload_from_spec
+
+    with pytest.raises(KeyError):
+        payload_from_spec(P.STORY_IMAGE_WRITER, story="이야기만 있음")
+
+
 def test_panel_caption_writer(legacy):
     from walklog import prompts as P
     assert_same(legacy, P.PANEL_CAPTION_WRITER, record_json='{"scene":"테스트"}')

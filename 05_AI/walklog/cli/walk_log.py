@@ -1,8 +1,9 @@
 """산책 일지 생성 CLI.
 
-  Stage 0  프레임 추출 -> 표본 추출 (시간 등분마다 무작위 1장, API 없음)
+  Stage 0  프레임 추출 -> 표본 추출 (시간 구간 중앙 밴드에서 무작위 1장, API 없음)
   Stage 1  표본 프레임 -> 관찰 기록 (VLM)
   Stage 2  관찰 기록 -> 산책 일지 (LLM)
+  Stage 3  일지(이야기) + 관찰 기록 -> 감성 이미지 한 장 (--story-image, LLM + 이미지 모델)
 
 사용:
     python run_walk_log.py
@@ -13,14 +14,24 @@
     python run_walk_log.py --limit 2 --dump-payload    # 2장만, 요청 덤프
     python run_walk_log.py --quarters 6                 # 6등분, 6장만 VLM 호출
     python run_walk_log.py --no-sample                  # 표본 추출 없이 전부 처리
+    python run_walk_log.py --style story --story-image --image-style watercolor
+                                                         # 이야기 문체 + 감성 이미지 한 장
+    python run_walk_log.py --session 2                  # 세션 번호를 직접 지정
 
 [분할 전에서 바뀐 점]
 1. --started-at / --location 이 생겼다. 분할 전에는 shot_datetime이 항상 "불명"이라
    프롬프트의 "촬영 일시가 주어졌다면 time_of_day를 그 값으로" 지시가 발동하지 않았다.
 2. --records + --no-observe 로 Stage 1을 건너뛰고 일지만 다시 쓸 수 있다.
    문체를 비교하려고 API를 다시 부를 필요가 없다.
-3. 결과가 outputs/<날짜>/ 아래에 쌓인다. 실행 위치에 덮어쓰지 않는다.
+3. 결과가 outputs/<날짜>/session<N>/ 아래에 쌓인다. 실행 위치에 덮어쓰지 않는다.
 4. 실패한 프레임 목록을 마지막에 요약한다.
+
+[세션 폴더]
+하루에 산책을 여러 번 다녀올 수 있다. outputs/<날짜>/ 에 바로 결과를 쓰면
+두 번째 산책이 첫 번째 산책 기록을 덮어쓴다. 그래서 실행마다 그날의
+세션 번호를 하나씩 올려 session1, session2, ... 로 나눈다(--session으로
+직접 지정하지 않는 한). 관찰 기록·일지·감성 이미지가 모두 같은 세션
+폴더 안에 함께 쌓인다.
 
 [표본 추출을 Stage 1 앞에 둔 이유]
 VLM 호출은 장당 과금된다. 추출된 프레임 전부를 설명하면 장수가 늘어날수록
@@ -81,8 +92,8 @@ def build_parser() -> argparse.ArgumentParser:
     source.add_argument("--limit", type=int, default=None,
                         help="앞에서 N장만 처리 (동작 확인용)")
     source.add_argument("--quarters", type=int, default=4,
-                        help="표본 추출 등분 수. 시간순 프레임을 이 수만큼 "
-                             "등분해 등분마다 무작위로 1장씩만 VLM에 보낸다 "
+                        help="표본 추출 등분 수. 산책 시간을 이 수만큼 등분해 "
+                             "각 구간 중앙 밴드에서 무작위로 1장씩만 VLM에 보낸다 "
                              "(기본: 4)")
     source.add_argument("--no-sample", action="store_true",
                         help="표본 추출을 건너뛰고 추출된 프레임 전부를 처리한다")
@@ -101,6 +112,8 @@ def build_parser() -> argparse.ArgumentParser:
                              "(그림은 만들지 않는다)")
     stages.add_argument("--image-style", default=P.DEFAULT_IMAGE_STYLE,
                         choices=list(P.IMAGE_STYLES))
+    stages.add_argument("--story-image", action="store_true",
+                        help="일지(이야기)를 바탕으로 감성 이미지 한 장을 생성")
 
     tuning = parser.add_argument_group("Stage 1 튜닝")
     tuning.add_argument("--no-thinking", action="store_true",
@@ -178,7 +191,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     if args.sample_seed is not None else None
                 metas = sample_time_quantiles(metas, args.quarters, rng=rng)
                 step(f"[표본 추출] {before}개 -> {len(metas)}개 "
-                     f"({args.quarters}등분, 등분마다 무작위 1장)")
+                     f"({args.quarters}등분, 구간 중앙 밴드에서 무작위 1장)")
             if args.limit:
                 metas = metas[:args.limit]
             step(f"[Stage 1] 프레임 {len(metas)}개 -> 관찰 기록")
@@ -211,6 +224,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             info("")
             info("=" * 50)
             info(diary)
+
+        # ---------------------------------------------- Stage 3 (감성 이미지)
+        if args.story_image:
+            if args.no_diary:
+                warn("--story-image 는 일지가 필요합니다 (--no-diary 와 함께 쓸 수 없음)")
+                return common.EXIT_ERROR
+            from ..stages.illustrate import IllustrateError, build_story_image
+            try:
+                image_path = build_story_image(
+                    client, records, diary,
+                    run_dir / config.STORY_IMAGE_NAME,
+                    style=args.image_style,
+                )
+                paths["감성 이미지"] = image_path
+            except IllustrateError as exc:
+                warn(str(exc))
+                return common.EXIT_ERROR
 
         # ---------------------------------------------- Stage 3B (프롬프트만)
         if args.image_prompt:

@@ -42,6 +42,7 @@ __all__ = [
     "compose_storyboard",
     "build_storyboard",
     "build_single_image",
+    "build_story_image",
 ]
 
 
@@ -429,6 +430,48 @@ def build_single_image(
     reference = next((s.reference for s in scenes if s.reference), None) \
         if use_reference else None
     data = client.generate_image(prompt, reference=reference, tag="flow_image")
+
+    out = Path(out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(data)
+    return out
+
+
+def build_story_image(
+    client: GMSClient,
+    records: Sequence[FrameRecord],
+    story: str,
+    out: str | Path,
+    *,
+    style: str = P.DEFAULT_IMAGE_STYLE,
+    use_reference: bool = True,
+) -> Path:
+    """이야기의 감정적 핵심 장면을 한 장의 삽화로.
+
+    build_single_image와의 차이: 프롬프트가 기록 요약이 아니라
+    이야기(Stage 2 산출물)에서 나온다. 이미지 API 호출은 1회다.
+    참조 프레임은 신뢰도가 가장 높은 장면의 것을 쓴다. 표본 추출(4등분
+    1장씩) 이후에는 장면당 프레임이 1개라 weight(머문 시간)가 전부 1이
+    되어 신호로 쓸 수 없다.
+    """
+    scenes = select_key_scenes(records, 4)
+
+    step("[Stage B] 이야기 핵심 장면 프롬프트 작성")
+    english = client.generate_text(
+        P.STORY_IMAGE_WRITER,
+        tag="story_image_prompt",
+        story=story,
+        json_lines=to_json_lines([s.record for s in scenes]),
+    )
+    prompt = P.build_image_request(english, style=style)
+
+    step("[Stage C] 감성 삽화 생성")
+    reference = None
+    if use_reference:
+        anchored = [s for s in scenes if s.reference]
+        if anchored:
+            reference = max(anchored, key=lambda s: s.confidence_mean).reference
+    data = client.generate_image(prompt, reference=reference, tag="story_image")
 
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)

@@ -33,8 +33,13 @@ __all__ = [
     "RECORDS_NAME",
     "DIARY_NAME",
     "FLOW_IMAGE_NAME",
+    "STORY_IMAGE_NAME",
+    "S3_UPLOAD_FILES",
     "PANELS_DIRNAME",
     "PAYLOAD_DIRNAME",
+    "SESSION_PREFIX",
+    "date_dir",
+    "list_sessions",
     "run_dir",
     "KEY_ENV",
     "get_key",
@@ -53,6 +58,7 @@ __all__ = [
     "FALLBACK_QUALITY",
     "JPEG_QUALITY_LADDER",
     "S3_BUCKET",
+    "DEVICE_ID",
     "S3_PREFIX",
     "AWS_REGION",
     "FONT_ENV",
@@ -74,7 +80,6 @@ class ConfigError(RuntimeError):
 # 실행 위치(cwd)가 아니라 파일 위치를 기준으로 잡으므로,
 # 어느 디렉터리에서 실행해도 같은 곳을 가리킨다.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent       # <== .\PJT\05_AI
-print(PROJECT_ROOT)
 
 DATA_DIR = PROJECT_ROOT / "data"                    # <-- 데이터 폴더 경로
 DEFAULT_FRAME_DIR = DATA_DIR / "sample_image"       # <-- 이미지 경로
@@ -85,20 +90,63 @@ OUTPUTS_DIR = PROJECT_ROOT / "outputs"              # <-- 산출물 경로
 RECORDS_NAME = "frame_records.json"
 DIARY_NAME = "walk_log.md"
 FLOW_IMAGE_NAME = "walk_flow.png"
+STORY_IMAGE_NAME = "story_image.png"
 PANELS_DIRNAME = "flow_panels"
+
+# S3에 올릴 "AI 최종 결과물"만 고른 허용 목록. frame_records.json(원자재),
+# walk_flow.png/flow_panels(스토리보드 부산물)는 로컬에만 남긴다.
+# storage.upload_outputs가 이 목록에 없는 파일은 세션 폴더에 있어도 올리지 않는다.
+S3_UPLOAD_FILES = (DIARY_NAME, STORY_IMAGE_NAME)
 PAYLOAD_DIRNAME = "payload"
 
 
-def run_dir(day: date | str | None = None, create: bool = True) -> Path:
-    """실행 결과를 담을 폴더를 반환한다. 예: outputs/2026-07-29
+SESSION_PREFIX = "session"
 
-    전에는 결과가 실행 위치에 그대로 떨어져 매번 덮어써졌다.
-    날짜별로 나누면 프롬프트를 손본 전후를 대조할 수 있다.
+
+def date_dir(day: date | str | None = None) -> Path:
+    """그 날짜의 outputs 폴더. 세션 폴더들의 부모. 예: outputs/2026-07-29
+
+    조회 전용이다 - 폴더를 만들지 않는다. list_sessions가 존재 여부만
+    확인할 때 부작용 없이 쓸 수 있어야 하기 때문이다.
     """
     if day is None:
         day = date.today()
     stamp = day.isoformat() if isinstance(day, date) else str(day)
-    path = OUTPUTS_DIR / stamp
+    return OUTPUTS_DIR / stamp
+
+
+def list_sessions(day: date | str | None = None) -> list[int]:
+    """그 날짜에 이미 있는 세션 번호를 오름차순으로 반환한다.
+
+    하루에 산책을 여러 번 다녀오면 run_walk_log.py도 여러 번 돌게 되는데,
+    예전에는 outputs/<날짜>/ 에 바로 결과를 써서 두 번째 실행이 첫 번째
+    산책 기록을 덮어썼다. session1, session2, ... 폴더로 나누면 실행마다
+    새 폴더가 생겨 이전 산책 기록이 사라지지 않는다.
+    """
+    base = date_dir(day)
+    if not base.is_dir():
+        return []
+    numbers = []
+    for path in base.iterdir():
+        if path.is_dir() and path.name.startswith(SESSION_PREFIX):
+            suffix = path.name[len(SESSION_PREFIX):]
+            if suffix.isdigit():
+                numbers.append(int(suffix))
+    return sorted(numbers)
+
+
+def run_dir(day: date | str | None = None, *, session: int | None = None,
+           create: bool = True) -> Path:
+    """실행 결과를 담을 폴더를 반환한다. 예: outputs/2026-07-29/session1
+
+    session을 주면 그 번호의 세션 폴더를, 안 주면 날짜 폴더 바로 아래를
+    가리킨다(세션을 나누기 전의 동작과 호환). "다음 세션을 새로 만들지,
+    최근 세션을 이어 쓸지"를 정하는 로직은 CLI 맥락(새 산책 기록인지,
+    이미 있는 기록으로 삽화만 만드는지)에 따라 다르므로 여기 두지 않는다
+    - cli/common.py의 resolve_run_dir 참고.
+    """
+    base = date_dir(day)
+    path = base / f"{SESSION_PREFIX}{session}" if session is not None else base
     if create:
         path.mkdir(parents=True, exist_ok=True)
     return path
@@ -209,9 +257,15 @@ JPEG_QUALITY_LADDER = (90, 80, 70, 60, 50)
 # 모듈 상수로 둔다. 자격증명(액세스 키)은 여기서 다루지 않는다 - boto3의
 # 기본 자격증명 체인(환경변수 -> ~/.aws/credentials -> IAM 역할)에 맡긴다.
 S3_BUCKET = os.environ.get("S3_BUCKET", "walk-picture-s3-483461801092-ap-northeast-2-an")
-# outputs/<날짜>/ 를 그대로 이 프리픽스 아래에 미러링한다.
-# 버킷 콘솔에 미리 만들어 둔 robot-images/outputs/ 폴더와 맞춘 값이다.
-S3_PREFIX = os.environ.get("S3_PREFIX", "robot-images/outputs").strip("/")
+
+# 이 서버/컨테이너가 대신 업로드해 주는 로봇의 식별자. 로봇이 여러 대가 되면
+# 기기별로 버킷 경로가 겹치지 않아야 하므로, S3_PREFIX 자체가 아니라 이 값을
+# 따로 두고 조합한다 - 나중에 기기가 늘어도 DEVICE_ID 하나만 바꾸면 된다.
+DEVICE_ID = os.environ.get("DEVICE_ID", "device-001")
+
+# outputs/<날짜>/session<N>/ 를 그대로 이 프리픽스 아래에 미러링한다.
+# 최종 경로: robot-images/<DEVICE_ID>/<날짜>/session<N>/<파일>
+S3_PREFIX = os.environ.get("S3_PREFIX", f"robot-images/{DEVICE_ID}").strip("/")
 AWS_REGION = os.environ.get("AWS_REGION", "ap-northeast-2")
 
 

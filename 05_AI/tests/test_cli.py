@@ -7,6 +7,7 @@ diagnostics의 핵심은 "거짓 통과를 만들지 않는가"다.
 
 from __future__ import annotations
 
+import argparse
 import base64
 import io
 import json
@@ -16,7 +17,7 @@ import pytest
 from PIL import Image
 
 from walklog import config, diagnostics
-from walklog.cli import flow_image, walk_log
+from walklog.cli import common, flow_image, walk_log
 from walklog.records import dump_records, iter_frames, FrameRecord, WalkInfo
 
 REAL_NAMES = [
@@ -216,6 +217,75 @@ def fake_client(monkeypatch):
     return client
 
 
+@pytest.fixture(autouse=True)
+def no_real_s3_upload(monkeypatch):
+    """S3 업로드가 기본값(True)이 되면서, 여기 있는 CLI 종단 테스트들이
+    아무 조치 없이 실행되면 실제 AWS 자격증명 체인(IMDS 프로브 등)을 건드려
+    느려지고, 자격증명이 있는 환경에서는 실제로 업로드까지 될 수 있다.
+    업로드 로직 자체는 test_storage.py가 가짜 S3 클라이언트로 검증하므로,
+    여기서는 호출만 막는다.
+    """
+    monkeypatch.setattr(common, "upload_if_requested", lambda args, run_dir: None)
+
+
+# ============================================================ 세션 폴더 계산
+
+def test_resolve_run_dir_new_session_increments(tmp_path, monkeypatch):
+    """new_session=True(run_walk_log.py 기본)는 부를 때마다 다음 번호를 새로 만든다."""
+    monkeypatch.setattr(config, "OUTPUTS_DIR", tmp_path)
+    args = argparse.Namespace(out_dir=None, date="2026-08-03", session=None)
+
+    first = common.resolve_run_dir(args)
+    second = common.resolve_run_dir(args)
+
+    assert first == tmp_path / "2026-08-03" / "session1"
+    assert second == tmp_path / "2026-08-03" / "session2"
+
+
+def test_resolve_run_dir_latest_session_reused(tmp_path, monkeypatch):
+    """new_session=False(run_flow_image.py)는 새로 만들지 않고 최근 세션을 그대로 쓴다."""
+    monkeypatch.setattr(config, "OUTPUTS_DIR", tmp_path)
+    args = argparse.Namespace(out_dir=None, date="2026-08-03", session=None)
+
+    created = common.resolve_run_dir(args)
+    reused = common.resolve_run_dir(args, new_session=False)
+
+    assert created == reused == tmp_path / "2026-08-03" / "session1"
+
+
+def test_resolve_run_dir_latest_session_when_none_exist_yet(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "OUTPUTS_DIR", tmp_path)
+    args = argparse.Namespace(out_dir=None, date="2026-08-03", session=None)
+
+    assert common.resolve_run_dir(args, new_session=False) == \
+        tmp_path / "2026-08-03" / "session1"
+
+
+def test_resolve_run_dir_explicit_session_overrides_auto(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "OUTPUTS_DIR", tmp_path)
+    args = argparse.Namespace(out_dir=None, date="2026-08-03", session=5)
+
+    assert common.resolve_run_dir(args) == tmp_path / "2026-08-03" / "session5"
+
+
+def test_resolve_run_dir_out_dir_bypasses_sessions(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "OUTPUTS_DIR", tmp_path)
+    custom = tmp_path / "anywhere"
+    args = argparse.Namespace(out_dir=custom, date="2026-08-03", session=None)
+
+    assert common.resolve_run_dir(args) == custom
+    assert config.list_sessions("2026-08-03") == []
+
+
+def test_run_label_under_outputs_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "OUTPUTS_DIR", tmp_path)
+    assert common.run_label(tmp_path / "2026-08-03" / "session2") == "2026-08-03/session2"
+
+
+def test_run_label_outside_outputs_dir(tmp_path):
+    assert common.run_label(tmp_path / "elsewhere") == "elsewhere"
+
+
 # ============================================================ walk_log CLI
 
 def test_walk_log_end_to_end(tmp_path, fake_client):
@@ -325,6 +395,25 @@ def test_walk_log_dump_payload_dir(tmp_path, monkeypatch):
     assert captured["dump"] is True
 
 
+def test_walk_log_second_walk_same_day_gets_own_session(tmp_path, fake_client, monkeypatch):
+    """하루에 산책을 두 번 다녀와도 두 번째 실행이 첫 번째 기록을 덮어쓰지 않는다.
+
+    --out-dir 를 안 주면(실제 사용자가 매번 쓰는 방식) 세션이 자동으로 나뉜다.
+    """
+    monkeypatch.setattr(config, "OUTPUTS_DIR", tmp_path / "outputs")
+    frames = touch_frames(tmp_path / "frames")
+
+    code1 = walk_log.main(["--frames", str(frames), "--date", "2026-08-03"])
+    code2 = walk_log.main(["--frames", str(frames), "--date", "2026-08-03"])
+
+    assert code1 == 0 and code2 == 0
+    day_dir = tmp_path / "outputs" / "2026-08-03"
+    assert (day_dir / "session1" / config.DIARY_NAME).is_file()
+    assert (day_dir / "session2" / config.DIARY_NAME).is_file()
+    assert (day_dir / "session1" / config.RECORDS_NAME).is_file()
+    assert (day_dir / "session2" / config.RECORDS_NAME).is_file()
+
+
 def test_walk_log_check_runs_diagnostics(monkeypatch, capsys):
     session = FakeSession(text_response("SYSTEM_OK"), text_response('{"ok":true}'),
                           text_response("2"))
@@ -426,3 +515,22 @@ def test_flow_image_all_unreadable(tmp_path, fake_client, capsys):
                             "--out-dir", str(tmp_path / "o"), "--dry-run"])
     assert code == 1
     assert "모두 unreadable" in capsys.readouterr().err
+
+
+def test_flow_image_defaults_to_latest_session(tmp_path, fake_client, monkeypatch):
+    """--out-dir/--session 을 안 주면 가장 최근 세션의 관찰 기록을 읽고
+    그 세션 폴더에 삽화를 쓴다 - 새 세션을 만들지 않는다.
+    """
+    monkeypatch.setattr(config, "OUTPUTS_DIR", tmp_path / "outputs")
+    frames = touch_frames(tmp_path / "frames")
+
+    walk_log.main(["--frames", str(frames), "--date", "2026-08-03", "--no-diary"])
+    walk_log.main(["--frames", str(frames), "--date", "2026-08-03", "--no-diary"])
+
+    code = flow_image.main(["--frames", str(frames), "--date", "2026-08-03", "-n", "2"])
+
+    assert code == 0
+    day_dir = tmp_path / "outputs" / "2026-08-03"
+    assert (day_dir / "session2" / config.FLOW_IMAGE_NAME).is_file()
+    assert not (day_dir / "session1" / config.FLOW_IMAGE_NAME).exists()
+    assert not (day_dir / "session3").exists()
