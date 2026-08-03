@@ -1,11 +1,3 @@
-def gitlabWebhookToken = System.getenv('GITLAB_WEBHOOK_TOKEN')
-
-if (!gitlabWebhookToken?.trim()) {
-    throw new IllegalStateException(
-        'GITLAB_WEBHOOK_TOKEN is not configured on the Jenkins controller.'
-    )
-}
-
 pipeline {
     agent any
 
