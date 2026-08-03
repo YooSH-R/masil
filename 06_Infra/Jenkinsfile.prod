@@ -1,4 +1,4 @@
-def gitlabWebhookToken = System.getenv('GITLAB_WEBHOOK_TOKEN')
+def gitlabWebhookToken = env.GITLAB_WEBHOOK_TOKEN
 
 if (!gitlabWebhookToken?.trim()) {
     throw new IllegalStateException(
