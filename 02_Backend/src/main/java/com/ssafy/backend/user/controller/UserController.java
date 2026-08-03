@@ -1,5 +1,6 @@
 package com.ssafy.backend.user.controller;
 
+import com.ssafy.backend.auth.security.UserPrincipal;
 import com.ssafy.backend.common.ApiResponse;
 import com.ssafy.backend.user.dto.ChangePasswordRequest;
 import com.ssafy.backend.user.dto.MemberResponse;
@@ -35,9 +36,11 @@ public class UserController {
     )
     @GetMapping("/me")
     public ApiResponse<MemberResponse> getMe(
-            @AuthenticationPrincipal Long userId
+            @AuthenticationPrincipal UserPrincipal principal
     ) {
-        return ApiResponse.success(memberService.getMember(userId));
+        return ApiResponse.success(
+                memberService.getMember(principal.userId())
+        );
     }
 
     @Operation(
@@ -46,11 +49,11 @@ public class UserController {
     )
     @PatchMapping("/me")
     public ApiResponse<MemberResponse> updateMe(
-            @AuthenticationPrincipal Long userId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody UpdateMemberRequest request
     ) {
         return ApiResponse.success(
-                memberService.updateMember(userId, request)
+                memberService.updateMember(principal.userId(), request)
         );
     }
 
@@ -60,7 +63,7 @@ public class UserController {
     )
     @PatchMapping("/me/password")
     public ResponseEntity<Void> changePassword(
-            @AuthenticationPrincipal Long userId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @RequestAttribute(
                     name = "authenticatedSessionId",
                     required = false
@@ -68,7 +71,11 @@ public class UserController {
             Long currentSessionId,
             @Valid @RequestBody ChangePasswordRequest request
     ) {
-        memberService.changePassword(userId, currentSessionId, request);
+        memberService.changePassword(
+                principal.userId(),
+                currentSessionId,
+                request
+        );
         return ResponseEntity.noContent().build();
     }
 
@@ -78,10 +85,10 @@ public class UserController {
     )
     @DeleteMapping("/me")
     public ResponseEntity<Void> withdraw(
-            @AuthenticationPrincipal Long userId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody WithdrawMemberRequest request
     ) {
-        memberService.withdraw(userId, request);
+        memberService.withdraw(principal.userId(), request);
         return ResponseEntity.noContent().build();
     }
 }

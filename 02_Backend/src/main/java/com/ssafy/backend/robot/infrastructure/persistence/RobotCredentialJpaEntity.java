@@ -15,6 +15,15 @@ public class RobotCredentialJpaEntity {
     @Column(name = "robot_id")
     private Long robotId;
 
+    @Column(name = "device_token_hash", unique = true, length = 255)
+    private String deviceTokenHash;
+
+    @Column(name = "device_token_expires_at")
+    private Instant deviceTokenExpiresAt;
+
+    @Column(name = "device_token_rotated_at")
+    private Instant deviceTokenRotatedAt;
+
     @Column(name = "qr_token_hash", nullable = false, unique = true, length = 64)
     private String qrTokenHash;
 

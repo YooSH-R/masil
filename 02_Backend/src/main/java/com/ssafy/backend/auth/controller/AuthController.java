@@ -1,5 +1,6 @@
 package com.ssafy.backend.auth.controller;
 
+import com.ssafy.backend.auth.security.UserPrincipal;
 import com.ssafy.backend.auth.dto.AuthResponse;
 import com.ssafy.backend.auth.dto.LoginRequest;
 import com.ssafy.backend.auth.dto.LogoutRequest;
@@ -97,10 +98,10 @@ public class AuthController {
     )
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
-            @AuthenticationPrincipal Long userId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody LogoutRequest request
     ) {
-        authService.logout(userId, request);
+        authService.logout(principal.userId(), request);
         return ResponseEntity.noContent().build();
     }
 
