@@ -115,16 +115,15 @@ INSERT INTO robot_pairings (pet_id, robot_id, paired_at)
 VALUES (900001, 900001, CURRENT_TIMESTAMP);
 
 INSERT INTO pet_affinity_states (
-    pet_id, affinity_score, affinity_level, mood, last_interaction_at,
-    updated_at
+    pet_id, affinity_score, affinity_level, mood,
+    last_interaction_at, updated_at
 ) VALUES (
     900001, 50, 3, 'FRIENDLY', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 );
 
 INSERT INTO robot_current_states (
-    robot_id, online, mode, battery_level, docked, last_seen_at,
-    updated_at
+    robot_id, online, mode, battery_level, docked,
+    last_seen_at, updated_at
 ) VALUES (
-    900001, TRUE, 'IDLE', 80, FALSE, CURRENT_TIMESTAMP,
-    CURRENT_TIMESTAMP
+    900001, TRUE, 'IDLE', 80, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 );

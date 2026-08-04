@@ -1,0 +1,116 @@
+{
+  "source": "video\\seg_0000.mp4",
+  "fps": 15.0,
+  "frames_read": 1639,
+  "window_sec": 10.0,
+  "metric": "laplacian",
+  "center_crop": 1.0,
+  "stats": {
+    "windows": 11,
+    "saved": 11,
+    "skipped_dup": 0,
+    "skipped_low": 0,
+    "rejected_exposure": 238
+  },
+  "frames": [
+    {
+      "frame_index": 128,
+      "timestamp_sec": 8.533,
+      "score": 274.67,
+      "clip_high": 0.0888,
+      "clip_low": 0.0038,
+      "mean_brightness": 65.6,
+      "file": "f_0000128_t000m08.53s.jpg"
+    },
+    {
+      "frame_index": 160,
+      "timestamp_sec": 10.667,
+      "score": 184.11,
+      "clip_high": 0.0683,
+      "clip_low": 0.011,
+      "mean_brightness": 58.9,
+      "file": "f_0000160_t000m10.67s.jpg"
+    },
+    {
+      "frame_index": 448,
+      "timestamp_sec": 29.867,
+      "score": 113.24,
+      "clip_high": 0.0525,
+      "clip_low": 0.2202,
+      "mean_brightness": 85.7,
+      "file": "f_0000448_t000m29.87s.jpg"
+    },
+    {
+      "frame_index": 540,
+      "timestamp_sec": 36.0,
+      "score": 133.33,
+      "clip_high": 0.053,
+      "clip_low": 0.15,
+      "mean_brightness": 83.2,
+      "file": "f_0000540_t000m36.00s.jpg"
+    },
+    {
+      "frame_index": 686,
+      "timestamp_sec": 45.733,
+      "score": 152.99,
+      "clip_high": 0.0588,
+      "clip_low": 0.1162,
+      "mean_brightness": 86.8,
+      "file": "f_0000686_t000m45.73s.jpg"
+    },
+    {
+      "frame_index": 870,
+      "timestamp_sec": 58.0,
+      "score": 127.71,
+      "clip_high": 0.0888,
+      "clip_low": 0.0742,
+      "mean_brightness": 82.3,
+      "file": "f_0000870_t000m58.00s.jpg"
+    },
+    {
+      "frame_index": 960,
+      "timestamp_sec": 64.0,
+      "score": 124.2,
+      "clip_high": 0.0849,
+      "clip_low": 0.0434,
+      "mean_brightness": 84.0,
+      "file": "f_0000960_t001m04.00s.jpg"
+    },
+    {
+      "frame_index": 1125,
+      "timestamp_sec": 75.0,
+      "score": 107.14,
+      "clip_high": 0.0622,
+      "clip_low": 0.1157,
+      "mean_brightness": 86.8,
+      "file": "f_0001125_t001m15.00s.jpg"
+    },
+    {
+      "frame_index": 1347,
+      "timestamp_sec": 89.8,
+      "score": 203.23,
+      "clip_high": 0.0872,
+      "clip_low": 0.0006,
+      "mean_brightness": 80.6,
+      "file": "f_0001347_t001m29.80s.jpg"
+    },
+    {
+      "frame_index": 1351,
+      "timestamp_sec": 90.067,
+      "score": 170.06,
+      "clip_high": 0.1018,
+      "clip_low": 0.0004,
+      "mean_brightness": 75.9,
+      "file": "f_0001351_t001m30.07s.jpg"
+    },
+    {
+      "frame_index": 1605,
+      "timestamp_sec": 107.0,
+      "score": 159.59,
+      "clip_high": 0.0388,
+      "clip_low": 0.3411,
+      "mean_brightness": 79.0,
+      "file": "f_0001605_t001m47.00s.jpg"
+    }
+  ]
+}
