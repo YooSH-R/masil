@@ -3,8 +3,10 @@ package com.ssafy.backend.robot.mqtt;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -40,13 +42,19 @@ class RobotMqttApplicationServiceTest {
                 messageId,
                 "1.0",
                 "device-001",
-                Instant.parse("2026-07-30T00:00:00Z"),
+                Instant.parse("2026-08-03T05:00:00Z"),
                 RobotEventType.WALK_COMPLETED,
-                null
+                new ObjectMapper().readTree("""
+                        {
+                          "startedAt": "2026-08-03T04:30:00Z",
+                          "walkDate": "2026-08-03",
+                          "session": 1
+                        }
+                        """)
         );
         when(store.findEventResult(messageId)).thenReturn(Optional.empty());
         when(store.lockAffinity("device-001")).thenReturn(
-                new RobotMqttStore.AffinityContext(1L, 2L, 95)
+                new RobotMqttStore.AffinityContext(1L, 10L, 2L, 95)
         );
         AffectionChangedMessage response = service.processEvent(event);
 
@@ -65,10 +73,19 @@ class RobotMqttApplicationServiceTest {
         verify(store).insertEvent(
                 event,
                 1L,
-                "{}",
+                "{\"startedAt\":\"2026-08-03T04:30:00Z\","
+                        + "\"walkDate\":\"2026-08-03\",\"session\":1}",
                 95,
                 5,
                 100
+        );
+        verify(store).insertCompletedWalk(
+                10L,
+                Instant.parse("2026-08-03T04:30:00Z"),
+                Instant.parse("2026-08-03T05:00:00Z"),
+                LocalDate.parse("2026-08-03"),
+                1,
+                "robot-images/device-001/2026-08-03/session1/"
         );
         verify(eventPublisher).publishEvent(
                 new AffectionPublishEvent(response)
@@ -89,7 +106,7 @@ class RobotMqttApplicationServiceTest {
         );
         when(store.findEventResult(messageId)).thenReturn(Optional.empty());
         when(store.lockAffinity("device-001")).thenReturn(
-                new RobotMqttStore.AffinityContext(1L, 2L, 10)
+                new RobotMqttStore.AffinityContext(1L, 10L, 2L, 10)
         );
         service.processEvent(event);
 
@@ -111,6 +128,56 @@ class RobotMqttApplicationServiceTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> service.processHeartbeat(heartbeat)
+        );
+    }
+
+    @Test
+    void rejectsWalkCompletedWithoutDiaryLocationData() {
+        RobotEventMessage event = new RobotEventMessage(
+                UUID.randomUUID(),
+                "1.0",
+                "device-001",
+                Instant.parse("2026-08-03T05:00:00Z"),
+                RobotEventType.WALK_COMPLETED,
+                null
+        );
+        when(store.findEventResult(event.messageId()))
+                .thenReturn(Optional.empty());
+        when(store.lockAffinity("device-001")).thenReturn(
+                new RobotMqttStore.AffinityContext(1L, 10L, 2L, 50)
+        );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.processEvent(event)
+        );
+    }
+
+    @Test
+    void rejectsWalkCompletedWithStringSession() throws Exception {
+        RobotEventMessage event = new RobotEventMessage(
+                UUID.randomUUID(),
+                "1.0",
+                "device-001",
+                Instant.parse("2026-08-03T05:00:00Z"),
+                RobotEventType.WALK_COMPLETED,
+                new ObjectMapper().readTree("""
+                        {
+                          "startedAt": "2026-08-03T04:30:00Z",
+                          "walkDate": "2026-08-03",
+                          "session": "1"
+                        }
+                        """)
+        );
+        when(store.findEventResult(event.messageId()))
+                .thenReturn(Optional.empty());
+        when(store.lockAffinity("device-001")).thenReturn(
+                new RobotMqttStore.AffinityContext(1L, 10L, 2L, 50)
+        );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.processEvent(event)
         );
     }
 }

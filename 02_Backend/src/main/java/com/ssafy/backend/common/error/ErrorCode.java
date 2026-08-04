@@ -20,6 +20,15 @@ public enum ErrorCode {
     ROBOT_ALREADY_PAIRED(HttpStatus.CONFLICT, "이미 등록된 로봇입니다."),
     PET_ALREADY_PAIRED(HttpStatus.CONFLICT, "반려봇에 이미 등록된 로봇이 있습니다."),
     ROBOT_OWNERSHIP_MISMATCH(HttpStatus.FORBIDDEN, "다른 사용자가 소유한 로봇입니다."),
+    WALK_DIARY_NOT_FOUND(HttpStatus.NOT_FOUND, "산책일지를 찾을 수 없습니다."),
+    WALK_DIARY_STORAGE_UNAVAILABLE(
+            HttpStatus.BAD_GATEWAY,
+            "산책일지 저장소에 일시적으로 연결할 수 없습니다."
+    ),
+    WALK_DIARY_CONTENT_INVALID(
+            HttpStatus.BAD_GATEWAY,
+            "산책일지 파일이 올바르지 않습니다."
+    ),
     RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."),
     OAUTH_PROVIDER_UNAVAILABLE(HttpStatus.BAD_GATEWAY, "소셜 인증 서버와 통신할 수 없습니다.");
 

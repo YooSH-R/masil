@@ -5,9 +5,12 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+
+import org.springframework.jdbc.support.GeneratedKeyHolder;
 
 @Repository
 public class RobotMqttStore {
@@ -45,36 +48,19 @@ public class RobotMqttStore {
     }
 
     AffinityContext lockAffinity(String deviceId) {
-        List<AffinityContext> pairings = jdbcTemplate.query("""
-                SELECT r.id AS robot_id, rp.pet_id, 0 AS affinity_score
-                FROM robots r
-                JOIN robot_pairings rp
-                  ON rp.robot_id = r.id AND rp.unpaired_at IS NULL
-                WHERE r.serial_number = ?
-                """,
-                (rs, rowNum) -> new AffinityContext(
-                        rs.getLong("robot_id"),
-                        rs.getLong("pet_id"),
-                        0
-                ),
-                deviceId
-        );
-        if (pairings.size() != 1) {
-            throw new IllegalArgumentException(
-                    "활성 페어링이 없는 deviceId입니다."
-            );
-        }
         List<AffinityContext> contexts = jdbcTemplate.query("""
-                SELECT r.id AS robot_id, rp.pet_id, a.affinity_score
+                SELECT r.id AS robot_id, rp.id AS pairing_id,
+                       rp.pet_id, a.affinity_score
                 FROM robots r
                 JOIN robot_pairings rp
                   ON rp.robot_id = r.id AND rp.unpaired_at IS NULL
                 JOIN pet_affinity_states a ON a.pet_id = rp.pet_id
                 WHERE r.serial_number = ?
-                FOR UPDATE
+                FOR UPDATE OF a
                 """,
                 (rs, rowNum) -> new AffinityContext(
                         rs.getLong("robot_id"),
+                        rs.getLong("pairing_id"),
                         rs.getLong("pet_id"),
                         rs.getInt("affinity_score")
                 ),
@@ -135,6 +121,45 @@ public class RobotMqttStore {
                 appliedChange,
                 currentScore,
                 Timestamp.from(event.occurredAt())
+        );
+    }
+
+    void insertCompletedWalk(
+            long pairingId,
+            Instant startedAt,
+            Instant endedAt,
+            LocalDate walkDate,
+            int session,
+            String objectPrefix
+    ) {
+        GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            var statement = connection.prepareStatement("""
+                    INSERT INTO walks (
+                        robot_pairing_id, status, started_at, ended_at,
+                        created_at, updated_at
+                    ) VALUES (?, 'COMPLETED', ?, ?, CURRENT_TIMESTAMP,
+                              CURRENT_TIMESTAMP)
+                    """, new String[]{"id"});
+            statement.setLong(1, pairingId);
+            statement.setTimestamp(2, Timestamp.from(startedAt));
+            statement.setTimestamp(3, Timestamp.from(endedAt));
+            return statement;
+        }, keyHolder);
+        Number walkId = keyHolder.getKey();
+        if (walkId == null) {
+            throw new IllegalStateException("생성된 산책 ID를 확인할 수 없습니다.");
+        }
+
+        jdbcTemplate.update("""
+                INSERT INTO walk_diaries (
+                    walk_id, walk_date, session_no, object_prefix
+                ) VALUES (?, ?, ?, ?)
+                """,
+                walkId.longValue(),
+                walkDate,
+                session,
+                objectPrefix
         );
     }
 
@@ -391,7 +416,12 @@ public class RobotMqttStore {
         return timestamp == null ? null : timestamp.toInstant();
     }
 
-    record AffinityContext(long robotId, long petId, int currentScore) {
+    record AffinityContext(
+            long robotId,
+            long pairingId,
+            long petId,
+            int currentScore
+    ) {
     }
 
     record AffectionResult(

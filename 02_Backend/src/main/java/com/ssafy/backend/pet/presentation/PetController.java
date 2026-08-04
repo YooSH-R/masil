@@ -1,5 +1,6 @@
 package com.ssafy.backend.pet.presentation;
 
+import com.ssafy.backend.auth.security.UserPrincipal;
 import com.ssafy.backend.common.ApiResponse;
 import com.ssafy.backend.pet.application.PetAffinityResult;
 import com.ssafy.backend.pet.application.PetCreatedResult;
@@ -45,7 +46,7 @@ public class PetController {
     @SecurityRequirement(name = "bearerAuth")
     @PostMapping
     public ResponseEntity<ApiResponse<PetCreatedResponse>> create(
-            @AuthenticationPrincipal Long userId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Parameter(
                     description = "요청마다 새로 생성하는 멱등성 키. "
                             + "같은 생성 요청 재시도에만 재사용하며 "
@@ -59,7 +60,7 @@ public class PetController {
             @Valid @RequestBody CreatePetRequest request
     ) {
         PetCreatedResult result = petService.create(
-                userId,
+                principal.userId(),
                 idempotencyKey,
                 request.name()
         );
@@ -71,11 +72,11 @@ public class PetController {
     @SecurityRequirement(name = "bearerAuth")
     @GetMapping("/{petId}")
     public ApiResponse<PetProfileResponse> getProfile(
-            @AuthenticationPrincipal Long userId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable @Positive Long petId
     ) {
         return ApiResponse.success(PetProfileResponse.from(
-                petService.getProfile(userId, petId)
+                petService.getProfile(principal.userId(), petId)
         ));
     }
 
@@ -83,12 +84,12 @@ public class PetController {
     @SecurityRequirement(name = "bearerAuth")
     @PatchMapping("/{petId}")
     public ApiResponse<PetProfileResponse> update(
-            @AuthenticationPrincipal Long userId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable @Positive Long petId,
             @Valid @RequestBody UpdatePetRequest request
     ) {
         return ApiResponse.success(PetProfileResponse.from(
-                petService.update(userId, petId, request.name())
+                petService.update(principal.userId(), petId, request.name())
         ));
     }
 
