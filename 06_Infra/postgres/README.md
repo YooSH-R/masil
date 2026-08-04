@@ -16,6 +16,11 @@ DB_PASSWORD=변경한_비밀번호
 
 스키마 파일을 수정해도 기존 볼륨에는 자동으로 다시 적용되지 않습니다. 개발 초기화가 필요한 경우에만 데이터를 백업한 후 볼륨을 새로 생성합니다.
 
+기존 Kubernetes PVC에는 Jenkins가 배포 직전에
+`scripts/apply-migrations.sh`로 신규 마이그레이션을 실행합니다. 마이그레이션은
+`ON_ERROR_STOP`으로 실행되며, 제거 대상 레거시 테이블에 데이터가 있으면
+백업과 명시적인 삭제 승인 전까지 중단됩니다.
+
 ## 배포 환경
 
 운영 환경에서는 `.env` 파일을 이미지나 Git 저장소에 포함하지 않습니다. Kubernetes Secret 또는 배포 플랫폼의 Secret에 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`를 등록해 백엔드 컨테이너 환경변수로 전달합니다.
@@ -149,6 +154,8 @@ export DEVICE_TOKEN_EXPIRES_DAYS=365
 - 기존 PVC가 있으면 ConfigMap을 수정해도 스키마가 다시 적용되지 않습니다.
 - 기존 PVC가 있는 상태에서 Secret의 비밀번호만 바꾸면 실제 DB 비밀번호는 자동 변경되지 않습니다.
 - 운영 스키마 변경은 이후 Flyway 같은 마이그레이션 도구로 관리해야 합니다.
+- `init/007_walk_diaries.sql` 이후 변경도 반드시 별도 번호의 멱등성
+  마이그레이션 파일로 추가하고 Jenkins 적용 목록에 포함합니다.
 - PostgreSQL Service는 클러스터 내부 전용이며 Ingress나 NodePort로 외부에 노출하지 않습니다.
 - PVC를 삭제하면 DB 데이터가 삭제될 수 있으므로 운영에서는 백업 없이 삭제하지 않습니다.
 - QR 등록 Rate Limit은 현재 단일 백엔드 인스턴스 메모리에서 관리됩니다.

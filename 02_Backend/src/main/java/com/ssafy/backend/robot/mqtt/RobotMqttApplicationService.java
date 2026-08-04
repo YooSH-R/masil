@@ -26,6 +26,11 @@ public class RobotMqttApplicationService {
             RobotEventMessage event
     ) {
         validateEvent(event);
+        if (event.eventType() == RobotEventType.WALK_COMPLETED) {
+            throw new IllegalArgumentException(
+                    "산책 완료는 POST /v1/walks/{walkId}/end로 처리해야 합니다."
+            );
+        }
 
         RobotMqttStore.AffectionResult result = store
                 .findEventResult(event.messageId())
@@ -158,6 +163,9 @@ public class RobotMqttApplicationService {
                 appliedChange,
                 currentScore
         );
+        if (event.eventType() == RobotEventType.WALK_COMPLETED) {
+            store.createWalkDiary(requireWalkId(event), event.deviceId());
+        }
         return new RobotMqttStore.AffectionResult(
                 event.deviceId(),
                 event.messageId(),
@@ -176,6 +184,22 @@ public class RobotMqttApplicationService {
         AffectionChangedMessage response = toMessage(result);
         eventPublisher.publishEvent(new AffectionPublishEvent(response));
         return response;
+    }
+
+    private long requireWalkId(RobotEventMessage event) {
+        if (event.data() == null || !event.data().isObject()) {
+            throw new IllegalArgumentException("WALK_COMPLETED data는 필수입니다.");
+        }
+        var walkIdNode = event.data().get("walkId");
+        if (walkIdNode == null
+                || !walkIdNode.isIntegralNumber()
+                || !walkIdNode.canConvertToLong()
+                || walkIdNode.longValue() <= 0) {
+            throw new IllegalArgumentException(
+                    "WALK_COMPLETED에는 양수 walkId가 필요합니다."
+            );
+        }
+        return walkIdNode.longValue();
     }
 
     private AffectionChangedMessage toMessage(

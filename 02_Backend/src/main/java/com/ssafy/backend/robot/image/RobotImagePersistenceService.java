@@ -61,8 +61,10 @@ class RobotImagePersistenceService {
             String actualContentType,
             Instant uploadedAt
     ) {
-        RobotImageStore.StoredImage image =
-                store.requirePending(deviceId, imageId);
+        RobotImageStore.StoredImage image = store.requirePending(
+                deviceId,
+                imageId
+        );
         validateMetadata(image, actualSize, actualContentType);
         store.markUploaded(imageId, actualSize, uploadedAt);
         return image.toResponse(actualSize, uploadedAt);
@@ -75,10 +77,7 @@ class RobotImagePersistenceService {
     }
 
     @Transactional(readOnly = true)
-    RobotImageStore.StoredImage requireUploaded(
-            Long userId,
-            UUID imageId
-    ) {
+    RobotImageStore.StoredImage requireUploaded(Long userId, UUID imageId) {
         return store.requireUploaded(userId, imageId);
     }
 

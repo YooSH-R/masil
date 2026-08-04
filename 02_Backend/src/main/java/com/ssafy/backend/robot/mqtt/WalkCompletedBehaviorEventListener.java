@@ -1,8 +1,9 @@
 package com.ssafy.backend.robot.mqtt;
 
 import com.ssafy.backend.walk.application.WalkCompletedDomainEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -25,7 +26,7 @@ class WalkCompletedBehaviorEventListener {
         this.objectMapper = objectMapper;
     }
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     void handle(WalkCompletedDomainEvent event) {
         ObjectNode data = objectMapper.createObjectNode();
         data.put("walkId", event.walkId());

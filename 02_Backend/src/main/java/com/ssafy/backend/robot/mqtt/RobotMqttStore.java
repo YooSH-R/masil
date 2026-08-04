@@ -1,16 +1,21 @@
 package com.ssafy.backend.robot.mqtt;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public class RobotMqttStore {
+
+    private static final ZoneId DIARY_ZONE = ZoneId.of("Asia/Seoul");
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -70,36 +75,19 @@ public class RobotMqttStore {
     }
 
     AffinityContext lockAffinity(String deviceId) {
-        List<AffinityContext> pairings = jdbcTemplate.query("""
-                SELECT r.id AS robot_id, rp.pet_id, 0 AS affinity_score
-                FROM robots r
-                JOIN robot_pairings rp
-                  ON rp.robot_id = r.id AND rp.unpaired_at IS NULL
-                WHERE r.serial_number = ?
-                """,
-                (rs, rowNum) -> new AffinityContext(
-                        rs.getLong("robot_id"),
-                        rs.getLong("pet_id"),
-                        0
-                ),
-                deviceId
-        );
-        if (pairings.size() != 1) {
-            throw new IllegalArgumentException(
-                    "활성 페어링이 없는 deviceId입니다."
-            );
-        }
         List<AffinityContext> contexts = jdbcTemplate.query("""
-                SELECT r.id AS robot_id, rp.pet_id, a.affinity_score
+                SELECT r.id AS robot_id, rp.id AS pairing_id,
+                       rp.pet_id, a.affinity_score
                 FROM robots r
                 JOIN robot_pairings rp
                   ON rp.robot_id = r.id AND rp.unpaired_at IS NULL
                 JOIN pet_affinity_states a ON a.pet_id = rp.pet_id
                 WHERE r.serial_number = ?
-                FOR UPDATE
+                FOR UPDATE OF a
                 """,
                 (rs, rowNum) -> new AffinityContext(
                         rs.getLong("robot_id"),
+                        rs.getLong("pairing_id"),
                         rs.getLong("pet_id"),
                         rs.getInt("affinity_score")
                 ),
@@ -197,6 +185,94 @@ public class RobotMqttStore {
                 currentScore,
                 Timestamp.from(event.occurredAt())
         );
+    }
+
+    void createWalkDiary(long walkId, String deviceId) {
+        if (walkDiaryExists(walkId)) {
+            return;
+        }
+        Optional<CompletedWalk> target = jdbcTemplate.query("""
+                SELECT w.id, w.ended_at, pairing.robot_id
+                FROM walks w
+                JOIN robot_pairings pairing
+                  ON pairing.id = w.robot_pairing_id
+                JOIN robots r ON r.id = pairing.robot_id
+                WHERE w.id = ?
+                  AND w.status = 'COMPLETED'
+                  AND r.serial_number = ?
+                """,
+                (rs, rowNum) -> new CompletedWalk(
+                        rs.getLong("id"),
+                        rs.getLong("robot_id"),
+                        rs.getTimestamp("ended_at").toInstant()
+                ),
+                walkId,
+                deviceId
+        ).stream().findFirst();
+        if (target.isEmpty()) {
+            if (walkDiaryExists(walkId)) {
+                return;
+            }
+            throw new IllegalArgumentException(
+                    "완료된 산책과 일치하는 walkId가 아닙니다."
+            );
+        }
+
+        CompletedWalk walk = target.get();
+        LocalDate walkDate = walk.endedAt().atZone(DIARY_ZONE).toLocalDate();
+        Integer session = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM walks w
+                JOIN robot_pairings pairing
+                  ON pairing.id = w.robot_pairing_id
+                WHERE pairing.robot_id = ?
+                  AND w.status = 'COMPLETED'
+                  AND w.ended_at >= ?
+                  AND w.ended_at < ?
+                  AND (
+                    w.ended_at < ?
+                    OR (w.ended_at = ? AND w.id <= ?)
+                  )
+                """,
+                Integer.class,
+                walk.robotId(),
+                Timestamp.from(walkDate.atStartOfDay(DIARY_ZONE).toInstant()),
+                Timestamp.from(walkDate.plusDays(1)
+                        .atStartOfDay(DIARY_ZONE).toInstant()),
+                Timestamp.from(walk.endedAt()),
+                Timestamp.from(walk.endedAt()),
+                walk.id()
+        );
+        if (session == null || session < 1) {
+            throw new IllegalStateException("산책일지 회차를 계산할 수 없습니다.");
+        }
+
+        try {
+            jdbcTemplate.update("""
+                    INSERT INTO walk_diaries (
+                        walk_id, walk_date, session_no, object_prefix
+                    ) VALUES (?, ?, ?, ?)
+                    """,
+                    walk.id(),
+                    walkDate,
+                    session,
+                    "robot-images/" + deviceId + "/" + walkDate
+                            + "/walk-" + walk.id() + "/"
+            );
+        } catch (DuplicateKeyException exception) {
+            if (!walkDiaryExists(walkId)) {
+                throw exception;
+            }
+        }
+    }
+
+    private boolean walkDiaryExists(long walkId) {
+        Integer existing = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM walk_diaries WHERE walk_id = ?",
+                Integer.class,
+                walkId
+        );
+        return existing != null && existing == 1;
     }
 
     void upsertHeartbeat(RobotHeartbeatMessage heartbeat) {
@@ -481,7 +557,15 @@ public class RobotMqttStore {
         return timestamp == null ? null : timestamp.toInstant();
     }
 
-    record AffinityContext(long robotId, long petId, int currentScore) {
+    record AffinityContext(
+            long robotId,
+            long pairingId,
+            long petId,
+            int currentScore
+    ) {
+        AffinityContext(long robotId, long petId, int currentScore) {
+            this(robotId, 0L, petId, currentScore);
+        }
     }
 
     record AffectionResult(
@@ -506,5 +590,8 @@ public class RobotMqttStore {
             Instant lastWalkAt,
             Instant lastPlayAt
     ) {
+    }
+
+    private record CompletedWalk(long id, long robotId, Instant endedAt) {
     }
 }

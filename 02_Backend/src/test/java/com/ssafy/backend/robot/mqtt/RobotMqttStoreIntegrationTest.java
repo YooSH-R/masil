@@ -152,4 +152,43 @@ class RobotMqttStoreIntegrationTest {
                 now
         ));
     }
+
+    @Test
+    void createsDiaryForExistingCompletedWalkIdempotently() {
+        RobotMqttStore.AffinityContext context =
+                store.lockAffinity("device-001");
+        jdbcTemplate.update("""
+                INSERT INTO walks (
+                    robot_pairing_id, status, started_at, ended_at,
+                    distance_meters, duration_seconds, created_at, updated_at
+                ) VALUES (?, 'COMPLETED', ?, ?, 1200.00, 1800,
+                          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """,
+                context.pairingId(),
+                java.sql.Timestamp.from(Instant.parse(
+                        "2026-08-03T04:30:00Z"
+                )),
+                java.sql.Timestamp.from(Instant.parse(
+                        "2026-08-03T05:00:00Z"
+                ))
+        );
+        Long walkId = jdbcTemplate.queryForObject("""
+                SELECT MAX(id) FROM walks WHERE robot_pairing_id = ?
+                """,
+                Long.class,
+                context.pairingId()
+        );
+
+        store.createWalkDiary(walkId, "device-001");
+        store.createWalkDiary(walkId, "device-001");
+
+        assertEquals(
+                1,
+                jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM walk_diaries WHERE walk_id = ?",
+                        Integer.class,
+                        walkId
+                )
+        );
+    }
 }

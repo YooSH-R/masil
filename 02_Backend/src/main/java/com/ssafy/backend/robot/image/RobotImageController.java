@@ -37,7 +37,10 @@ public class RobotImageController {
             @PathVariable String deviceId,
             @Valid @RequestBody UploadUrlRequest request
     ) {
-        return ApiResponse.success(robotImageService.createUploadUrl(deviceId, request));
+        return ApiResponse.success(robotImageService.createUploadUrl(
+                deviceId,
+                request
+        ));
     }
 
     @PostMapping("/devices/{deviceId}/images/{imageId}/complete")
@@ -45,7 +48,10 @@ public class RobotImageController {
             @PathVariable String deviceId,
             @PathVariable UUID imageId
     ) {
-        return ApiResponse.success(robotImageService.completeUpload(deviceId, imageId));
+        return ApiResponse.success(robotImageService.completeUpload(
+                deviceId,
+                imageId
+        ));
     }
 
     @GetMapping("/pets/{petId}/images")
@@ -53,9 +59,10 @@ public class RobotImageController {
             @PathVariable Long petId,
             @AuthenticationPrincipal UserPrincipal principal
     ) {
-        return ApiResponse.success(
-                robotImageService.listImages(principal.userId(), petId)
-        );
+        return ApiResponse.success(robotImageService.listImages(
+                principal.userId(),
+                petId
+        ));
     }
 
     @GetMapping("/images/{imageId}/download-url")
@@ -63,12 +70,10 @@ public class RobotImageController {
             @PathVariable UUID imageId,
             @AuthenticationPrincipal UserPrincipal principal
     ) {
-        return ApiResponse.success(
-                robotImageService.createDownloadUrl(
-                        principal.userId(),
-                        imageId
-                )
-        );
+        return ApiResponse.success(robotImageService.createDownloadUrl(
+                principal.userId(),
+                imageId
+        ));
     }
 
     public record UploadUrlRequest(

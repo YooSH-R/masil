@@ -1,0 +1,95 @@
+{
+  "schema": 1,
+  "generated_at": "2026-08-03T12:52:48",
+  "frame_count": 2,
+  "prompt_version": "2026-07-29",
+  "walk": {
+    "date": "불명",
+    "started_at": null,
+    "location": "불명"
+  },
+  "records": [
+    {
+      "file": "f_0000705_t000m47.00s.jpg",
+      "segment": "불명",
+      "index": 705,
+      "offset_seconds": 47.0,
+      "elapsed": "0분 47초",
+      "shot_datetime": "불명",
+      "location": "불명",
+      "observation": {
+        "scene": "실내 사무 공간 혹은 교육 공간에서 사람들이 책상에 앉아 작업을 하거나 대화를 나누고 있으며, 전면의 인물이 카메라를 보며 웃고 있다.",
+        "location_type": "실내",
+        "time_of_day": "불명",
+        "weather": "불명",
+        "people": "6~15",
+        "atmosphere": [
+          "친근함",
+          "분주함",
+          "학구적인"
+        ],
+        "confidence": {
+          "location_type": 0.95,
+          "time_of_day": 0.1,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "목걸이 등록증을 착용한 인물이 카메라를 보며 미소를 짓고 있음",
+        "objects": [
+          "사무용 의자",
+          "파티션",
+          "컴퓨터 모니터",
+          "음료 컵",
+          "천장 조명"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "창문이 보이지 않고 실내 전등이 밝게 켜져 있어 외부 시간대를 파악하기 어려움",
+        "weather_evidence": "실내 공간으로 외부 날씨를 관찰할 수 없음"
+      }
+    },
+    {
+      "file": "f_0003885_t004m19.00s.jpg",
+      "segment": "불명",
+      "index": 3885,
+      "offset_seconds": 259.0,
+      "elapsed": "4분 19초",
+      "shot_datetime": "불명",
+      "location": "불명",
+      "observation": {
+        "scene": "실내 사무실 혹은 강의실 공간에서 여러 사람들이 책상에 앉아 노트북을 보며 대화를 나누거나 작업을 하고 있다.",
+        "location_type": "실내",
+        "time_of_day": "불명",
+        "weather": "불명",
+        "people": "6~15",
+        "atmosphere": [
+          "분주함",
+          "집중하는",
+          "사무적인"
+        ],
+        "confidence": {
+          "location_type": 0.9,
+          "time_of_day": 0.1,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "실내 조명이 밝게 켜진 상태에서 협업 중인 듯한 사람들의 모습",
+        "objects": [
+          "노트북",
+          "의자",
+          "책상",
+          "일회용 컵",
+          "파티션"
+        ],
+        "plants": [],
+        "season_hint": "불명",
+        "surface": "불명",
+        "time_evidence": "창문이 보이지 않고 실내 전등만 켜져 있어 외부 시간 파악 불가",
+        "weather_evidence": "외부를 볼 수 없는 실내 공간임"
+      }
+    }
+  ]
+}

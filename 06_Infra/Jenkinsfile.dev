@@ -79,6 +79,7 @@ pipeline {
                         .any {
                             it.startsWith('02_Backend/') ||
                             it.startsWith("${env.MANIFEST_DIR}/") ||
+                            it == '06_Infra/postgres/scripts/apply-migrations.sh' ||
                             it == '06_Infra/Jenkinsfile.dev'
                         } || migrationChanged
 
@@ -165,26 +166,17 @@ pipeline {
             }
             steps {
                 sh '''
-                    set -eu
-
-                    for migration_name in \
-                      002_robot_events.sql \
-                      003_robot_photos.sql \
-                      004_robot_mqtt_runtime.sql \
-                      006_robot_qr_compat.sql \
-                      007_pet_creation_requests_compat.sql \
-                      008_users_version_compat.sql \
-                      009_walk_api.sql \
-                      010_behavior_requests_open_unique.sql
-                    do
-                        migration_path="$MIGRATION_DIR/$migration_name"
-                        test -f "$migration_path"
-                        echo "Applying database migration: $migration_name"
-
-                        .tools/kubectl -n "$K8S_NAMESPACE" exec -i postgres-0 -- \
-                          sh -ec 'exec psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
-                          < "$migration_path"
-                    done
+                    KUBECTL_BIN=.tools/kubectl \
+                      sh 06_Infra/postgres/scripts/apply-migrations.sh \
+                      "$MIGRATION_DIR/002_robot_events.sql" \
+                      "$MIGRATION_DIR/003_robot_photos.sql" \
+                      "$MIGRATION_DIR/004_robot_mqtt_runtime.sql" \
+                      "$MIGRATION_DIR/006_robot_qr_compat.sql" \
+                      "$MIGRATION_DIR/007_pet_creation_requests_compat.sql" \
+                      "$MIGRATION_DIR/007_walk_diaries.sql" \
+                      "$MIGRATION_DIR/008_users_version_compat.sql" \
+                      "$MIGRATION_DIR/009_walk_api.sql" \
+                      "$MIGRATION_DIR/010_behavior_requests_open_unique.sql"
                 '''
             }
         }
@@ -227,6 +219,9 @@ pipeline {
                 ]) {
                     sh '''
                         set +x
+
+                        .tools/kubectl -n "$K8S_NAMESPACE" get secret \
+                          backend-mqtt-secret backend-s3-secret > /dev/null
 
                         .tools/kubectl -n "$K8S_NAMESPACE" create secret docker-registry dockerhub-registry \
                           --docker-server="https://index.docker.io/v1/" \

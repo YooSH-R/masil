@@ -4,12 +4,13 @@ import com.ssafy.backend.robot.image.RobotImageController.DownloadUrlResponse;
 import com.ssafy.backend.robot.image.RobotImageController.ImageResponse;
 import com.ssafy.backend.robot.image.RobotImageController.UploadUrlRequest;
 import com.ssafy.backend.robot.image.RobotImageController.UploadUrlResponse;
+import com.ssafy.backend.walk.diary.WalkDiaryS3Properties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
@@ -38,13 +39,13 @@ public class RobotImageService {
     private final RobotImagePersistenceService persistenceService;
     private final S3Client s3Client;
     private final S3Presigner presigner;
-    private final S3StorageProperties properties;
+    private final WalkDiaryS3Properties properties;
 
     public RobotImageService(
             RobotImagePersistenceService persistenceService,
             S3Client s3Client,
             S3Presigner presigner,
-            S3StorageProperties properties
+            WalkDiaryS3Properties properties
     ) {
         this.persistenceService = persistenceService;
         this.s3Client = s3Client;
@@ -62,10 +63,9 @@ public class RobotImageService {
         Instant expiresAt = Instant.now().plusSeconds(
                 properties.presignDurationSeconds()
         );
-        String extension = extensionOf(request.contentType());
         String objectKey = "robot-images/" + deviceId + "/"
                 + KEY_DATE.format(request.capturedAt()) + "/"
-                + imageId + extension;
+                + imageId + extensionOf(request.contentType());
 
         PutObjectRequest putObject = PutObjectRequest.builder()
                 .bucket(properties.bucket())
@@ -104,13 +104,12 @@ public class RobotImageService {
                         .build()
         );
         validateMetadata(image, head);
-        Instant uploadedAt = Instant.now();
         return persistenceService.completeUpload(
                 deviceId,
                 imageId,
                 head.contentLength(),
                 head.contentType(),
-                uploadedAt
+                Instant.now()
         );
     }
 
@@ -165,7 +164,9 @@ public class RobotImageService {
             case "image/jpeg" -> ".jpg";
             case "image/png" -> ".png";
             case "image/webp" -> ".webp";
-            default -> throw new IllegalArgumentException("지원하지 않는 이미지 형식입니다.");
+            default -> throw new IllegalArgumentException(
+                    "지원하지 않는 이미지 형식입니다."
+            );
         };
     }
 }

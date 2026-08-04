@@ -45,7 +45,11 @@ public class RobotImageStore {
                     captured_at, upload_expires_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                id, robotId, objectKey, contentType, expectedSize,
+                id,
+                robotId,
+                objectKey,
+                contentType,
+                expectedSize,
                 Timestamp.from(capturedAt),
                 Timestamp.from(expiresAt)
         );
@@ -66,7 +70,9 @@ public class RobotImageStore {
                 deviceId
         );
         if (images.size() != 1) {
-            throw new IllegalArgumentException("완료할 수 없는 이미지 업로드입니다.");
+            throw new IllegalArgumentException(
+                    "완료할 수 없는 이미지 업로드입니다."
+            );
         }
         return images.get(0);
     }
@@ -77,10 +83,10 @@ public class RobotImageStore {
                        p.expected_size_bytes, p.captured_at, p.uploaded_at
                 FROM robot_photos p
                 JOIN robots r ON r.id = p.robot_id
-                JOIN robot_pairings rp ON rp.robot_id = r.id
-                JOIN pets pet ON pet.id = rp.pet_id
+                JOIN robot_pairings pairing ON pairing.robot_id = r.id
+                JOIN pets pet ON pet.id = pairing.pet_id
                 WHERE p.id = ? AND p.upload_status = 'UPLOADED'
-                  AND rp.unpaired_at IS NULL
+                  AND pairing.unpaired_at IS NULL
                   AND pet.user_id = ?
                   AND pet.deleted_at IS NULL
                 """,
@@ -129,8 +135,8 @@ public class RobotImageStore {
                        p.actual_size_bytes, p.captured_at, p.uploaded_at
                 FROM robot_photos p
                 JOIN robots r ON r.id = p.robot_id
-                JOIN robot_pairings rp ON rp.robot_id = r.id
-                WHERE rp.pet_id = ? AND rp.unpaired_at IS NULL
+                JOIN robot_pairings pairing ON pairing.robot_id = r.id
+                WHERE pairing.pet_id = ? AND pairing.unpaired_at IS NULL
                   AND p.upload_status = 'UPLOADED'
                 ORDER BY p.captured_at DESC
                 """,
@@ -147,8 +153,9 @@ public class RobotImageStore {
         );
     }
 
-    private StoredImage map(java.sql.ResultSet rs) throws java.sql.SQLException {
-        java.sql.Timestamp uploadedAt = rs.getTimestamp("uploaded_at");
+    private StoredImage map(java.sql.ResultSet rs)
+            throws java.sql.SQLException {
+        Timestamp uploadedAt = rs.getTimestamp("uploaded_at");
         return new StoredImage(
                 rs.getObject("id", UUID.class),
                 rs.getString("serial_number"),
