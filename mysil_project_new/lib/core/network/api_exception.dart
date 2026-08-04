@@ -94,11 +94,40 @@ class ApiException implements Exception {
           message: '요청이 취소되었습니다.',
         );
       default:
+        // dio 의 e.message 는 "This exception was thrown because the response
+        // has a status code of 401 and RequestOptions.validateStatus..." 같은
+        // 영어 설명문이다. 그대로 화면에 띄우면 사용자가 읽을 수 없으므로
+        // 상태코드로 사람이 읽을 문장을 만든다.
         return ApiException(
           code: ApiErrorCode.unknown,
-          message: e.message ?? '알 수 없는 오류가 발생했습니다.',
+          message: _messageForStatus(e.response?.statusCode),
           statusCode: e.response?.statusCode,
         );
+    }
+  }
+
+  /// 서버가 오류 봉투(`{success:false,error:{...}}`)를 주지 않았을 때 쓸 문장.
+  ///
+  /// 이 서버는 **매핑되지 않은 경로에 404 가 아니라 401 + 빈 본문**을 준다
+  /// (Spring Security 가 라우팅 전에 거부). 그래서 미구현 API 호출이
+  /// "인증 만료"처럼 보인다. 문구를 그에 맞게 두 갈래로 나눴다.
+  static String _messageForStatus(int? statusCode) {
+    switch (statusCode) {
+      case 401:
+        return '요청을 처리할 수 없어요. 로그인 상태이거나 아직 준비되지 않은 기능일 수 있어요.';
+      case 403:
+        return '접근 권한이 없어요.';
+      case 404:
+        return '요청한 정보를 찾을 수 없어요.';
+      case 409:
+        return '이미 처리된 요청이거나 다른 값과 충돌했어요.';
+      case 429:
+        return '요청이 너무 많아요. 잠시 후 다시 시도해 주세요.';
+      default:
+        if (statusCode != null && statusCode >= 500) {
+          return '서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.';
+        }
+        return '알 수 없는 오류가 발생했어요. 다시 시도해 주세요.';
     }
   }
 

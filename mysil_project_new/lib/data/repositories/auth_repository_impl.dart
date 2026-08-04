@@ -326,21 +326,22 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<void> withdraw({String? currentPassword}) async {
-    try {
-      await _client.delete(
-        ApiEndpoints.me,
-        // 소셜 전용 회원은 비밀번호가 없어 confirmation 만 보낸다.
-        data: {
-          if (currentPassword != null) 'currentPassword': currentPassword,
-          'confirmation': 'WITHDRAW',
-        },
-      );
-    } finally {
-      // 탈퇴가 성공하면 서버 세션이 사라진다. 실패했더라도 남은 토큰으로
-      // 계속 요청하는 것보다 정리하는 편이 안전하다.
-      await _tokenStorage.clearTokens();
-      await _cache.clear();
-    }
+    await _client.delete(
+      ApiEndpoints.me,
+      // 소셜 전용 회원은 비밀번호가 없어 confirmation 만 보낸다.
+      data: {
+        if (currentPassword != null) 'currentPassword': currentPassword,
+        'confirmation': 'WITHDRAW',
+      },
+    );
+
+    // 성공했을 때만 세션을 정리한다.
+    //
+    // 이전에는 finally 로 무조건 지웠는데, 그러면 탈퇴가 실패해도 토큰이
+    // 사라져 "탈퇴는 안 됐는데 로그아웃됨" 상태가 된다. 비밀번호를 틀렸거나
+    // 서버 오류인 경우 계정은 그대로 살아있으므로 로그인 상태를 유지해야 한다.
+    await _tokenStorage.clearTokens();
+    await _cache.clear();
   }
 
   @override
