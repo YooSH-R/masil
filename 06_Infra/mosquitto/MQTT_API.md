@@ -18,11 +18,20 @@ robot-pet/v1/devices/{deviceId}/events
   "messageId": "550e8400-e29b-41d4-a716-446655440000",
   "messageVersion": "1.0",
   "deviceId": "device-001",
-  "occurredAt": "2026-07-30T00:00:00Z",
+  "occurredAt": "2026-08-03T05:00:00Z",
   "eventType": "WALK_COMPLETED",
-  "data": {}
+  "data": {
+    "startedAt": "2026-08-03T04:30:00Z",
+    "walkDate": "2026-08-03",
+    "session": 1
+  }
 }
 ```
+
+`WALK_COMPLETED`는 S3 업로드와 전후처리가 모두 끝난 뒤 발행한다. 백엔드는
+`robot-images/{deviceId}/{walkDate}/session{session}/` 경로를 산책과 연결한다.
+`walkDate`는 `startedAt`의 한국 시간(`Asia/Seoul`) 날짜여야 한다. 다른 이벤트의
+`data`는 기존처럼 빈 객체를 사용할 수 있다.
 
 `eventType`과 기본 호감도 변화:
 
@@ -280,9 +289,13 @@ mosquitto_pub \
     "messageId":"550e8400-e29b-41d4-a716-446655440000",
     "messageVersion":"1.0",
     "deviceId":"device-001",
-    "occurredAt":"2026-07-30T00:00:00Z",
+    "occurredAt":"2026-08-03T05:00:00Z",
     "eventType":"WALK_COMPLETED",
-    "data":{}
+    "data":{
+      "startedAt":"2026-08-03T04:30:00Z",
+      "walkDate":"2026-08-03",
+      "session":1
+    }
   }'
 ```
 

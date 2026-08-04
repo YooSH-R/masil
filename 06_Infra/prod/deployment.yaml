@@ -65,6 +65,8 @@ spec:
               value: ap-northeast-2
             - name: S3_BUCKET
               value: walk-picture-s3-483461801092-ap-northeast-2-an
+            - name: S3_MAX_MARKDOWN_BYTES
+              value: "1048576"
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:

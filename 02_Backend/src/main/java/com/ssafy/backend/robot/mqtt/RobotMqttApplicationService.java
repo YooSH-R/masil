@@ -6,11 +6,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.UUID;
 
 @Service
 @ConditionalOnProperty(name = "mqtt.enabled", havingValue = "true")
 public class RobotMqttApplicationService {
+
+    private static final ZoneId DIARY_ZONE = ZoneId.of("Asia/Seoul");
 
     private final RobotMqttStore store;
     private final ApplicationEventPublisher eventPublisher;
@@ -120,6 +124,19 @@ public class RobotMqttApplicationService {
                 appliedChange,
                 currentScore
         );
+        if (event.eventType() == RobotEventType.WALK_COMPLETED) {
+            WalkCompletedData walk = requireWalkCompletedData(event);
+            store.insertCompletedWalk(
+                    affinity.pairingId(),
+                    walk.startedAt(),
+                    event.occurredAt(),
+                    walk.walkDate(),
+                    walk.session(),
+                    "robot-images/" + event.deviceId() + "/"
+                            + walk.walkDate() + "/session"
+                            + walk.session() + "/"
+            );
+        }
         return new RobotMqttStore.AffectionResult(
                 event.deviceId(),
                 event.messageId(),
@@ -130,6 +147,53 @@ public class RobotMqttApplicationService {
                 mood,
                 event.occurredAt()
         );
+    }
+
+    private WalkCompletedData requireWalkCompletedData(
+            RobotEventMessage event
+    ) {
+        if (event.data() == null || !event.data().isObject()) {
+            throw new IllegalArgumentException(
+                    "WALK_COMPLETED data는 필수입니다."
+            );
+        }
+        try {
+            var startedAtNode = event.data().get("startedAt");
+            var walkDateNode = event.data().get("walkDate");
+            var sessionNode = event.data().get("session");
+            if (startedAtNode == null
+                    || walkDateNode == null
+                    || sessionNode == null
+                    || !startedAtNode.isTextual()
+                    || !walkDateNode.isTextual()
+                    || !sessionNode.isIntegralNumber()
+                    || !sessionNode.canConvertToInt()) {
+                throw new IllegalArgumentException(
+                        "WALK_COMPLETED에는 startedAt, walkDate, session이 필요합니다."
+                );
+            }
+            Instant startedAt = Instant.parse(startedAtNode.asText());
+            LocalDate walkDate = LocalDate.parse(walkDateNode.asText());
+            int session = sessionNode.intValue();
+            if (session <= 0 || startedAt.isAfter(event.occurredAt())) {
+                throw new IllegalArgumentException(
+                        "WALK_COMPLETED 산책 시간 또는 session이 올바르지 않습니다."
+                );
+            }
+            LocalDate expectedDate = startedAt.atZone(DIARY_ZONE)
+                    .toLocalDate();
+            if (!walkDate.equals(expectedDate)) {
+                throw new IllegalArgumentException(
+                        "walkDate는 startedAt의 한국 날짜와 같아야 합니다."
+                );
+            }
+            return new WalkCompletedData(startedAt, walkDate, session);
+        } catch (java.time.DateTimeException exception) {
+            throw new IllegalArgumentException(
+                    "WALK_COMPLETED 날짜 형식이 올바르지 않습니다.",
+                    exception
+            );
+        }
     }
 
     private AffectionChangedMessage toMessage(
@@ -176,5 +240,12 @@ public class RobotMqttApplicationService {
                     "MQTT 공통 메시지 필드가 누락되었습니다."
             );
         }
+    }
+
+    private record WalkCompletedData(
+            Instant startedAt,
+            LocalDate walkDate,
+            int session
+    ) {
     }
 }

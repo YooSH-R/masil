@@ -1,7 +1,6 @@
 package com.ssafy.backend.config;
 
 import com.ssafy.backend.auth.security.JwtAuthenticationFilter;
-import com.ssafy.backend.robot.security.DeviceAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,8 +22,7 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            JwtAuthenticationFilter jwtAuthenticationFilter,
-            DeviceAuthenticationFilter deviceAuthenticationFilter
+            JwtAuthenticationFilter jwtAuthenticationFilter
     ) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
@@ -42,8 +40,6 @@ public class SecurityConfig {
                         )
                 )
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/v1/devices/*/images/**")
-                        .hasRole("DEVICE")
                         .requestMatchers(
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
@@ -60,10 +56,6 @@ public class SecurityConfig {
                                 "/v1/users/nickname-availability"
                         ).permitAll()
                         .anyRequest().hasRole("USER")
-                )
-                .addFilterBefore(
-                        deviceAuthenticationFilter,
-                        UsernamePasswordAuthenticationFilter.class
                 )
                 .addFilterBefore(
                         jwtAuthenticationFilter,

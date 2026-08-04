@@ -78,6 +78,8 @@ pipeline {
                             .any {
                                 it.startsWith('02_Backend/') ||
                                 it.startsWith("${env.MANIFEST_DIR}/") ||
+                                it.startsWith('06_Infra/postgres/init/') ||
+                                it == '06_Infra/postgres/scripts/apply-migrations.sh' ||
                                 it == '06_Infra/Jenkinsfile.prod'
                             }
 
@@ -167,6 +169,19 @@ pipeline {
                         ok: '운영 배포'
                 )
                 echo "운영 배포 승인 완료: ${env.BACKEND_IMAGE}"
+            }
+        }
+
+        stage('Migrate Database') {
+            when {
+                expression { env.BACKEND_CHANGED == 'true' }
+            }
+            steps {
+                sh '''
+                    KUBECTL_BIN=.tools/kubectl \
+                      sh 06_Infra/postgres/scripts/apply-migrations.sh \
+                      06_Infra/postgres/init/007_walk_diaries.sql
+                '''
             }
         }
 
