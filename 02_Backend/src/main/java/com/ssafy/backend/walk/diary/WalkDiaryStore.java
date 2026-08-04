@@ -52,11 +52,11 @@ class WalkDiaryStore {
             parameters.add(beforeDate);
         }
         parameters.add(dayLimit);
-        parameters.add(userId);
 
         return jdbcTemplate.query("""
-                WITH selected_dates AS (
-                    SELECT d.walk_date
+                WITH owned_diaries AS (
+                    SELECT w.id AS walk_id, d.walk_date, d.session_no,
+                           w.started_at, w.ended_at
                     FROM pets pet
                     JOIN robot_pairings pairing
                       ON pairing.pet_id = pet.id
@@ -67,24 +67,22 @@ class WalkDiaryStore {
                     WHERE pet.user_id = ?
                       AND pet.deleted_at IS NULL
                       %s
-                    GROUP BY d.walk_date
-                    ORDER BY d.walk_date DESC
+                ),
+                selected_dates AS (
+                    SELECT walk_date
+                    FROM owned_diaries
+                    GROUP BY walk_date
+                    ORDER BY walk_date DESC
                     LIMIT ?
                 )
-                SELECT w.id AS walk_id, d.walk_date, d.session_no,
-                       w.started_at, w.ended_at
-                FROM selected_dates selected
-                JOIN walk_diaries d
-                  ON d.walk_date = selected.walk_date
-                JOIN walks w
-                  ON w.id = d.walk_id
-                JOIN robot_pairings pairing
-                  ON pairing.id = w.robot_pairing_id
-                JOIN pets pet
-                  ON pet.id = pairing.pet_id
-                WHERE pet.user_id = ?
-                  AND pet.deleted_at IS NULL
-                ORDER BY d.walk_date DESC, d.session_no ASC, w.id ASC
+                SELECT owned.walk_id, owned.walk_date, owned.session_no,
+                       owned.started_at, owned.ended_at
+                FROM owned_diaries owned
+                JOIN selected_dates selected
+                  ON selected.walk_date = owned.walk_date
+                ORDER BY owned.walk_date DESC,
+                         owned.session_no ASC,
+                         owned.walk_id ASC
                 """.formatted(cursorCondition),
                 (rs, rowNum) -> mapFeedRow(rs),
                 parameters.toArray()

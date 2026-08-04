@@ -9,8 +9,6 @@ import software.amazon.awssdk.http.AbortableInputStream;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
-import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
-import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 
@@ -57,10 +55,6 @@ class WalkDiaryServiceTest {
         );
 
         byte[] markdown = "# 오늘의 산책".getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        when(s3Client.headObject(any(HeadObjectRequest.class)))
-                .thenReturn(HeadObjectResponse.builder()
-                        .contentLength((long) markdown.length)
-                        .build());
         when(s3Client.getObject(any(GetObjectRequest.class)))
                 .thenAnswer(ignored -> responseStream(markdown));
         PresignedGetObjectRequest signed =
@@ -84,7 +78,6 @@ class WalkDiaryServiceTest {
         assertEquals(1, result.session());
         assertEquals("# 오늘의 산책", result.markdown());
         assertEquals("https://example.com/story.png", result.imageUrl());
-        verify(s3Client).headObject(any(HeadObjectRequest.class));
         verify(s3Client).getObject(any(GetObjectRequest.class));
     }
 
@@ -145,10 +138,6 @@ class WalkDiaryServiceTest {
         when(store.findOwnedDiary(10L, 20L)).thenReturn(Optional.of(
                 diary(20L, LocalDate.parse("2026-08-03"), 1)
         ));
-        when(s3Client.headObject(any(HeadObjectRequest.class)))
-                .thenReturn(HeadObjectResponse.builder()
-                        .contentLength(1L)
-                        .build());
         when(s3Client.getObject(any(GetObjectRequest.class)))
                 .thenAnswer(ignored -> responseStream(new byte[]{(byte) 0x80}));
 

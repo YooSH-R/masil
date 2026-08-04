@@ -9,7 +9,6 @@ import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
-import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
@@ -61,10 +60,6 @@ public class WalkDiaryService {
         String markdownKey = diary.objectPrefix() + MARKDOWN_FILE;
 
         try {
-            s3Client.headObject(HeadObjectRequest.builder()
-                    .bucket(properties.bucket())
-                    .key(imageKey)
-                    .build());
             String markdown = readMarkdown(markdownKey);
             Instant expiresAt = Instant.now().plusSeconds(
                     properties.presignDurationSeconds()

@@ -18,8 +18,6 @@ import software.amazon.awssdk.http.AbortableInputStream;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
-import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
-import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
@@ -301,10 +299,6 @@ class WalkDiaryApiIntegrationTest {
 
     private void stubS3() throws Exception {
         byte[] markdown = "# 오늘의 산책".getBytes(StandardCharsets.UTF_8);
-        when(s3Client.headObject(any(HeadObjectRequest.class)))
-                .thenReturn(HeadObjectResponse.builder()
-                        .contentLength((long) markdown.length)
-                        .build());
         when(s3Client.getObject(any(GetObjectRequest.class)))
                 .thenAnswer(ignored -> new ResponseInputStream<>(
                         GetObjectResponse.builder()
