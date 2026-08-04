@@ -1,38 +1,7 @@
 BEGIN;
 
-DO $migration$
-DECLARE
-    legacy_table TEXT;
-    existing_rows BIGINT;
-BEGIN
-    FOREACH legacy_table IN ARRAY ARRAY[
-        'photo_analyses',
-        'walk_photos',
-        'robot_photos'
-    ]
-    LOOP
-        IF to_regclass('public.' || legacy_table) IS NOT NULL THEN
-            EXECUTE format(
-                'SELECT COUNT(*) FROM %I',
-                legacy_table
-            ) INTO existing_rows;
-
-            IF existing_rows > 0 THEN
-                RAISE EXCEPTION
-                    'Migration stopped: table % contains % row(s)',
-                    legacy_table,
-                    existing_rows
-                    USING HINT =
-                        'Back up and explicitly approve deletion before retrying.';
-            END IF;
-        END IF;
-    END LOOP;
-END
-$migration$;
-
-DROP TABLE IF EXISTS photo_analyses;
-DROP TABLE IF EXISTS walk_photos;
-DROP TABLE IF EXISTS robot_photos;
+-- 기존 사진 업로드 및 분석 테이블은 다른 기능에서 사용하므로 보존한다.
+-- 이 마이그레이션은 산책일지 메타데이터만 추가한다.
 
 CREATE TABLE IF NOT EXISTS walk_diaries (
     walk_id BIGINT PRIMARY KEY REFERENCES walks(id) ON DELETE CASCADE,

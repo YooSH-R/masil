@@ -1,9 +1,12 @@
 package com.ssafy.backend.config;
 
 import com.ssafy.backend.auth.security.JwtAuthenticationFilter;
-import jakarta.servlet.http.HttpServletResponse;
+import com.ssafy.backend.common.error.ErrorCode;
+import com.ssafy.backend.common.error.ErrorResponseWriter;
+import com.ssafy.backend.robot.security.DeviceAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
@@ -22,7 +25,9 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            JwtAuthenticationFilter jwtAuthenticationFilter
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            DeviceAuthenticationFilter deviceAuthenticationFilter,
+            ErrorResponseWriter errorResponseWriter
     ) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
@@ -33,13 +38,21 @@ public class SecurityConfig {
                 .httpBasic(basic -> basic.disable())
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, cause) ->
-                                response.sendError(
-                                        HttpServletResponse.SC_UNAUTHORIZED,
-                                        "인증이 필요합니다."
+                                errorResponseWriter.write(
+                                        request,
+                                        response,
+                                        ErrorCode.AUTHENTICATION_REQUIRED
                                 )
                         )
                 )
                 .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers("/v1/devices/*/images/**")
+                        .hasRole("DEVICE")
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/v1/walks/*/start",
+                                "/v1/walks/*/end"
+                        ).hasRole("DEVICE")
                         .requestMatchers(
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
@@ -56,6 +69,10 @@ public class SecurityConfig {
                                 "/v1/users/nickname-availability"
                         ).permitAll()
                         .anyRequest().hasRole("USER")
+                )
+                .addFilterBefore(
+                        deviceAuthenticationFilter,
+                        UsernamePasswordAuthenticationFilter.class
                 )
                 .addFilterBefore(
                         jwtAuthenticationFilter,

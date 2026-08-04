@@ -53,4 +53,8 @@ public class RobotPairingJpaEntity {
     public Long getRobotId() {
         return robotId;
     }
+
+    public Instant getUnpairedAt() {
+        return unpairedAt;
+    }
 }

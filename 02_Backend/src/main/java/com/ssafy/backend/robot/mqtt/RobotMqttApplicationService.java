@@ -1,20 +1,14 @@
 package com.ssafy.backend.robot.mqtt;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.UUID;
 
 @Service
-@ConditionalOnProperty(name = "mqtt.enabled", havingValue = "true")
 public class RobotMqttApplicationService {
-
-    private static final ZoneId DIARY_ZONE = ZoneId.of("Asia/Seoul");
 
     private final RobotMqttStore store;
     private final ApplicationEventPublisher eventPublisher;
@@ -31,22 +25,40 @@ public class RobotMqttApplicationService {
     public AffectionChangedMessage processEvent(
             RobotEventMessage event
     ) {
-        validateEnvelope(
-                event.messageId(),
-                event.messageVersion(),
-                event.deviceId(),
-                event.occurredAt()
-        );
-        if (event.eventType() == null) {
-            throw new IllegalArgumentException("eventType은 필수입니다.");
+        validateEvent(event);
+        if (event.eventType() == RobotEventType.WALK_COMPLETED) {
+            throw new IllegalArgumentException(
+                    "산책 완료는 POST /v1/walks/{walkId}/end로 처리해야 합니다."
+            );
         }
 
         RobotMqttStore.AffectionResult result = store
                 .findEventResult(event.messageId())
                 .orElseGet(() -> createEvent(event));
-        AffectionChangedMessage response = toMessage(result);
-        eventPublisher.publishEvent(new AffectionPublishEvent(response));
-        return response;
+        return publishAffinityChanged(result);
+    }
+
+    @Transactional
+    public AffectionChangedMessage processWalkCompletedEvent(
+            RobotEventMessage event,
+            long robotId,
+            long petId
+    ) {
+        validateEvent(event);
+        if (event.eventType() != RobotEventType.WALK_COMPLETED) {
+            throw new IllegalArgumentException(
+                    "산책 완료 처리에는 WALK_COMPLETED 이벤트가 필요합니다."
+            );
+        }
+
+        RobotMqttStore.AffectionResult result = store
+                .findEventResult(event.messageId(), petId)
+                .orElseGet(() -> createWalkCompletedEvent(
+                        event,
+                        robotId,
+                        petId
+                ));
+        return publishAffinityChanged(result);
     }
 
     @Transactional
@@ -93,6 +105,33 @@ public class RobotMqttApplicationService {
         if (concurrentResult.isPresent()) {
             return concurrentResult.get();
         }
+        return applyEvent(event, affinity);
+    }
+
+    private RobotMqttStore.AffectionResult createWalkCompletedEvent(
+            RobotEventMessage event,
+            long robotId,
+            long petId
+    ) {
+        RobotMqttStore.AffinityContext affinity = store.lockAffinity(
+                robotId,
+                petId,
+                event.deviceId()
+        );
+        var concurrentResult = store.findEventResult(
+                event.messageId(),
+                petId
+        );
+        if (concurrentResult.isPresent()) {
+            return concurrentResult.get();
+        }
+        return applyEvent(event, affinity);
+    }
+
+    private RobotMqttStore.AffectionResult applyEvent(
+            RobotEventMessage event,
+            RobotMqttStore.AffinityContext affinity
+    ) {
         int previousScore = affinity.currentScore();
         int currentScore = Math.max(
                 0,
@@ -125,17 +164,7 @@ public class RobotMqttApplicationService {
                 currentScore
         );
         if (event.eventType() == RobotEventType.WALK_COMPLETED) {
-            WalkCompletedData walk = requireWalkCompletedData(event);
-            store.insertCompletedWalk(
-                    affinity.pairingId(),
-                    walk.startedAt(),
-                    event.occurredAt(),
-                    walk.walkDate(),
-                    walk.session(),
-                    "robot-images/" + event.deviceId() + "/"
-                            + walk.walkDate() + "/session"
-                            + walk.session() + "/"
-            );
+            store.createWalkDiary(requireWalkId(event), event.deviceId());
         }
         return new RobotMqttStore.AffectionResult(
                 event.deviceId(),
@@ -149,51 +178,28 @@ public class RobotMqttApplicationService {
         );
     }
 
-    private WalkCompletedData requireWalkCompletedData(
-            RobotEventMessage event
+    private AffectionChangedMessage publishAffinityChanged(
+            RobotMqttStore.AffectionResult result
     ) {
+        AffectionChangedMessage response = toMessage(result);
+        eventPublisher.publishEvent(new AffectionPublishEvent(response));
+        return response;
+    }
+
+    private long requireWalkId(RobotEventMessage event) {
         if (event.data() == null || !event.data().isObject()) {
+            throw new IllegalArgumentException("WALK_COMPLETED data는 필수입니다.");
+        }
+        var walkIdNode = event.data().get("walkId");
+        if (walkIdNode == null
+                || !walkIdNode.isIntegralNumber()
+                || !walkIdNode.canConvertToLong()
+                || walkIdNode.longValue() <= 0) {
             throw new IllegalArgumentException(
-                    "WALK_COMPLETED data는 필수입니다."
+                    "WALK_COMPLETED에는 양수 walkId가 필요합니다."
             );
         }
-        try {
-            var startedAtNode = event.data().get("startedAt");
-            var walkDateNode = event.data().get("walkDate");
-            var sessionNode = event.data().get("session");
-            if (startedAtNode == null
-                    || walkDateNode == null
-                    || sessionNode == null
-                    || !startedAtNode.isTextual()
-                    || !walkDateNode.isTextual()
-                    || !sessionNode.isIntegralNumber()
-                    || !sessionNode.canConvertToInt()) {
-                throw new IllegalArgumentException(
-                        "WALK_COMPLETED에는 startedAt, walkDate, session이 필요합니다."
-                );
-            }
-            Instant startedAt = Instant.parse(startedAtNode.asText());
-            LocalDate walkDate = LocalDate.parse(walkDateNode.asText());
-            int session = sessionNode.intValue();
-            if (session <= 0 || startedAt.isAfter(event.occurredAt())) {
-                throw new IllegalArgumentException(
-                        "WALK_COMPLETED 산책 시간 또는 session이 올바르지 않습니다."
-                );
-            }
-            LocalDate expectedDate = startedAt.atZone(DIARY_ZONE)
-                    .toLocalDate();
-            if (!walkDate.equals(expectedDate)) {
-                throw new IllegalArgumentException(
-                        "walkDate는 startedAt의 한국 날짜와 같아야 합니다."
-                );
-            }
-            return new WalkCompletedData(startedAt, walkDate, session);
-        } catch (java.time.DateTimeException exception) {
-            throw new IllegalArgumentException(
-                    "WALK_COMPLETED 날짜 형식이 올바르지 않습니다.",
-                    exception
-            );
-        }
+        return walkIdNode.longValue();
     }
 
     private AffectionChangedMessage toMessage(
@@ -242,10 +248,15 @@ public class RobotMqttApplicationService {
         }
     }
 
-    private record WalkCompletedData(
-            Instant startedAt,
-            LocalDate walkDate,
-            int session
-    ) {
+    private void validateEvent(RobotEventMessage event) {
+        validateEnvelope(
+                event.messageId(),
+                event.messageVersion(),
+                event.deviceId(),
+                event.occurredAt()
+        );
+        if (event.eventType() == null) {
+            throw new IllegalArgumentException("eventType은 필수입니다.");
+        }
     }
 }

@@ -42,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "storage.s3.bucket=test-bucket",
         "storage.s3.region=ap-northeast-2",
         "storage.s3.presign-duration-seconds=300",
+        "storage.s3.max-file-size-bytes=10485760",
         "storage.s3.max-markdown-bytes=1024",
         "storage.s3.api-call-attempt-timeout-seconds=2",
         "storage.s3.api-call-timeout-seconds=5"
@@ -262,8 +263,11 @@ class WalkDiaryApiIntegrationTest {
                     robot_pairing_id,
                     status,
                     started_at,
-                    ended_at
-                ) VALUES (?, 'COMPLETED', ?, ?)
+                    ended_at,
+                    created_at,
+                    updated_at
+                ) VALUES (?, 'COMPLETED', ?, ?,
+                          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """,
                 pairingId,
                 Timestamp.from(startedAt),

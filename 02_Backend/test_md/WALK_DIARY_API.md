@@ -3,12 +3,14 @@
 산책 종료 후 로봇의 전후처리가 완료되면 S3에 아래 두 객체가 저장된다.
 
 ```text
-robot-images/{deviceId}/{yyyy-MM-dd}/session{N}/story_image.png
-robot-images/{deviceId}/{yyyy-MM-dd}/session{N}/walk_log.md
+robot-images/{deviceId}/{yyyy-MM-dd}/walk-{walkId}/story_image.png
+robot-images/{deviceId}/{yyyy-MM-dd}/walk-{walkId}/walk_log.md
 ```
 
-로봇은 두 객체의 업로드가 끝난 뒤 `WALK_COMPLETED` MQTT 이벤트를 발행한다.
-백엔드는 이벤트의 `walkDate`와 `session`을 `walk_diaries`에 기록한다.
+디바이스가 `POST /api/v1/walks/{walkId}/end`를 호출하면 백엔드는 해당 산책을
+완료하고, DB 커밋 후 `walk_diaries`에 기존 `walkId`와 S3 경로를 연결한다.
+`WALK_COMPLETED` MQTT 이벤트를 별도로 발행하지 않는다. 일지의 `session`은
+같은 디바이스의 한국 날짜별 완료 순서로 서버가 계산한다.
 
 ## 산책일지 상세 조회
 

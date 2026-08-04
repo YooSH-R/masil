@@ -19,26 +19,23 @@ robot-pet/v1/devices/{deviceId}/events
   "messageVersion": "1.0",
   "deviceId": "device-001",
   "occurredAt": "2026-08-03T05:00:00Z",
-  "eventType": "WALK_COMPLETED",
-  "data": {
-    "startedAt": "2026-08-03T04:30:00Z",
-    "walkDate": "2026-08-03",
-    "session": 1
-  }
+  "eventType": "CARE_ACTION",
+  "data": {}
 }
 ```
 
-`WALK_COMPLETED`는 S3 업로드와 전후처리가 모두 끝난 뒤 발행한다. 백엔드는
-`robot-images/{deviceId}/{walkDate}/session{session}/` 경로를 산책과 연결한다.
-`walkDate`는 `startedAt`의 한국 시간(`Asia/Seoul`) 날짜여야 한다. 다른 이벤트의
-`data`는 기존처럼 빈 객체를 사용할 수 있다.
+산책 완료의 기준 API는 `POST /api/v1/walks/{walkId}/end`다. 디바이스가
+`WALK_COMPLETED`를 MQTT 행동 토픽에 별도로 발행하면 산책과 호감도가 중복될 수
+있으므로 서버가 거부한다. 산책 종료 트랜잭션이 커밋되면 백엔드가 내부적으로
+`WALK_COMPLETED`를 처리해 호감도를 변경하고 `/affection` 토픽으로 결과를
+발행한다. 그 밖의 행동 이벤트 `data`는 빈 객체를 사용할 수 있다.
 
 `eventType`과 기본 호감도 변화:
 
 | eventType | 변화량 |
 |---|---:|
 | `CALL_AND_RESPONSE` | +2 |
-| `WALK_COMPLETED` | +10 |
+| `WALK_COMPLETED` | +10 (`POST /walks/{walkId}/end` 성공 시 서버 내부 처리) |
 | `CARE_ACTION` | +3 |
 | `NEGATIVE_REACTION` | -3 |
 | `LONG_INACTIVITY` | -1 |
@@ -275,7 +272,7 @@ mosquitto_sub \
   -v
 ```
 
-#### 5. 행동 이벤트와 호감도 응답 확인
+#### 5. 일반 행동 이벤트와 호감도 응답 확인
 
 ```bash
 mosquitto_pub \
@@ -290,12 +287,8 @@ mosquitto_pub \
     "messageVersion":"1.0",
     "deviceId":"device-001",
     "occurredAt":"2026-08-03T05:00:00Z",
-    "eventType":"WALK_COMPLETED",
-    "data":{
-      "startedAt":"2026-08-03T04:30:00Z",
-      "walkDate":"2026-08-03",
-      "session":1
-    }
+    "eventType":"CARE_ACTION",
+    "data":{}
   }'
 ```
 
@@ -303,9 +296,9 @@ mosquitto_pub \
 
 ```text
 previousScore: 50
-scoreChange: 10
-currentScore: 60
-affinityLevel: 4
+scoreChange: 3
+currentScore: 53
+affinityLevel: 3
 ```
 
 같은 메시지를 다시 발행했을 때 `currentScore`가 추가로 증가하지 않아야 한다.

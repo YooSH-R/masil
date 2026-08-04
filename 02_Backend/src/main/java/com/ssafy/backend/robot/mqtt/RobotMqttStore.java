@@ -1,19 +1,21 @@
 package com.ssafy.backend.robot.mqtt;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.springframework.jdbc.support.GeneratedKeyHolder;
-
 @Repository
 public class RobotMqttStore {
+
+    private static final ZoneId DIARY_ZONE = ZoneId.of("Asia/Seoul");
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -47,6 +49,31 @@ public class RobotMqttStore {
         ).stream().findFirst();
     }
 
+    Optional<AffectionResult> findEventResult(UUID messageId, long petId) {
+        return jdbcTemplate.query("""
+                SELECT r.serial_number, e.message_id, e.previous_score,
+                       e.score_change, e.current_score, a.affinity_level,
+                       a.mood, e.occurred_at
+                FROM device_events e
+                JOIN robots r ON r.id = e.robot_id
+                JOIN pet_affinity_states a ON a.pet_id = ?
+                WHERE e.message_id = ?
+                """,
+                (rs, rowNum) -> new AffectionResult(
+                        rs.getString("serial_number"),
+                        rs.getObject("message_id", UUID.class),
+                        rs.getInt("previous_score"),
+                        rs.getInt("score_change"),
+                        rs.getInt("current_score"),
+                        rs.getInt("affinity_level"),
+                        rs.getString("mood"),
+                        rs.getTimestamp("occurred_at").toInstant()
+                ),
+                petId,
+                messageId
+        ).stream().findFirst();
+    }
+
     AffinityContext lockAffinity(String deviceId) {
         List<AffinityContext> contexts = jdbcTemplate.query("""
                 SELECT r.id AS robot_id, rp.id AS pairing_id,
@@ -69,6 +96,42 @@ public class RobotMqttStore {
         if (contexts.size() != 1) {
             throw new IllegalArgumentException(
                     "활성 페어링이 없는 deviceId입니다."
+            );
+        }
+        return contexts.get(0);
+    }
+
+    AffinityContext lockAffinity(
+            long robotId,
+            long petId,
+            String deviceId
+    ) {
+        List<AffinityContext> contexts = jdbcTemplate.query("""
+                SELECT r.id AS robot_id, a.pet_id, a.affinity_score
+                FROM robots r
+                JOIN pet_affinity_states a ON a.pet_id = ?
+                WHERE r.id = ?
+                  AND r.serial_number = ?
+                  AND EXISTS (
+                    SELECT 1
+                    FROM robot_pairings rp
+                    WHERE rp.robot_id = r.id
+                      AND rp.pet_id = a.pet_id
+                  )
+                FOR UPDATE
+                """,
+                (rs, rowNum) -> new AffinityContext(
+                        rs.getLong("robot_id"),
+                        rs.getLong("pet_id"),
+                        rs.getInt("affinity_score")
+                ),
+                petId,
+                robotId,
+                deviceId
+        );
+        if (contexts.size() != 1) {
+            throw new IllegalArgumentException(
+                    "산책 페어링과 일치하지 않는 디바이스입니다."
             );
         }
         return contexts.get(0);
@@ -124,43 +187,92 @@ public class RobotMqttStore {
         );
     }
 
-    void insertCompletedWalk(
-            long pairingId,
-            Instant startedAt,
-            Instant endedAt,
-            LocalDate walkDate,
-            int session,
-            String objectPrefix
-    ) {
-        GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
-        jdbcTemplate.update(connection -> {
-            var statement = connection.prepareStatement("""
-                    INSERT INTO walks (
-                        robot_pairing_id, status, started_at, ended_at,
-                        created_at, updated_at
-                    ) VALUES (?, 'COMPLETED', ?, ?, CURRENT_TIMESTAMP,
-                              CURRENT_TIMESTAMP)
-                    """, new String[]{"id"});
-            statement.setLong(1, pairingId);
-            statement.setTimestamp(2, Timestamp.from(startedAt));
-            statement.setTimestamp(3, Timestamp.from(endedAt));
-            return statement;
-        }, keyHolder);
-        Number walkId = keyHolder.getKey();
-        if (walkId == null) {
-            throw new IllegalStateException("생성된 산책 ID를 확인할 수 없습니다.");
+    void createWalkDiary(long walkId, String deviceId) {
+        if (walkDiaryExists(walkId)) {
+            return;
+        }
+        Optional<CompletedWalk> target = jdbcTemplate.query("""
+                SELECT w.id, w.ended_at, pairing.robot_id
+                FROM walks w
+                JOIN robot_pairings pairing
+                  ON pairing.id = w.robot_pairing_id
+                JOIN robots r ON r.id = pairing.robot_id
+                WHERE w.id = ?
+                  AND w.status = 'COMPLETED'
+                  AND r.serial_number = ?
+                """,
+                (rs, rowNum) -> new CompletedWalk(
+                        rs.getLong("id"),
+                        rs.getLong("robot_id"),
+                        rs.getTimestamp("ended_at").toInstant()
+                ),
+                walkId,
+                deviceId
+        ).stream().findFirst();
+        if (target.isEmpty()) {
+            if (walkDiaryExists(walkId)) {
+                return;
+            }
+            throw new IllegalArgumentException(
+                    "완료된 산책과 일치하는 walkId가 아닙니다."
+            );
         }
 
-        jdbcTemplate.update("""
-                INSERT INTO walk_diaries (
-                    walk_id, walk_date, session_no, object_prefix
-                ) VALUES (?, ?, ?, ?)
+        CompletedWalk walk = target.get();
+        LocalDate walkDate = walk.endedAt().atZone(DIARY_ZONE).toLocalDate();
+        Integer session = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM walks w
+                JOIN robot_pairings pairing
+                  ON pairing.id = w.robot_pairing_id
+                WHERE pairing.robot_id = ?
+                  AND w.status = 'COMPLETED'
+                  AND w.ended_at >= ?
+                  AND w.ended_at < ?
+                  AND (
+                    w.ended_at < ?
+                    OR (w.ended_at = ? AND w.id <= ?)
+                  )
                 """,
-                walkId.longValue(),
-                walkDate,
-                session,
-                objectPrefix
+                Integer.class,
+                walk.robotId(),
+                Timestamp.from(walkDate.atStartOfDay(DIARY_ZONE).toInstant()),
+                Timestamp.from(walkDate.plusDays(1)
+                        .atStartOfDay(DIARY_ZONE).toInstant()),
+                Timestamp.from(walk.endedAt()),
+                Timestamp.from(walk.endedAt()),
+                walk.id()
         );
+        if (session == null || session < 1) {
+            throw new IllegalStateException("산책일지 회차를 계산할 수 없습니다.");
+        }
+
+        try {
+            jdbcTemplate.update("""
+                    INSERT INTO walk_diaries (
+                        walk_id, walk_date, session_no, object_prefix
+                    ) VALUES (?, ?, ?, ?)
+                    """,
+                    walk.id(),
+                    walkDate,
+                    session,
+                    "robot-images/" + deviceId + "/" + walkDate
+                            + "/walk-" + walk.id() + "/"
+            );
+        } catch (DuplicateKeyException exception) {
+            if (!walkDiaryExists(walkId)) {
+                throw exception;
+            }
+        }
+    }
+
+    private boolean walkDiaryExists(long walkId) {
+        Integer existing = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM walk_diaries WHERE walk_id = ?",
+                Integer.class,
+                walkId
+        );
+        return existing != null && existing == 1;
     }
 
     void upsertHeartbeat(RobotHeartbeatMessage heartbeat) {
@@ -303,6 +415,7 @@ public class RobotMqttStore {
                   ON rp.robot_id = r.id AND rp.unpaired_at IS NULL
                 LEFT JOIN pet_affinity_states a ON a.pet_id = rp.pet_id
                 LEFT JOIN robot_current_states s ON s.robot_id = r.id
+                ORDER BY r.id
                 """,
                 (rs, rowNum) -> new RequestCandidate(
                         rs.getLong("robot_id"),
@@ -328,6 +441,34 @@ public class RobotMqttStore {
                 Integer.class,
                 robotId,
                 requestType.name()
+        );
+        return count != null && count > 0;
+    }
+
+    void lockRequestGeneration(long robotId) {
+        jdbcTemplate.queryForObject(
+                "SELECT id FROM robots WHERE id = ? FOR UPDATE",
+                Long.class,
+                robotId
+        );
+    }
+
+    boolean hasRecentRequest(
+            long robotId,
+            BehaviorRequestType requestType,
+            Instant createdAfter
+    ) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM behavior_requests
+                WHERE robot_id = ?
+                  AND request_type = ?
+                  AND created_at > ?
+                """,
+                Integer.class,
+                robotId,
+                requestType.name(),
+                Timestamp.from(createdAfter)
         );
         return count != null && count > 0;
     }
@@ -422,6 +563,9 @@ public class RobotMqttStore {
             long petId,
             int currentScore
     ) {
+        AffinityContext(long robotId, long petId, int currentScore) {
+            this(robotId, 0L, petId, currentScore);
+        }
     }
 
     record AffectionResult(
@@ -446,5 +590,8 @@ public class RobotMqttStore {
             Instant lastWalkAt,
             Instant lastPlayAt
     ) {
+    }
+
+    private record CompletedWalk(long id, long robotId, Instant endedAt) {
     }
 }

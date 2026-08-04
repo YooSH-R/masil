@@ -48,6 +48,7 @@ class WalkDiaryServiceTest {
                         "test-bucket",
                         "ap-northeast-2",
                         300,
+                        10_485_760,
                         1024,
                         2,
                         5
