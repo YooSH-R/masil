@@ -139,6 +139,12 @@ class MotorControlNode(Node):
         drive(self.motor_right, v_right)
 
     def publish_odom(self):
+        # time.monotonic() is intentional here (not self.get_clock().now()):
+        # this board has no RTC battery, so the system/ROS wall clock can
+        # jump when NTP corrects it after boot. A dt computed across that
+        # jump would be wrong or negative. monotonic time can't jump, which
+        # matters for a delta calculation like this one; message timestamps
+        # below still use ROS time, which is what consumers expect.
         now = time.monotonic()
         dt = now - self.last_tick_time
         self.last_tick_time = now
@@ -182,6 +188,31 @@ class MotorControlNode(Node):
         odom.pose.pose.orientation.w = math.cos(self.theta / 2.0)
         odom.twist.twist.linear.x = linear_x
         odom.twist.twist.angular.z = angular_z
+
+        # Engineering estimates, not measured -- but must not be left at 0:
+        # the EKF reads zero covariance as "this is exact", which drowns out
+        # every other input on that channel. ekf.yaml only fuses vx/vyaw
+        # from this message (not position), so those two matter most; x/y/yaw
+        # get a moderate value reflecting unbounded dead-reckoning drift, and
+        # z/roll/pitch get a large value since this is a ground robot that
+        # can't move or measure along those axes at all.
+        odom.pose.covariance = [
+            0.05, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.05, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 1e6, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 1e6, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 1e6, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.05,
+        ]
+        odom.twist.covariance = [
+            0.001, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.001, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.001, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.001, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.001, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.001,
+        ]
+
         self.odom_pub.publish(odom)
 
 
