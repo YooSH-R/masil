@@ -9,6 +9,13 @@
   3. 찾으면 회전을 멈추고 MoveInterface로 그 사람 앞(APPROACH_STOP_DISTANCE)까지 이동한다.
   4. ROTATE_TIMEOUT_SEC 안에 못 찾으면 포기하고 대기 상태로 복귀한다.
 
+탐색(searching) 또는 접근 이동(approaching) 중에는 새 웨이크워드를 무시한다. 원래
+접근 이동 중 상태를 안 막아뒀더니, 사용자가 몇 초 간격으로 계속 말할 때마다 Nav2
+목표가 계속 새로 갱신돼서(진행 중이던 이동이 중간에 끊기고 새 회전이 시작됨) 로봇이
+Nav2 복구 동작(후진)까지 타는 문제가 있었다 - 실기 테스트로 발견, 이 가드로 해결.
+접근 이동은 APPROACH_TIMEOUT_SEC 안에 안 끝나면 강제로 취소하고 대기 상태로 돌아간다
+(막히거나 오래 걸려서 다음 웨이크워드를 영영 못 받는 상황 방지).
+
 카메라-라이다 시차보정 로직은 person_approach.py와 동일하다. 차이는 거기는
 "신뢰도 1등 사람 1명"만 보는 반면, 여기는 "화면에 보이는 모든 사람 중 최근접"을 고른다는 것.
 
@@ -38,7 +45,7 @@ CAMERA_HORIZONTAL_FOV_DEG = 52.0
 MIN_CONFIDENCE = 0.5
 MIN_VALID_DISTANCE = 0.3
 MAX_VALID_DISTANCE = 8.0
-APPROACH_STOP_DISTANCE = 0.6
+APPROACH_STOP_DISTANCE = 0.25
 
 # petbot_person_locator/person_approach.py와 동일 (URDF 기준 camera_link 오프셋)
 CAMERA_X_OFFSET_FROM_LIDAR = 0.15
@@ -47,6 +54,7 @@ MATCH_TOLERANCE_DEG = 5.0
 
 ROTATE_ANGULAR_SPEED = 0.5   # rad/s
 ROTATE_TIMEOUT_SEC = 15.0    # 2*pi/0.5 ~= 12.6s 한 바퀴 + 여유
+APPROACH_TIMEOUT_SEC = 20.0  # 접근 이동이 이보다 오래 걸리면 강제로 취소하고 대기 상태 복귀
 
 
 class OwnerSearch(Node):
@@ -62,6 +70,8 @@ class OwnerSearch(Node):
         self.latest_scan = None
         self.searching = False
         self.search_start_time = None
+        self.approaching = False
+        self.approach_start_time = None
 
         lidar_qos = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -94,8 +104,8 @@ class OwnerSearch(Node):
     def wakeword_callback(self, msg: Bool):
         if not msg.data:
             return
-        if self.searching:
-            self.get_logger().info('이미 탐색 중이라 웨이크워드 무시')
+        if self.searching or self.approaching:
+            self.get_logger().info('이미 탐색/접근 중이라 웨이크워드 무시')
             return
         self.get_logger().info('웨이크워드 감지 - 제자리 회전하며 사람 탐색 시작')
         self.searching = True
@@ -105,6 +115,10 @@ class OwnerSearch(Node):
         self.latest_scan = msg
 
     def _rotate_tick(self):
+        if self.approaching:
+            self._check_approach_done()
+            return
+
         if not self.searching:
             return
         elapsed = (self.get_clock().now() - self.search_start_time).nanoseconds / 1e9
@@ -115,6 +129,16 @@ class OwnerSearch(Node):
         twist = Twist()
         twist.angular.z = ROTATE_ANGULAR_SPEED
         self.cmd_vel_pub.publish(twist)
+
+    def _check_approach_done(self):
+        elapsed = (self.get_clock().now() - self.approach_start_time).nanoseconds / 1e9
+        if self.mover.is_done():
+            self.get_logger().info(f'접근 완료 (결과={self.mover.get_result()}) - 다음 웨이크워드 대기')
+            self.approaching = False
+        elif elapsed >= APPROACH_TIMEOUT_SEC:
+            self.get_logger().warn('접근이 너무 오래 걸려 강제로 대기 상태 복귀')
+            self.mover.cancel()
+            self.approaching = False
 
     def _stop_rotation(self):
         self.searching = False
@@ -164,6 +188,8 @@ class OwnerSearch(Node):
         target_distance = distance - APPROACH_STOP_DISTANCE
         goal_x, goal_y = ux * target_distance, uy * target_distance
         self.mover.move_to(goal_x, goal_y, frame_id='base_link')
+        self.approaching = True
+        self.approach_start_time = self.get_clock().now()
         self.get_logger().info(f'목표 전송 (x={goal_x:.2f}, y={goal_y:.2f}, frame=base_link)')
 
     def pixel_to_angle(self, pixel_x, image_width):
