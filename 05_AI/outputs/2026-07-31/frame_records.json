@@ -1,0 +1,176 @@
+{
+  "schema": 1,
+  "generated_at": "2026-07-31T16:04:59",
+  "frame_count": 4,
+  "prompt_version": "2026-07-29",
+  "walk": {
+    "date": "불명",
+    "started_at": null,
+    "location": "불명"
+  },
+  "records": [
+    {
+      "file": "f_0000285_t000m19.00s.jpg",
+      "segment": "불명",
+      "index": 285,
+      "offset_seconds": 19.0,
+      "elapsed": "0분 19초",
+      "shot_datetime": "불명",
+      "location": "불명",
+      "observation": {
+        "scene": "여러 사람들이 책상에 앉아 노트북으로 작업을 하거나 대화를 나누고 있는 실내 공간의 모습이다.",
+        "location_type": "실내",
+        "time_of_day": "불명",
+        "weather": "불명",
+        "people": "6~15",
+        "atmosphere": [
+          "집중하는",
+          "차분함",
+          "학구적인"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 0.1,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "개인 노트북을 지참하여 공동 작업 공간에서 업무나 학습을 진행하는 모습",
+        "objects": [
+          "노트북",
+          "책상",
+          "의자",
+          "천장 조명",
+          "모니터"
+        ],
+        "plants": [],
+        "season_hint": "불명",
+        "surface": "불명",
+        "time_evidence": "창문이 없어 외부의 밝기를 확인할 수 없음",
+        "weather_evidence": "실내 공간으로 외부 날씨를 관찰할 수 없음"
+      }
+    },
+    {
+      "file": "f_0001739_t001m55.93s.jpg",
+      "segment": "불명",
+      "index": 1739,
+      "offset_seconds": 115.93,
+      "elapsed": "1분 56초",
+      "shot_datetime": "불명",
+      "location": "불명",
+      "observation": {
+        "scene": "여러 사람들이 책상에 앉아 노트북으로 작업하고 있는 실내 사무실 혹은 교육 공간의 모습이다.",
+        "location_type": "실내",
+        "time_of_day": "불명",
+        "weather": "불명",
+        "people": "6~15",
+        "atmosphere": [
+          "차분함",
+          "집중하는",
+          "실내의"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 0.1,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "전면에 보라색 스트랩의 사원증을 목에 건 인물이 카메라를 응시하고 있음",
+        "objects": [
+          "노트북",
+          "사무용 의자",
+          "책상",
+          "사원증"
+        ],
+        "plants": [],
+        "season_hint": "불명",
+        "surface": "불명",
+        "time_evidence": "창문이 없어 외부 광원을 확인할 수 없음",
+        "weather_evidence": "실내 공간으로 외부 날씨를 관찰할 수 없음"
+      }
+    },
+    {
+      "file": "f_0002400_t002m40.00s.jpg",
+      "segment": "불명",
+      "index": 2400,
+      "offset_seconds": 160.0,
+      "elapsed": "2분 40초",
+      "shot_datetime": "불명",
+      "location": "불명",
+      "observation": {
+        "scene": "여러 사람들이 책상에 앉아 컴퓨터 작업을 하거나 대기하고 있는 실내 교육장 혹은 사무실 공간이다.",
+        "location_type": "실내",
+        "time_of_day": "불명",
+        "weather": "불명",
+        "people": "6~15",
+        "atmosphere": [
+          "차분함",
+          "집중",
+          "일상적"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 0.1,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "앞쪽 인물이 목에 보라색 스트랩의 카드 홀더를 걸고 있음",
+        "objects": [
+          "의자",
+          "책상",
+          "컴퓨터",
+          "사원증",
+          "음료컵"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "창문이 없어 외부 광원을 확인할 수 없음",
+        "weather_evidence": "실내 공간으로 외부 날씨를 관측할 수 없음"
+      }
+    },
+    {
+      "file": "f_0004215_t004m41.00s.jpg",
+      "segment": "불명",
+      "index": 4215,
+      "offset_seconds": 281.0,
+      "elapsed": "4분 41초",
+      "shot_datetime": "불명",
+      "location": "불명",
+      "observation": {
+        "scene": "실내 사무실 혹은 교육장 환경에서 사람들이 책상에 앉아 있으며, 전면의 인물이 분홍색 인형을 들고 있다.",
+        "location_type": "실내",
+        "time_of_day": "불명",
+        "weather": "불명",
+        "people": "6~15",
+        "atmosphere": [
+          "차분함",
+          "실내",
+          "일상적임"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 0.1,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "전면의 인물이 분홍색 캐릭터 인형을 소지하고 있음",
+        "objects": [
+          "의자",
+          "컴퓨터",
+          "인형",
+          "칸막이",
+          "음료컵"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "창문이 없어 외부 조도를 확인할 수 없음",
+        "weather_evidence": "실내 공간으로 외부 날씨 확인 불가"
+      }
+    }
+  ]
+}

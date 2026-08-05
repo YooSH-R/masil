@@ -2,6 +2,8 @@ package com.ssafy.backend.auth.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -25,8 +27,9 @@ public class AuthVerification {
     @Column(name = "phone_number", nullable = false, length = 20)
     private String phoneNumber;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    private String purpose;
+    private VerificationPurpose purpose;
 
     @Column(name = "code_hash", nullable = false, length = 255)
     private String codeHash;
@@ -58,13 +61,14 @@ public class AuthVerification {
     public static AuthVerification create(
             UUID verificationId,
             String phoneNumber,
+            VerificationPurpose purpose,
             String codeHash,
             Instant expiresAt
     ) {
         AuthVerification verification = new AuthVerification();
         verification.verificationId = verificationId;
         verification.phoneNumber = phoneNumber;
-        verification.purpose = "SIGNUP";
+        verification.purpose = purpose;
         verification.codeHash = codeHash;
         verification.expiresAt = expiresAt;
         return verification;
@@ -113,6 +117,10 @@ public class AuthVerification {
 
     public String getCodeHash() {
         return codeHash;
+    }
+
+    public VerificationPurpose getPurpose() {
+        return purpose;
     }
 
     public Instant getExpiresAt() {
