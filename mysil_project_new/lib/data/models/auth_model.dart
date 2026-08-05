@@ -5,15 +5,27 @@ import 'user_model.dart';
 ///
 /// 서버는 목적별로 발급한 verificationToken 을 구분해 검증한다.
 /// 목적이 다르면 VERIFICATION_PURPOSE_MISMATCH 오류가 온다.
+///
+/// **[wireValue] 는 서버 enum 과 글자까지 같아야 한다.**
+/// `VerificationSendRequest.purpose` 의 허용값은 `SIGNUP`, `PASSWORD_RESET`
+/// 두 개뿐이다. 다른 값을 보내면 Jackson 이 역직렬화에 실패해 400
+/// `INVALID_REQUEST` 가 온다(어느 필드가 틀렸는지는 알려주지 않는다).
+///
+/// prod 배포에는 `purpose` 필드가 아예 없어서 틀린 값을 보내도 무시된다.
+/// 그래서 prod 를 보고 있으면 이 오류가 드러나지 않는다 — 2026-08-03 에
+/// 기본 서버를 dev 로 바꾸고 나서야 `SIGN_UP` 오타가 발견됐다.
 enum VerificationPurpose {
-  /// 회원가입 휴대전화 인증.
-  signUp('SIGN_UP'),
+  /// 회원가입 휴대전화 인증. 서버 값은 밑줄 없는 `SIGNUP` 이다.
+  signUp('SIGNUP'),
 
   /// 비밀번호 분실 시 재설정.
   passwordReset('PASSWORD_RESET'),
 
   /// 로그인 상태에서 전화번호 변경.
-  phoneChange('PHONE_CHANGE');
+  ///
+  /// 서버 enum 에는 이 값이 **없다.** 전화번호 변경도 회원가입과 같은
+  /// `SIGNUP` 인증을 쓴다. 서버에 전용 목적이 생기면 이 값을 바꾼다.
+  phoneChange('SIGNUP');
 
   const VerificationPurpose(this.wireValue);
 

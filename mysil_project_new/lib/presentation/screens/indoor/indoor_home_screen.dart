@@ -1,11 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
-class IndoorHomeScreen extends StatelessWidget {
+// PetMood.label 은 pet.dart 의 확장(PetMoodX)에 있다.
+import '../../../domain/entities/pet.dart';
+import '../../viewmodels/pet_view_model.dart';
+
+class IndoorHomeScreen extends StatefulWidget {
   const IndoorHomeScreen({super.key});
 
   @override
+  State<IndoorHomeScreen> createState() => _IndoorHomeScreenState();
+}
+
+class _IndoorHomeScreenState extends State<IndoorHomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // 친밀도·기분은 GET /pets/{petId} 응답의 affinity 에서 온다.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final petVm = context.read<PetViewModel>();
+      if (petVm.pet == null) petVm.loadCurrentPet(silent: true);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final affinity = context.watch<PetViewModel>().affinity;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9F3E7),
       appBar: AppBar(
@@ -42,9 +65,23 @@ class IndoorHomeScreen extends StatelessWidget {
             // Intimacy & Mood Row
             Row(
               children: [
-                Expanded(child: _buildStatCard('친밀도', '78%', Icons.favorite, Colors.redAccent, 0.78, () => context.push('/indoor/intimacy'))),
+                Expanded(
+                    child: _buildStatCard(
+                        '친밀도',
+                        affinity == null ? '-' : '${affinity.score}%',
+                        Icons.favorite,
+                        Colors.redAccent,
+                        affinity?.progress ?? 0,
+                        () => context.push('/indoor/intimacy'))),
                 const SizedBox(width: 16),
-                Expanded(child: _buildStatCard('오늘 기분', '기분 최고 ✨', Icons.sentiment_very_satisfied, Colors.orange, null, () => context.push('/indoor/intimacy'))),
+                Expanded(
+                    child: _buildStatCard(
+                        '오늘 기분',
+                        affinity?.mood.label ?? '불러오는 중',
+                        Icons.sentiment_very_satisfied,
+                        Colors.orange,
+                        null,
+                        () => context.push('/indoor/intimacy'))),
               ],
             ),
             const SizedBox(height: 24),

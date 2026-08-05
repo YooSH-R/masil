@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../viewmodels/auth_view_model.dart';
+import '../../viewmodels/pet_view_model.dart';
 
 /// 회원탈퇴. DELETE /users/me
 ///
@@ -26,6 +27,9 @@ class _AccountWithdrawalScreenState extends State<AccountWithdrawalScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<AuthViewModel>().loadMyProfile(silent: true);
+      // 무엇이 사라지는지 실제 값으로 보여주기 위해 친밀도도 불러온다.
+      final petVm = context.read<PetViewModel>();
+      if (petVm.pet == null) petVm.loadCurrentPet(silent: true);
     });
   }
 
@@ -104,6 +108,7 @@ class _AccountWithdrawalScreenState extends State<AccountWithdrawalScreen> {
   @override
   Widget build(BuildContext context) {
     final authViewModel = context.watch<AuthViewModel>();
+    final affinity = context.watch<PetViewModel>().affinity;
 
     // 프로필을 아직 못 받았으면(서버 미배포 등) 일반 회원으로 보고 비밀번호를
     // 받는다. 소셜 전용 회원이면 서버가 비밀번호를 무시한다.
@@ -147,18 +152,25 @@ class _AccountWithdrawalScreenState extends State<AccountWithdrawalScreen> {
                 color: const Color(0xFFFFF1F0),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Column(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('탈퇴 시 삭제되는 정보', style: TextStyle(color: Color(0xFFD32F2F), fontWeight: FontWeight.bold, fontSize: 16)),
-                  SizedBox(height: 16),
-                  Text('· 산책 기록 128회 · 214km', style: TextStyle(color: Color(0xFF5D4037), fontSize: 14)),
-                  SizedBox(height: 8),
-                  Text('· 저장된 영상 12개 및 감성 일지 34편', style: TextStyle(color: Color(0xFF5D4037), fontSize: 14)),
-                  SizedBox(height: 8),
-                  Text('· 마실이와의 친밀도 80%', style: TextStyle(color: Color(0xFF5D4037), fontSize: 14)),
-                  SizedBox(height: 8),
-                  Text('· 등록된 로봇 MS-2231 연결 해제', style: TextStyle(color: Color(0xFF5D4037), fontSize: 14)),
+                  const Text('탈퇴 시 삭제되는 정보', style: TextStyle(color: Color(0xFFD32F2F), fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 16),
+                  const Text('· 산책 기록 128회 · 214km', style: TextStyle(color: Color(0xFF5D4037), fontSize: 14)),
+                  const SizedBox(height: 8),
+                  const Text('· 저장된 영상 12개 및 감성 일지 34편', style: TextStyle(color: Color(0xFF5D4037), fontSize: 14)),
+                  const SizedBox(height: 8),
+                  // 친밀도는 GET /pets/{petId} 응답에서 온다. 탈퇴는 되돌릴 수
+                  // 없으므로, 못 불러왔으면 숫자를 지어내지 않고 생략한다.
+                  Text(
+                    affinity == null
+                        ? '· 마실이와 쌓은 친밀도'
+                        : '· 마실이와의 친밀도 ${affinity.score}%',
+                    style: const TextStyle(color: Color(0xFF5D4037), fontSize: 14),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text('· 등록된 로봇 연결 해제', style: TextStyle(color: Color(0xFF5D4037), fontSize: 14)),
                 ],
               ),
             ),

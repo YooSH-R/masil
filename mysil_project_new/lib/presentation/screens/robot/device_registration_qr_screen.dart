@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -99,11 +100,19 @@ class _DeviceRegistrationQrScreenState
     await _controller.stop();
     if (!mounted) return;
 
+    await _registerToken(token);
+  }
+
+  /// 토큰 하나로 등록까지 가는 공통 경로.
+  ///
+  /// 카메라 스캔과 (디버그용) 직접 입력이 **같은 길**을 지나야, 직접 입력으로 한
+  /// 확인이 실제 스캔 동작을 보증한다. 갈라지면 한쪽만 되는 상황이 생긴다.
+  Future<void> _registerToken(String token) async {
     final robotVm = context.read<RobotViewModel>();
     final petId = context.read<PetViewModel>().petId;
 
     if (petId == null) {
-      // 펫 API 미배포로 petId 를 못 구한 경우. 토큰은 버리지 않고 보관한다.
+      // 펫이 없어 petId 를 못 구한 경우. 토큰은 버리지 않고 보관한다.
       robotVm.holdScannedToken(token);
       _show('QR을 인식했어요. 펫 정보를 불러온 뒤 등록을 완료할 수 있어요.');
       return;
@@ -122,6 +131,73 @@ class _DeviceRegistrationQrScreenState
     await Future<void>.delayed(const Duration(milliseconds: 700));
     if (!mounted) return;
     context.pop();
+  }
+
+  /// 카메라 없이 토큰을 직접 넣어 등록해 본다. **디버그 빌드에서만** 쓴다.
+  ///
+  /// 에뮬레이터 카메라는 호스트 화면을 못 보기 때문에 QR 을 비출 수가 없다.
+  /// 그렇다고 스캔 이후 흐름(형식 검증 → petId 확인 → 서버 등록 → 결과 표시)을
+  /// 확인 못 하면 시연 전에 남는 위험이 크다. 그래서 카메라 단계만 건너뛴다.
+  Future<void> _openManualEntry() async {
+    final controller = TextEditingController();
+
+    final input = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('QR 토큰 직접 입력'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '카메라 없이 등록 흐름을 확인하는 디버그 기능이에요.\n'
+              '토큰(43자 이상) 또는 mysil://pair?token=... 형태를 넣어 주세요.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF8D6E63)),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              maxLines: 3,
+              minLines: 2,
+              style: const TextStyle(fontSize: 12),
+              decoration: const InputDecoration(
+                hintText: 'vWy6ljEwfJ8-jNFG_2tgCk8rFn1Xg3dMXthSV3liX7M',
+                hintStyle: TextStyle(fontSize: 11),
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(controller.text.trim()),
+            child: const Text('등록 시도'),
+          ),
+        ],
+      ),
+    );
+
+    if (input == null || input.isEmpty || !mounted) return;
+
+    // 스캔과 똑같이 형식부터 검증한다. 이 단계도 확인 대상이다.
+    final token = RobotQr.extractToken(input);
+    if (token == null) {
+      _show('토큰 형식이 맞지 않아요. 43자 이상의 영문·숫자·_- 조합이어야 해요.',
+          isError: true);
+      return;
+    }
+
+    _handling = true;
+    await _controller.stop();
+    if (!mounted) return;
+
+    await _registerToken(token);
   }
 
   void _show(String message, {bool isError = false}) {
@@ -187,6 +263,25 @@ class _DeviceRegistrationQrScreenState
               ),
             ),
           ),
+
+          // 토큰 직접 입력 (디버그 빌드 전용).
+          //
+          // 에뮬레이터 카메라로는 QR 을 비출 수 없어서 스캔 이후 흐름을 확인할
+          // 방법이 없다. kDebugMode 로 묶어 릴리즈 빌드에는 나가지 않는다.
+          if (kDebugMode)
+            Positioned(
+              top: 60,
+              right: 24,
+              child: CircleAvatar(
+                backgroundColor: Colors.white.withValues(alpha: 0.2),
+                child: IconButton(
+                  icon: const Icon(Icons.keyboard_alt_outlined,
+                      color: Colors.white),
+                  tooltip: 'QR 토큰 직접 입력 (디버그)',
+                  onPressed: _openManualEntry,
+                ),
+              ),
+            ),
 
           // 안내 문구
           Positioned(
