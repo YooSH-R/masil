@@ -42,10 +42,10 @@ tmux send-keys -t $SESSION:odomtf \
 
 sleep 2
 
-echo "[5/7] Nav2 bringup 시작..."
+echo "[5/7] Nav2 bringup 시작 (map_server/AMCL 없는 상태용 커스텀 파라미터, static_layer 제외)..."
 tmux new-window -t $SESSION -n nav2
 tmux send-keys -t $SESSION:nav2 \
-  "source /opt/ros/humble/setup.bash && ros2 launch nav2_bringup navigation_launch.py use_sim_time:=False" C-m
+  "source /opt/ros/humble/setup.bash && ros2 launch nav2_bringup navigation_launch.py use_sim_time:=False params_file:=$(dirname "$0")/nav2_params_no_map.yaml" C-m
 
 sleep 8
 
