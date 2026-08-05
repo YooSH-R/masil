@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  카카오맵 JS SDK 는 WebView 안에서 동작하는데, 페이지 origin 이
+  http://localhost 라서 SDK 가 일부 리소스를 평문(http)으로 요청한다.
+  Android 9+ 는 평문을 기본 차단하므로 지도 초기화가 조용히 실패한다.
+
+  지도에 필요한 도메인과 localhost 에만 평문을 허용한다.
+  API 서버(i15a203.p.ssafy.io)는 HTTPS 이므로 여기에 넣지 않는다 —
+  기본 정책(평문 차단)이 그대로 적용된다.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">daumcdn.net</domain>
+        <domain includeSubdomains="true">kakaocdn.net</domain>
+        <domain includeSubdomains="true">kakao.com</domain>
+        <domain includeSubdomains="true">daum.net</domain>
+    </domain-config>
+</network-security-config>
