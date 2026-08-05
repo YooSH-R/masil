@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
 import '../../core/config/api_config.dart';
@@ -92,4 +94,10 @@ class WalkPhotoRepositoryImpl implements WalkPhotoRepository {
   @override
   String contentUrl(int photoId) =>
       '${ApiConfig.baseUrl}${ApiEndpoints.photoContent(photoId)}';
+
+  @override
+  Future<Uint8List> photoBytes(int photoId) async {
+    final bytes = await _client.getBytes(ApiEndpoints.photoContent(photoId));
+    return Uint8List.fromList(bytes);
+  }
 }
