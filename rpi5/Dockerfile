@@ -2,6 +2,11 @@ FROM ros:humble
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# 라즈베리파이 5에 RTC 배터리가 없어서 부팅 직후엔 시계가 실제 시각보다
+# 뒤쳐져 있을 수 있음 -> apt가 리포지토리 Release 파일을 "아직 유효하지
+# 않음"으로 오판하는 걸 방지하기 위해 유효기간 체크를 건너뜀
+RUN printf 'Acquire::Check-Valid-Until "false";\nAcquire::Check-Date "false";\n' > /etc/apt/apt.conf.d/10no-check-valid-until
+
 # 라즈베리파이 5 필수 하드웨어 제어 및 디버깅 패키지 설치
 RUN apt-get update && apt-get install -y \
     python3-gpiozero \

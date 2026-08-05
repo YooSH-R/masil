@@ -11,6 +11,6 @@ services:
       - ./ros2_ws/src:/root/ros2_ws/src
     tty: true
     stdin_open: true
-    command: /bin/bash
+    command: /root/ros2_ws/src/start_robot.sh
     environment:
       - ROS_DOMAIN_ID=30
