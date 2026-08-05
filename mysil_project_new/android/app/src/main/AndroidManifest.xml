@@ -10,6 +10,32 @@
          (QR 등록만 못 하고 나머지 기능은 동작한다) -->
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
 
+    <!-- 감성 사진을 기기 갤러리에 저장한다(gal 패키지).
+         안드로이드 10(API 29)부터는 MediaStore 로 저장해 권한이 필요 없으므로
+         maxSdkVersion 으로 구형 기기에만 요청한다. 이걸 빼면 API 28 이하에서
+         저장이 ACCESS_DENIED 로 실패한다. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29"/>
+
+    <!-- 산책 경로를 휴대폰 GPS 로 기록한다(geolocator).
+         FINE 은 경로를 그릴 정확도(수 m)를 위해, COARSE 는 사용자가 "대략적인
+         위치"만 허용한 경우를 위해 둘 다 선언한다. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+
+    <!-- 산책 중에는 화면이 꺼지거나 앱이 뒤로 가도 좌표가 계속 찍혀야 한다.
+         안드로이드는 그러려면 Foreground Service 가 필요하고, API 34+ 는
+         용도별 권한(...SERVICE_LOCATION)까지 요구한다. 이게 없으면 화면을
+         내리는 순간 경로가 끊긴다. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+
+    <!-- Foreground Service 는 알림을 반드시 띄워야 한다. 안드로이드 13(API 33)
+         부터는 알림에도 권한이 필요해서, 이게 없으면 서비스 시작이 실패하고
+         **위치 스트림이 아예 시작되지 않는다.**
+         (그래서 첫 좌표만 찍히고 이후 갱신이 없는 증상이 난다) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
     <application
         android:label="mysil_project_new"
         android:name="${applicationName}"

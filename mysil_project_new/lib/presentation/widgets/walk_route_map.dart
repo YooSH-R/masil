@@ -18,7 +18,6 @@ class WalkRouteMap extends StatefulWidget {
     required this.points,
     this.followLast = false,
     this.fitWholeRoute = false,
-    this.showStartEndMarkers = false,
     this.initialLevel = 3,
   });
 
@@ -31,9 +30,6 @@ class WalkRouteMap extends StatefulWidget {
   /// 경로 전체가 화면에 들어오도록 줌을 맞춘다. (경로 상세)
   final bool fitWholeRoute;
 
-  /// 출발·도착 지점에 마커를 찍는다. (경로 상세)
-  final bool showStartEndMarkers;
-
   final int initialLevel;
 
   @override
@@ -43,9 +39,13 @@ class WalkRouteMap extends StatefulWidget {
 class _WalkRouteMapState extends State<WalkRouteMap> {
   static const Color _brand = Color(0xFFC67C4E);
   static const String _routeId = 'walk-route';
-  static const String _currentId = 'walk-current';
   static const String _startId = 'walk-start';
   static const String _endId = 'walk-end';
+
+  /// 지도에 표시할 핀 크기. 에셋은 4배(120x160)로 그려져 있고 여기서 줄여
+  /// 표시하므로 테두리가 깨끗하게 나온다.
+  static const int _pinWidth = 30;
+  static const int _pinHeight = 40;
 
   KakaoMapController? _controller;
 
@@ -84,16 +84,7 @@ class _WalkRouteMapState extends State<WalkRouteMap> {
       ]);
     }
 
-    if (widget.showStartEndMarkers) {
-      await controller.addMarker(markers: [
-        Marker(markerId: _startId, latLng: path.first),
-        if (path.length >= 2) Marker(markerId: _endId, latLng: path.last),
-      ]);
-    } else {
-      await controller.addMarker(markers: [
-        Marker(markerId: _currentId, latLng: path.last),
-      ]);
-    }
+    await _drawMarkers(controller, path);
 
     if (widget.fitWholeRoute && path.length >= 2) {
       await controller.fitBounds(path);
@@ -101,6 +92,62 @@ class _WalkRouteMapState extends State<WalkRouteMap> {
       await controller.setCenter(path.last);
     }
   }
+
+  /// 출발·도착 핀을 찍는다.
+  ///
+  /// 시작은 민트 발바닥, 끝은 오렌지 하트로 **서로 다르게** 보이게 한다.
+  /// 예전에는 같은 기본 마커라 어디가 시작인지 알 수 없었다.
+  ///
+  /// 산책 중에는 마지막 좌표가 곧 현재 위치이므로, 그 자리에 도착 핀을 찍어
+  /// 걸어갈수록 따라오게 한다(멈추면 그대로 도착 지점이 된다).
+  ///
+  /// 좌표가 하나뿐이면 출발 핀만 찍는다 — 같은 자리에 두 핀이 겹치면
+  /// 뒤에 찍힌 것만 보여서 시작 지점이 사라진 것처럼 된다.
+  Future<void> _drawMarkers(
+    KakaoMapController controller,
+    List<LatLng> path,
+  ) async {
+    final start = await _startIcon();
+    final end = await _endIcon();
+    if (!mounted) return;
+
+    await controller.addMarker(markers: [
+      Marker(
+        markerId: _startId,
+        latLng: path.first,
+        width: _pinWidth,
+        height: _pinHeight,
+        // 핀 끝(아래 꼭지점)이 좌표를 가리키게 맞춘다. 기본값이면 이미지
+        // 가운데가 좌표에 놓여 실제 위치보다 아래에 찍힌 것처럼 보인다.
+        offsetX: _pinWidth ~/ 2,
+        offsetY: _pinHeight,
+        icon: start,
+        zIndex: 1,
+      ),
+      if (path.length >= 2)
+        Marker(
+          markerId: _endId,
+          latLng: path.last,
+          width: _pinWidth,
+          height: _pinHeight,
+          offsetX: _pinWidth ~/ 2,
+          offsetY: _pinHeight,
+          icon: end,
+          zIndex: 2,
+        ),
+    ]);
+  }
+
+  /// 핀 이미지는 한 번만 읽어 재사용한다. 좌표마다 다시 읽으면 산책 중에
+  /// 5초마다 에셋을 디코딩하게 된다.
+  static MarkerIcon? _cachedStart;
+  static MarkerIcon? _cachedEnd;
+
+  Future<MarkerIcon> _startIcon() async =>
+      _cachedStart ??= await MarkerIcon.fromAsset('assets/images/pin_start.png');
+
+  Future<MarkerIcon> _endIcon() async =>
+      _cachedEnd ??= await MarkerIcon.fromAsset('assets/images/pin_end.png');
 
   @override
   Widget build(BuildContext context) {

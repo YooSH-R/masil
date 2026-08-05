@@ -40,7 +40,12 @@ class SampleWalkDiaries {
   ///
   /// 서버가 발급하는 id 와 절대 겹치지 않게 하려는 것이다. 이 값으로
   /// "서버에 없는 기록"임을 판별해 상세 조회·역지오코딩을 건너뛴다.
-  static bool isSampleId(int walkId) => walkId < 0;
+  /// 예시 기록인지. **`< 0` 으로 판정하지 않는다.**
+  ///
+  /// 기기에 저장하는 산책 기록도 음수 id 를 쓴다(서버 id 와 겹치지 않게).
+  /// `< 0` 으로 보면 로컬 기록까지 예시로 오인해서, 실제로 걸은 경로 대신
+  /// 예시 데이터를 찾다가 아무것도 못 찾는다. 그래서 목록에 있는지로 판정한다.
+  static bool isSampleId(int walkId) => _rowOf(walkId) != null;
 
   /// 7월에 10회. 주차별로 흩어 놓아 주간 통계가 값마다 달라지게 했다.
   static final List<WalkDiaryFeedItem> items = _rows

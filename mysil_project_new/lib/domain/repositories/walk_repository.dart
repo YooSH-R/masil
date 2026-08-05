@@ -30,6 +30,14 @@ abstract class WalkRepository {
     String? idempotencyKey,
   });
 
+  /// POST /walks/{walkId}/end — 산책 종료
+  ///
+  /// **사용자가 `산책 종료` 버튼을 누르는 것이 유일한 종료 트리거다.**
+  /// 서버는 이 호출을 받고서야 산책을 끝난 것으로 보고, 감성 사진·일지 생성을
+  /// 시작한다. 그래서 남은 좌표를 먼저 다 올린 뒤에 불러야 한다
+  /// ([WalkViewModel.endWalk] 가 그 순서를 지킨다).
+  Future<Walk> endWalk(int walkId);
+
   /// GET /walks/{walkId} — 산책 상세 조회
   Future<Walk> getWalk(int walkId);
 
