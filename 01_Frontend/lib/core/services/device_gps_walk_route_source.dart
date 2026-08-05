@@ -23,26 +23,26 @@ enum GpsUnavailableReason {
 /// 거리·평균 페이스·발자국 수가 모두 사용자가 실제로 걸은 값이 된다.
 ///
 /// 수집 규칙은 명세서 2.4 "배치 처리 속도"를 따른다.
-///   측정 5초 간격 / 최소 이동거리 5m / accuracy 가 나쁜 좌표는 제외
+///   측정 3초 간격 / 최소 이동거리 2m / accuracy 가 나쁜 좌표는 제외
 ///
 /// 역할을 나눠 두었다.
-/// - **여기**: OS 에게 "5초·5m 마다 알려달라"고 요청한다(배터리를 아끼는 쪽).
-/// - **[WalkViewModel]**: 들어온 좌표를 5m·accuracy 로 한 번 더 걸러 저장한다.
+/// - **여기**: OS 에게 3초·2m 조건으로 위치를 요청한다.
+/// - **[WalkViewModel]**: accuracy 에 따라 저장 기준을 조절해 흔들림을 거른다.
 ///
 /// OS 가 요청을 항상 정확히 지키지는 않기 때문에 양쪽에서 거른다. 서버 전송은
 /// 이것과 별개로 뷰모델이 30초마다 묶어서 한다.
 class DeviceGpsWalkRouteSource implements WalkRouteSource {
   DeviceGpsWalkRouteSource();
 
-  /// 측정 간격. 명세서의 일반 산책 권장값.
-  static const Duration interval = Duration(seconds: 5);
+  /// 지도 반응성과 배터리 소모 사이의 절충값. 일반 보행이면 약 3~5m마다 온다.
+  static const Duration interval = Duration(seconds: 3);
 
-  /// 이만큼 움직여야 새 좌표를 준다. OS 단계에서 거르면 배터리가 덜 든다.
-  static const int distanceFilterMeters = 5;
+  /// 제자리 GPS 흔들림을 OS 단계에서 먼저 줄인다.
+  static const int distanceFilterMeters = 2;
 
   /// 좌표가 이만큼 안 오면 멈춘 것으로 보고 직접 물어본다.
-  /// 측정 간격(5초)보다 넉넉히 잡아, 정상 지연을 실패로 오인하지 않는다.
-  static const Duration _stallThreshold = Duration(seconds: 20);
+  /// 측정 간격(3초)보다 넉넉히 잡아, 정상 지연을 실패로 오인하지 않는다.
+  static const Duration _stallThreshold = Duration(seconds: 12);
 
   StreamController<WalkLocationPoint>? _controller;
   StreamSubscription<Position>? _positionSub;
@@ -71,10 +71,8 @@ class DeviceGpsWalkRouteSource implements WalkRouteSource {
 
   @override
   String? get unavailableMessage => switch (_unavailableReason) {
-        GpsUnavailableReason.serviceDisabled =>
-          '위치 서비스가 꺼져 있어요. 설정에서 켜 주세요',
-        GpsUnavailableReason.permissionDenied =>
-          '위치 권한이 필요해요. 허용하면 경로가 그려져요',
+        GpsUnavailableReason.serviceDisabled => '위치 서비스가 꺼져 있어요. 설정에서 켜 주세요',
+        GpsUnavailableReason.permissionDenied => '위치 권한이 필요해요. 허용하면 경로가 그려져요',
         GpsUnavailableReason.permissionDeniedForever =>
           '위치 권한이 차단돼 있어요. 앱 설정에서 허용해 주세요',
         // 권한은 있는데 스트림이 끝내 실패한 경우. 예전에는 이 상황이 화면에
@@ -109,7 +107,7 @@ class DeviceGpsWalkRouteSource implements WalkRouteSource {
       return;
     }
 
-    // 첫 좌표를 바로 하나 찍어 준다. 그러지 않으면 5m 를 움직일 때까지
+    // 첫 좌표를 바로 하나 찍어 준다. 그러지 않으면 스트림 첫 이벤트가 올 때까지
     // 지도가 빈 채로 남아서 고장난 것처럼 보인다.
     try {
       final first = await Geolocator.getCurrentPosition(

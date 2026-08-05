@@ -41,9 +41,8 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
 
     final diaryVm = context.read<WalkDiaryViewModel>();
     final item = diaryVm.itemOn(date);
-    if (item != null) diaryVm.selectWalk(item.walkId);
+    if (item != null) diaryVm.selectFeedItem(item);
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +73,10 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
         ),
         leadingWidth: 100,
         actions: [
-          IconButton(onPressed: () {}, icon: const Icon(Icons.notifications_none, color: Color(0xFF5D4037))),
+          IconButton(
+              onPressed: () {},
+              icon: const Icon(Icons.notifications_none,
+                  color: Color(0xFF5D4037))),
           const SizedBox(width: 12),
         ],
       ),
@@ -92,7 +94,10 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
                 ),
                 Text(
                   '$_currentYear년 ${_currentMonth.toString().padLeft(2, '0')}월 산책 일지',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF5D4037)),
+                  style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF5D4037)),
                 ),
                 IconButton(
                   icon: const Icon(Icons.chevron_right, color: Colors.grey),
@@ -101,7 +106,7 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
               ],
             ),
             const SizedBox(height: 20),
-            
+
             // Full Month Calendar
             _buildMonthlyCalendar(walkDays),
             const SizedBox(height: 16),
@@ -110,7 +115,8 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
               children: [
                 const Icon(Icons.circle, color: Color(0xFFC67C4E), size: 10),
                 const SizedBox(width: 8),
-                Text('일지가 있는 날 · 총 $monthLogCount편', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                Text('일지가 있는 날 · 총 $monthLogCount편',
+                    style: const TextStyle(color: Colors.grey, fontSize: 12)),
               ],
             ),
             const SizedBox(height: 24),
@@ -134,7 +140,7 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
               _buildLogPost(context, selectedItem, placeName)
             else
               _buildEmptyState(),
-            
+
             const SizedBox(height: 40),
           ],
         ),
@@ -181,7 +187,10 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(25),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 5)),
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 10,
+              offset: const Offset(0, 5)),
         ],
       ),
       child: Column(
@@ -189,18 +198,22 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
           // Weekday Labels
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: labels.map((l) => Expanded(
-              child: Center(
-                child: Text(
-                  l,
-                  style: TextStyle(
-                    color: l == '일' ? Colors.red : (l == '토' ? Colors.blue : Colors.grey),
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            )).toList(),
+            children: labels
+                .map((l) => Expanded(
+                      child: Center(
+                        child: Text(
+                          l,
+                          style: TextStyle(
+                            color: l == '일'
+                                ? Colors.red
+                                : (l == '토' ? Colors.blue : Colors.grey),
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ))
+                .toList(),
           ),
           const SizedBox(height: 15),
           // Days Grid
@@ -215,13 +228,17 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
             itemCount: daysInMonth + startWeekday,
             itemBuilder: (context, index) {
               if (index < startWeekday) return const SizedBox();
-              
+
               final day = index - startWeekday + 1;
               final date = DateTime(_currentYear, _currentMonth, day);
 
-              bool isSelected = _selectedDate.year == date.year && _selectedDate.month == date.month && _selectedDate.day == date.day;
+              bool isSelected = _selectedDate.year == date.year &&
+                  _selectedDate.month == date.month &&
+                  _selectedDate.day == date.day;
               bool hasLog = walkDays.contains(date);
-              bool isToday = DateTime.now().year == date.year && DateTime.now().month == date.month && DateTime.now().day == date.day;
+              bool isToday = DateTime.now().year == date.year &&
+                  DateTime.now().month == date.month &&
+                  DateTime.now().day == date.day;
 
               return GestureDetector(
                 onTap: () => _selectDate(date),
@@ -232,21 +249,27 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
                       Container(
                         width: 40,
                         height: 40,
-                        decoration: const BoxDecoration(color: Color(0xFFC67C4E), shape: BoxShape.circle),
+                        decoration: const BoxDecoration(
+                            color: Color(0xFFC67C4E), shape: BoxShape.circle),
                       )
                     else if (isToday)
                       Container(
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          border: Border.all(color: const Color(0xFFC67C4E), width: 1),
+                          border: Border.all(
+                              color: const Color(0xFFC67C4E), width: 1),
                           shape: BoxShape.circle,
                         ),
                       ),
                     Text(
                       day.toString(),
                       style: TextStyle(
-                        color: isSelected ? Colors.white : (hasLog ? const Color(0xFF5D4037) : Colors.grey.shade400),
+                        color: isSelected
+                            ? Colors.white
+                            : (hasLog
+                                ? const Color(0xFF5D4037)
+                                : Colors.grey.shade400),
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
@@ -257,7 +280,8 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
                         child: Container(
                           width: 4,
                           height: 4,
-                          decoration: const BoxDecoration(color: Color(0xFFC67C4E), shape: BoxShape.circle),
+                          decoration: const BoxDecoration(
+                              color: Color(0xFFC67C4E), shape: BoxShape.circle),
                         ),
                       ),
                   ],
@@ -325,7 +349,10 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(25),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 15, offset: const Offset(0, 8)),
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 15,
+              offset: const Offset(0, 8)),
         ],
       ),
       child: Row(
@@ -350,7 +377,8 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
         borderRadius: BorderRadius.circular(25),
       ),
       child: const Center(
-        child: Text('산책한 날을 클릭해 상세 기록을 확인하세요', style: TextStyle(color: Colors.grey, fontSize: 13)),
+        child: Text('산책한 날을 클릭해 상세 기록을 확인하세요',
+            style: TextStyle(color: Colors.grey, fontSize: 13)),
       ),
     );
   }
@@ -362,7 +390,11 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
         const SizedBox(height: 8),
         Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11)),
         const SizedBox(height: 4),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF5D4037))),
+        Text(value,
+            style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+                color: Color(0xFF5D4037))),
       ],
     );
   }
@@ -371,12 +403,15 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 60),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(30)),
+      decoration: BoxDecoration(
+          color: Colors.white, borderRadius: BorderRadius.circular(30)),
       child: Column(
         children: [
           Icon(Icons.pets, size: 48, color: Colors.grey.shade200),
           const SizedBox(height: 16),
-          const Text('이날은 생성된 일지가 없어요', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+          const Text('이날은 생성된 일지가 없어요',
+              style:
+                  TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
         ],
       ),
     );
@@ -386,14 +421,22 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF5D4037))),
+        Text(title,
+            style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF5D4037))),
         Container(
           padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(color: const Color(0xFFEFE5D8), borderRadius: BorderRadius.circular(15)),
+          decoration: BoxDecoration(
+              color: const Color(0xFFEFE5D8),
+              borderRadius: BorderRadius.circular(15)),
           child: Row(
             children: [
-              _buildSmallTab('주간', _isWeekly, () => setState(() => _isWeekly = true)),
-              _buildSmallTab('월간', !_isWeekly, () => setState(() => _isWeekly = false)),
+              _buildSmallTab(
+                  '주간', _isWeekly, () => setState(() => _isWeekly = true)),
+              _buildSmallTab(
+                  '월간', !_isWeekly, () => setState(() => _isWeekly = false)),
             ],
           ),
         ),
@@ -412,7 +455,10 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
         ),
         child: Text(
           label,
-          style: TextStyle(color: isSelected ? Colors.white : Colors.grey, fontSize: 12, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              color: isSelected ? Colors.white : Colors.grey,
+              fontSize: 12,
+              fontWeight: FontWeight.bold),
         ),
       ),
     );
@@ -437,8 +483,8 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
         const SizedBox(height: 16),
         Row(
           children: [
-            _buildMiniStatCard(Icons.timer_outlined, stats.durationLabel, '산책 시간',
-                const Color(0xFFF9F3E7)),
+            _buildMiniStatCard(Icons.timer_outlined, stats.durationLabel,
+                '산책 시간', const Color(0xFFF9F3E7)),
             const SizedBox(width: 16),
             _buildMiniStatCard(Icons.straighten, stats.averageDistanceLabel,
                 '평균 거리', const Color(0xFFFFF8F1)),
@@ -448,11 +494,13 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     );
   }
 
-  Widget _buildMiniStatCard(IconData icon, String value, String label, Color bgColor) {
+  Widget _buildMiniStatCard(
+      IconData icon, String value, String label, Color bgColor) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(20)),
+        decoration: BoxDecoration(
+            color: bgColor, borderRadius: BorderRadius.circular(20)),
         child: Row(
           children: [
             Icon(icon, color: const Color(0xFFC67C4E), size: 20),
@@ -460,8 +508,13 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF5D4037))),
-                Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                Text(value,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: Color(0xFF5D4037))),
+                Text(label,
+                    style: const TextStyle(color: Colors.grey, fontSize: 11)),
               ],
             ),
           ],
@@ -483,6 +536,7 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
       durationLabel: item.durationLabel,
       distanceLabel: distance,
       thumbnailUrl: item.thumbnailUrl,
+      showPathButton: !item.isS3Diary,
       // 7월 예시 기록은 서버 사진이 없어 asset 그림을 쓴다.
       imageAsset: SampleWalkDiaries.imageAssetOf(item.walkId),
     );
@@ -496,11 +550,13 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     required String durationLabel,
     required String distanceLabel,
     required String? thumbnailUrl,
+    required bool showPathButton,
     String? imageAsset,
   }) {
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(30)),
+      decoration: BoxDecoration(
+          color: Colors.white, borderRadius: BorderRadius.circular(30)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -524,31 +580,41 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
                     ),
                   ),
                 ),
-                Positioned(
-                  bottom: 20,
-                  right: 20,
-                  child: ElevatedButton(
-                    // 어떤 산책의 경로인지 walkId 를 넘긴다.
-                    onPressed: () =>
-                        context.push('/walk/path-detail', extra: walkId),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFC67C4E),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                if (showPathButton)
+                  Positioned(
+                    bottom: 20,
+                    right: 20,
+                    child: ElevatedButton(
+                      // 어떤 산책의 경로인지 walkId 를 넘긴다.
+                      onPressed: () =>
+                          context.push('/walk/path-detail', extra: walkId),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFC67C4E),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15)),
+                      ),
+                      child: const Text('경로 보기',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold)),
                     ),
-                    child: const Text('경로 보기', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
-                ),
               ],
             ),
           ),
           const SizedBox(height: 20),
-          
-          Text("${_selectedDate.year}.${_selectedDate.month.toString().padLeft(2, '0')}.${_selectedDate.day.toString().padLeft(2, '0')}", style: const TextStyle(color: Colors.grey, fontSize: 13)),
+
+          Text(
+              "${_selectedDate.year}.${_selectedDate.month.toString().padLeft(2, '0')}.${_selectedDate.day.toString().padLeft(2, '0')}",
+              style: const TextStyle(color: Colors.grey, fontSize: 13)),
           const SizedBox(height: 8),
           // 날씨·기분은 서버가 주는 값이 없어 표시하지 않는다.
           Text(
             placeName ?? '산책 기록',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF5D4037)),
+            style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF5D4037)),
           ),
           const SizedBox(height: 12),
           Text(
@@ -559,25 +625,32 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
 
           Row(
             children: [
-              const Icon(Icons.timer_outlined, size: 16, color: Color(0xFFC67C4E)),
+              const Icon(Icons.timer_outlined,
+                  size: 16, color: Color(0xFFC67C4E)),
               const SizedBox(width: 6),
-              Text(durationLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(durationLabel,
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(width: 20),
-              const Icon(Icons.map_outlined, size: 16, color: Color(0xFFC67C4E)),
+              const Icon(Icons.map_outlined,
+                  size: 16, color: Color(0xFFC67C4E)),
               const SizedBox(width: 6),
-              Text(distanceLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(distanceLabel,
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 24),
-          
+
           // Action Buttons
           Row(
             children: [
-              _buildLogAction(Icons.refresh, '재생성', Colors.blue.shade50, Colors.blue),
+              _buildLogAction(
+                  Icons.refresh, '재생성', Colors.blue.shade50, Colors.blue),
               const SizedBox(width: 12),
-              _buildLogAction(Icons.edit_outlined, '수정', const Color(0xFFF9F3E7), const Color(0xFF5D4037)),
+              _buildLogAction(Icons.edit_outlined, '수정',
+                  const Color(0xFFF9F3E7), const Color(0xFF5D4037)),
               const SizedBox(width: 12),
-              _buildLogAction(Icons.delete_outline, '삭제', const Color(0xFFFFF1F0), Colors.redAccent),
+              _buildLogAction(Icons.delete_outline, '삭제',
+                  const Color(0xFFFFF1F0), Colors.redAccent),
             ],
           ),
         ],
@@ -585,17 +658,23 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     );
   }
 
-  Widget _buildLogAction(IconData icon, String label, Color bgColor, Color iconColor) {
+  Widget _buildLogAction(
+      IconData icon, String label, Color bgColor, Color iconColor) {
     return Expanded(
       child: Container(
         height: 50,
-        decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(15)),
+        decoration: BoxDecoration(
+            color: bgColor, borderRadius: BorderRadius.circular(15)),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, color: iconColor, size: 18),
             const SizedBox(width: 8),
-            Text(label, style: TextStyle(color: iconColor, fontWeight: FontWeight.bold, fontSize: 13)),
+            Text(label,
+                style: TextStyle(
+                    color: iconColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13)),
           ],
         ),
       ),

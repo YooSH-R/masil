@@ -7,6 +7,8 @@ const _moodMapping = <String, PetMood>{
   'LONELY': PetMood.lonely,
   'SLEEPING': PetMood.sleeping,
   'EXCITED': PetMood.excited,
+  // 현재 로컬 백엔드 시드와 MQTT 친밀도 상태값.
+  'FRIENDLY': PetMood.happy,
 };
 
 class AffinityModel extends Affinity {
@@ -84,8 +86,11 @@ class PetModel extends Pet {
       profileImageUrl: Json.asStringOrNull(
         json['profileImageUrl'] ?? json['profileImage'],
       ),
-      affinity: affinityJson == null ? null : AffinityModel.fromJson(affinityJson),
-      robot: robotJson == null ? null : PairedRobotSummaryModel.fromJson(robotJson),
+      affinity:
+          affinityJson == null ? null : AffinityModel.fromJson(affinityJson),
+      robot: robotJson == null
+          ? null
+          : PairedRobotSummaryModel.fromJson(robotJson),
       createdAt: Json.asDateTime(json['createdAt']),
     );
   }

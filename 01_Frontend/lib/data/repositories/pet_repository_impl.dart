@@ -1,6 +1,7 @@
 import '../../core/network/api_client.dart';
 import '../../core/network/api_endpoints.dart';
 import '../../core/network/api_exception.dart';
+import '../../core/config/api_config.dart';
 import '../../core/storage/session_cache.dart';
 import '../../core/utils/json_parse.dart';
 import '../../domain/entities/pet.dart';
@@ -113,18 +114,24 @@ class PetRepositoryImpl implements PetRepository {
     // 명세서에 응답 예시가 없어 배열/{items:[]} 두 형태를 모두 받아준다.
     final list = data is List
         ? Json.asMapList(data)
-        : Json.asMapList(Json.asMap(data)['items'] ?? Json.asMap(data)['history']);
-    return list
-        .map(AffinityHistoryEntryModel.fromJson)
-        .toList(growable: false);
+        : Json.asMapList(
+            Json.asMap(data)['items'] ?? Json.asMap(data)['history']);
+    return list.map(AffinityHistoryEntryModel.fromJson).toList(growable: false);
   }
 
   @override
   Future<Pet?> getCurrentPet() async {
-    final petId = await _cache.readPetId();
+    var petId = await _cache.readPetId();
+    // 로컬 테스트 로그인은 펫 생성 과정을 거치지 않아 캐시에 id가 없을 수 있다.
+    // 운영/개발 서버에는 절대 적용하지 않고 loopback 백엔드에서만 시드 펫을 쓴다.
+    petId ??= ApiConfig.isLoopback ? ApiConfig.localTestPetId : null;
     if (petId == null) return null;
     try {
-      return await getPet(petId);
+      final pet = await getPet(petId);
+      // 백엔드의 로컬 fallback이 다른 시드 id를 돌려준 경우에도 다음 조회부터는
+      // 실제 id를 사용하도록 캐시를 바로잡는다.
+      await _cache.savePetId(pet.id);
+      return pet;
     } on ApiException catch (e) {
       // 삭제된 펫이면 캐시를 비운다.
       if (e.code == ApiErrorCode.petNotFound || e.isNotFound) return null;

@@ -71,6 +71,8 @@ class WalkDiaryFeedItemModel extends WalkDiaryFeedItem {
     super.distanceMeters,
     super.thumbnailUrl,
     super.summary,
+    super.deviceId,
+    super.session,
   });
 
   factory WalkDiaryFeedItemModel.fromJson(Map<String, dynamic> json) {
@@ -81,6 +83,53 @@ class WalkDiaryFeedItemModel extends WalkDiaryFeedItem {
       distanceMeters: Json.asIntOrNull(json['distanceMeters']),
       thumbnailUrl: Json.asStringOrNull(json['thumbnailUrl']),
       summary: Json.asStringOrNull(json['summary']),
+      deviceId: Json.asStringOrNull(json['deviceId']),
+      session: Json.asIntOrNull(json['session']),
+    );
+  }
+
+  /// 새 S3 피드의 날짜별 묶음을 화면이 쓰는 일지 목록으로 펼친다.
+  static List<WalkDiaryFeedItem> fromS3Day(Map<String, dynamic> json) {
+    final walkDate = Json.asDateTime(json['walkDate']);
+    if (walkDate == null) return const [];
+
+    return Json.asMapList(json['diaries']).map((diary) {
+      final deviceId = Json.asString(diary['deviceId']);
+      final session = Json.asInt(diary['session']);
+      return WalkDiaryFeedItem(
+        walkId: _s3DiaryId(deviceId, walkDate, session),
+        walkedAt: walkDate,
+        deviceId: deviceId,
+        session: session,
+      );
+    }).toList(growable: false);
+  }
+}
+
+int _s3DiaryId(String deviceId, DateTime date, int session) {
+  final hash = Object.hash(deviceId, date.year, date.month, date.day, session);
+  // 예시 ID(-1~-10) 및 로컬 산책 ID(-10억 이하)와 겹치지 않는 범위다.
+  return -100000 - (hash & 0x1fffffff);
+}
+
+class WalkDiaryContentModel extends WalkDiaryContent {
+  const WalkDiaryContentModel({
+    required super.deviceId,
+    required super.walkDate,
+    required super.session,
+    required super.imageUrl,
+    required super.markdown,
+    super.imageUrlExpiresAt,
+  });
+
+  factory WalkDiaryContentModel.fromJson(Map<String, dynamic> json) {
+    return WalkDiaryContentModel(
+      deviceId: Json.asString(json['deviceId']),
+      walkDate: Json.asDateTime(json['walkDate']) ?? DateTime(1970),
+      session: Json.asInt(json['session']),
+      imageUrl: Json.asString(json['imageUrl']),
+      markdown: Json.asString(json['markdown']),
+      imageUrlExpiresAt: Json.asDateTime(json['imageUrlExpiresAt']),
     );
   }
 }
@@ -91,7 +140,8 @@ CursorPage<T> parseCursorPage<T>(
   T Function(Map<String, dynamic>) itemParser,
 ) {
   return CursorPage<T>(
-    items: Json.asMapList(json['items']).map(itemParser).toList(growable: false),
+    items:
+        Json.asMapList(json['items']).map(itemParser).toList(growable: false),
     nextCursor: Json.asStringOrNull(json['nextCursor']),
     hasNext: Json.asBool(json['hasNext']),
   );

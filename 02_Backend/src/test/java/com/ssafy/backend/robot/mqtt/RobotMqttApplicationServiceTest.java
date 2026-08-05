@@ -137,7 +137,6 @@ class RobotMqttApplicationServiceTest {
                 10,
                 60
         );
-        verify(store).createWalkDiary(101L, "device-001");
     }
 
     @Test
@@ -176,7 +175,7 @@ class RobotMqttApplicationServiceTest {
     }
 
     @Test
-    void rejectsInternalWalkCompletedWithoutWalkId() {
+    void acceptsInternalWalkCompletedWithoutDiaryMetadata() {
         RobotEventMessage event = new RobotEventMessage(
                 UUID.randomUUID(),
                 "1.0",
@@ -191,9 +190,13 @@ class RobotMqttApplicationServiceTest {
                 new RobotMqttStore.AffinityContext(1L, 2L, 50)
         );
 
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> service.processWalkCompletedEvent(event, 1L, 2L)
+        AffectionChangedMessage response = service.processWalkCompletedEvent(
+                event,
+                1L,
+                2L
         );
+
+        assertEquals(60, response.currentScore());
+        verify(store).insertEvent(event, 1L, "{}", 50, 10, 60);
     }
 }

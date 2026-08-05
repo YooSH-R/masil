@@ -55,15 +55,9 @@ class MockWalkRouteSource implements WalkRouteSource {
     List<({double lat, double lng})>? path,
   }) : _path = path ?? _defaultPath;
 
-  /// 좌표 측정 간격. 명세서 2.4 "배치 처리 속도" 의 일반 산책 권장값(5초)이다.
-  ///
-  /// 1초 단위는 좌표 노이즈와 배터리 사용량만 커지고, 보행 속도 1.2~1.5m/s 면
-  /// 5초에 6~8m 씩 벌어져 경로를 그리기에 충분하다. 서버 전송은 이것과 별개로
-  /// [WalkViewModel] 이 30초마다 묶어서 보낸다.
-  ///
-  /// 실제 GPS 소스를 붙일 때도 이 값을 기준으로 맞춘다(안드로이드는 가능한 한
-  /// 긴 간격 + 배치 처리를 권장한다).
-  static const Duration defaultInterval = Duration(seconds: 5);
+  /// 실제 GPS와 같은 3초 간격으로 흘려 화면 갱신 동작을 검증한다.
+  /// 서버 전송은 이것과 별개로 [WalkViewModel]이 30초마다 묶어서 보낸다.
+  static const Duration defaultInterval = Duration(seconds: 3);
 
   final Duration interval;
   final List<({double lat, double lng})> _path;

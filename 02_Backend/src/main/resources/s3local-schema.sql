@@ -68,22 +68,11 @@ CREATE TABLE IF NOT EXISTS walks (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS walk_diaries (
-    walk_id BIGINT PRIMARY KEY REFERENCES walks(id) ON DELETE CASCADE,
-    walk_date DATE NOT NULL,
-    session_no INTEGER NOT NULL CHECK (session_no > 0),
-    object_prefix VARCHAR(500) NOT NULL UNIQUE,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
 CREATE INDEX IF NOT EXISTS idx_robot_pairings_pet_lookup
     ON robot_pairings (pet_id, id);
 
 CREATE INDEX IF NOT EXISTS idx_walks_pairing_lookup
     ON walks (robot_pairing_id, id);
-
-CREATE INDEX IF NOT EXISTS idx_walk_diaries_feed_order
-    ON walk_diaries (walk_date DESC, session_no ASC, walk_id ASC);
 
 INSERT INTO users (
     id, version, nickname, created_at, updated_at

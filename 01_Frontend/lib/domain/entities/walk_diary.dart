@@ -118,6 +118,8 @@ class WalkDiaryFeedItem {
     this.distanceMeters,
     this.thumbnailUrl,
     this.summary,
+    this.deviceId,
+    this.session,
   });
 
   final int walkId;
@@ -126,10 +128,48 @@ class WalkDiaryFeedItem {
   final int? distanceMeters;
   final String? thumbnailUrl;
   final String? summary;
+  final String? deviceId;
+  final int? session;
+
+  bool get isS3Diary => deviceId != null && session != null && walkedAt != null;
+
+  WalkDiaryFeedItem copyWith({
+    String? thumbnailUrl,
+    String? summary,
+  }) =>
+      WalkDiaryFeedItem(
+        walkId: walkId,
+        walkedAt: walkedAt,
+        durationSeconds: durationSeconds,
+        distanceMeters: distanceMeters,
+        thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+        summary: summary ?? this.summary,
+        deviceId: deviceId,
+        session: session,
+      );
 
   String get durationLabel {
     final seconds = durationSeconds;
     if (seconds == null) return '-';
     return '${seconds ~/ 60}분';
   }
+}
+
+/// S3 고정 경로에서 조회한 산책일지 본문과 이미지.
+class WalkDiaryContent {
+  const WalkDiaryContent({
+    required this.deviceId,
+    required this.walkDate,
+    required this.session,
+    required this.imageUrl,
+    required this.markdown,
+    this.imageUrlExpiresAt,
+  });
+
+  final String deviceId;
+  final DateTime walkDate;
+  final int session;
+  final String imageUrl;
+  final String markdown;
+  final DateTime? imageUrlExpiresAt;
 }

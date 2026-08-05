@@ -31,6 +31,18 @@ class ApiConfig {
   /// 지금 개발 서버를 보고 있는지. 화면에 환경 배지를 띄울 때 쓸 수 있다.
   static bool get isDev => baseUrl == devBaseUrl;
 
+  /// 에뮬레이터에서 로컬 백엔드를 볼 때만 쓰는 시드 펫. 앱 데이터를 지운 직후엔
+  /// current_pet_id가 없어서 프로필/친밀도 요청 자체가 생략되는 문제를 막는다.
+  static const int localTestPetId = int.fromEnvironment(
+    'LOCAL_TEST_PET_ID',
+    defaultValue: 900001,
+  );
+
+  static bool get isLoopback {
+    final host = Uri.tryParse(baseUrl)?.host;
+    return host == '127.0.0.1' || host == 'localhost' || host == '10.0.2.2';
+  }
+
   static const Duration connectTimeout = Duration(seconds: 15);
   static const Duration receiveTimeout = Duration(seconds: 15);
   static const Duration sendTimeout = Duration(seconds: 30);

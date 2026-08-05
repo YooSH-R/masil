@@ -23,7 +23,7 @@ class WalkDiaryRepositoryImpl implements WalkDiaryRepository {
   }) async {
     final data = await _client.get(
       ApiEndpoints.walkDiaries,
-      query: {'limit': limit, if (cursor != null) 'cursor': cursor},
+      query: {'size': limit, if (cursor != null) 'beforeDate': cursor},
     );
     if (data is List) {
       return CursorPage<WalkDiaryFeedItem>(
@@ -32,10 +32,34 @@ class WalkDiaryRepositoryImpl implements WalkDiaryRepository {
             .toList(growable: false),
       );
     }
-    return parseCursorPage<WalkDiaryFeedItem>(
-      Json.asMap(data),
-      WalkDiaryFeedItemModel.fromJson,
+    final page = Json.asMap(data);
+    final rawItems = Json.asMapList(page['items']);
+    final items = <WalkDiaryFeedItem>[];
+    for (final rawItem in rawItems) {
+      if (rawItem.containsKey('walkDate') && rawItem.containsKey('diaries')) {
+        items.addAll(WalkDiaryFeedItemModel.fromS3Day(rawItem));
+      } else {
+        items.add(WalkDiaryFeedItemModel.fromJson(rawItem));
+      }
+    }
+    return CursorPage<WalkDiaryFeedItem>(
+      items: items,
+      nextCursor: Json.asStringOrNull(page['nextCursor']),
+      hasNext: Json.asBool(page['hasNext']),
     );
+  }
+
+  @override
+  Future<WalkDiaryContent> getS3Diary({
+    required String deviceId,
+    required DateTime walkDate,
+    required int session,
+  }) async {
+    final date = _dateOnly(walkDate);
+    final data = await _client.get(
+      ApiEndpoints.s3WalkDiary(deviceId, date, session),
+    );
+    return WalkDiaryContentModel.fromJson(Json.asMap(data));
   }
 
   @override
@@ -52,4 +76,9 @@ class WalkDiaryRepositoryImpl implements WalkDiaryRepository {
     );
     return WalkDiaryModel.fromJson(Json.asMap(data));
   }
+
+  static String _dateOnly(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
 }
