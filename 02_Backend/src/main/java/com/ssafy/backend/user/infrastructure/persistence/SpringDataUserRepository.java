@@ -13,4 +13,15 @@ public interface SpringDataUserRepository extends JpaRepository<UserJpaEntity, L
     boolean existsByPhoneNumberAndDeletedAtIsNull(String phoneNumber);
 
     Optional<UserJpaEntity> findByEmailIgnoreCaseAndDeletedAtIsNull(String email);
+
+    Optional<UserJpaEntity> findByIdAndDeletedAtIsNull(Long id);
+
+    Optional<UserJpaEntity> findByPhoneNumberAndDeletedAtIsNull(String phoneNumber);
+
+    boolean existsByNicknameAndDeletedAtIsNullAndIdNot(String nickname, Long id);
+
+    boolean existsByPhoneNumberAndDeletedAtIsNullAndIdNot(
+            String phoneNumber,
+            Long id
+    );
 }

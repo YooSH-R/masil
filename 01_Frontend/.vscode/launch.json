@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // 소셜 로그인 키는 dart_defines.json(gitignore 대상)에서 읽는다.
+      // 새 팀원은 아래 형식으로 파일을 만들어야 한다:
+      //   { "GOOGLE_SERVER_CLIENT_ID": "...", "KAKAO_NATIVE_APP_KEY": "..." }
+      "name": "mysil (debug)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": ["--dart-define-from-file", "dart_defines.json"]
+    }
+  ]
+}

@@ -18,6 +18,8 @@ public interface AuthVerificationRepository
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<AuthVerification> findByTokenHash(String tokenHash);
 
+    long deleteByVerificationId(UUID verificationId);
+
     boolean existsByPhoneNumberAndCreatedAtAfter(
             String phoneNumber,
             Instant createdAfter

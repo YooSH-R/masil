@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mosquitto-config
+  labels:
+    app: mosquitto
+data:
+  mosquitto.conf: |
+    persistence true
+    persistence_location /mosquitto/data/
+    autosave_interval 30
+    allow_anonymous false
+    password_file /mosquitto/security/password_file
+    acl_file /mosquitto/config/acl
+    listener 1883 0.0.0.0
+    log_dest stdout
+    log_type error
+    log_type warning
+    log_type notice
+  acl: |
+    user backend
+    topic read robot-pet/v1/devices/+/events
+    topic read robot-pet/v1/devices/+/heartbeat
+    topic read robot-pet/v1/devices/+/request-results
+    topic write robot-pet/v1/devices/+/affection
+    topic write robot-pet/v1/devices/+/requests
+
+    pattern write robot-pet/v1/devices/%u/events
+    pattern write robot-pet/v1/devices/%u/heartbeat
+    pattern write robot-pet/v1/devices/%u/request-results
+    pattern read robot-pet/v1/devices/%u/affection
+    pattern read robot-pet/v1/devices/%u/requests

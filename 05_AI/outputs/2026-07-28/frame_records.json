@@ -1,0 +1,357 @@
+[
+  {
+    "scene": "여러 개의 선형 LED 조명과 배관이 노출된 어두운 실내 천장 아래로 모니터와 사람들의 머리 윗부분이 일부 보입니다.",
+    "location_type": "실내",
+    "time_of_day": "불명",
+    "weather": "불명",
+    "people": "2~5",
+    "atmosphere": [
+      "현대적임",
+      "인공적임",
+      "차분함"
+    ],
+    "confidence": {
+      "location_type": 0.9,
+      "time_of_day": 0.1,
+      "weather": 0.1
+    },
+    "unreadable": false,
+    "animals": [],
+    "notable": "천장에 매달려 있는 모니터와 노출형 배관 구조",
+    "objects": [
+      "천장 조명",
+      "모니터",
+      "배관"
+    ],
+    "plants": [],
+    "season_hint": "불명",
+    "surface": "불명",
+    "time_evidence": "실내 조명만 켜져 있고 외부 창문이 보이지 않아 시간대 판별 불가",
+    "weather_evidence": "외부를 볼 수 없는 실내 공간임",
+    "_elapsed": "0분 9초",
+    "_sort": 8.53
+  },
+  {
+    "scene": "길게 늘어선 선형 LED 조명과 원형 스포트라이트가 설치된 어두운 천장 아래로 사람들의 머리 윗부분이 보입니다.",
+    "location_type": "실내",
+    "time_of_day": "불명",
+    "weather": "불명",
+    "people": "2~5",
+    "atmosphere": [
+      "인공적인",
+      "어두운",
+      "실내"
+    ],
+    "confidence": {
+      "location_type": 0.9,
+      "time_of_day": 0.1,
+      "weather": 0.1
+    },
+    "unreadable": false,
+    "animals": [],
+    "notable": "천장에 평행하게 배치된 밝은 선형 조명들",
+    "objects": [
+      "천장 조명",
+      "스포트라이트"
+    ],
+    "plants": [],
+    "season_hint": "불명",
+    "surface": "불명",
+    "time_evidence": "창문이 없는 실내 공간이며 인공 조명만 켜져 있어 시간대를 알 수 없음",
+    "weather_evidence": "실내 공간으로 외부 날씨를 관찰할 수 없음",
+    "_elapsed": "0분 11초",
+    "_sort": 10.67
+  },
+  {
+    "scene": "실내 공간에서 한 인물이 정면을 응시하고 있으며 배경으로 창문과 외부 빌딩들이 보입니다.",
+    "location_type": "실내",
+    "time_of_day": "낮",
+    "weather": "불명",
+    "people": "1",
+    "atmosphere": [
+      "차분함",
+      "정적인",
+      "실내"
+    ],
+    "confidence": {
+      "location_type": 0.9,
+      "time_of_day": 0.8,
+      "weather": 0.3
+    },
+    "unreadable": false,
+    "animals": [],
+    "notable": "인물이 실내에서 카메라를 정면으로 바라보고 있음",
+    "objects": [
+      "창문",
+      "전등",
+      "목걸이형 카드홀더"
+    ],
+    "plants": [],
+    "season_hint": "불명",
+    "surface": "불명",
+    "time_evidence": "창밖으로 보이는 외부 전경이 밝음",
+    "weather_evidence": "창밖으로 빌딩들이 보이나 하늘이 흐릿하여 날씨 판별이 어려움",
+    "_elapsed": "0분 30초",
+    "_sort": 29.87
+  },
+  {
+    "scene": "실내에서 한 사람이 투명한 플라스틱 생수병을 세로로 들고 있으며, 배경으로 창문과 천장 조명이 보입니다.",
+    "location_type": "실내",
+    "time_of_day": "낮",
+    "weather": "불명",
+    "people": "1",
+    "atmosphere": [
+      "차분함",
+      "정적인",
+      "실내"
+    ],
+    "confidence": {
+      "location_type": 0.9,
+      "time_of_day": 0.8,
+      "weather": 0.3
+    },
+    "unreadable": false,
+    "animals": [],
+    "notable": "사람이 생수병을 들어 올려 얼굴 앞을 가리고 있음",
+    "objects": [
+      "생수병",
+      "창문",
+      "전등"
+    ],
+    "plants": [],
+    "season_hint": "불명",
+    "surface": "불명",
+    "time_evidence": "창문 밖으로 보이는 외부 전경이 밝음",
+    "weather_evidence": "창문을 통해 건물의 외벽만 보이고 하늘이 직접 보이지 않음",
+    "_elapsed": "0분 36초",
+    "_sort": 36.0
+  },
+  {
+    "scene": "실내에서 한 사람이 페트병에 담긴 물을 마시고 있으며 배경으로 창문과 건너편 건물이 보입니다.",
+    "location_type": "실내",
+    "time_of_day": "낮",
+    "weather": "불명",
+    "people": "1",
+    "atmosphere": [
+      "일상적",
+      "차분함",
+      "실내"
+    ],
+    "confidence": {
+      "location_type": 0.9,
+      "time_of_day": 0.8,
+      "weather": 0.1
+    },
+    "unreadable": false,
+    "animals": [],
+    "notable": "페트병에 담긴 물을 마시는 모습이 근접하여 촬영됨",
+    "objects": [
+      "페트병",
+      "무선 이어폰",
+      "사원증 스트랩",
+      "천장 조명"
+    ],
+    "plants": [],
+    "season_hint": "불명",
+    "surface": "불명",
+    "time_evidence": "창문을 통해 보이는 외부 전경이 밝음",
+    "weather_evidence": "창밖으로 건너편 건물만 보이고 하늘이 직접 보이지 않아 날씨를 알 수 없음",
+    "_elapsed": "0분 46초",
+    "_sort": 45.73
+  },
+  {
+    "scene": "실내 공간에서 한 사람이 목걸이 등록증을 착용한 채 앉아 있으며 배경으로 창문과 천장 조명이 보입니다.",
+    "location_type": "실내",
+    "time_of_day": "낮",
+    "weather": "불명",
+    "people": "1",
+    "atmosphere": [
+      "차분함",
+      "정적인",
+      "실내"
+    ],
+    "confidence": {
+      "location_type": 0.9,
+      "time_of_day": 0.8,
+      "weather": 0.3
+    },
+    "unreadable": false,
+    "animals": [],
+    "notable": "인물이 글자가 적힌 보라색 목걸이 등록증을 착용하고 있음",
+    "objects": [
+      "목걸이 등록증",
+      "벽시계",
+      "천장 조명",
+      "블라인드"
+    ],
+    "plants": [],
+    "season_hint": "불명",
+    "surface": "불명",
+    "time_evidence": "창밖으로 밝은 빛이 들어옴",
+    "weather_evidence": "실내에서 촬영되어 외부 날씨를 정확히 판별하기 어려움",
+    "_elapsed": "0분 58초",
+    "_sort": 58.0
+  },
+  {
+    "scene": "밝은 창문이 있는 실내 공간에서 한 사람이 고개를 약간 숙인 채 무언가를 바라보고 있다.",
+    "location_type": "실내",
+    "time_of_day": "낮",
+    "weather": "불명",
+    "people": "2~5",
+    "atmosphere": [
+      "차분함",
+      "정적인",
+      "실내"
+    ],
+    "confidence": {
+      "location_type": 0.9,
+      "time_of_day": 0.8,
+      "weather": 0.3
+    },
+    "unreadable": false,
+    "animals": [],
+    "notable": "실내 기둥에 원형 벽시계가 걸려 있음",
+    "objects": [
+      "벽시계",
+      "천장 조명",
+      "목걸이 줄",
+      "창문"
+    ],
+    "plants": [],
+    "season_hint": "불명",
+    "surface": "불명",
+    "time_evidence": "창문 외측으로 밝은 빛이 보임",
+    "weather_evidence": "",
+    "_elapsed": "1분 4초",
+    "_sort": 64.0
+  },
+  {
+    "scene": "실내 공간에서 한 인물이 카메라를 정면으로 바라보고 있으며 배경으로 노출형 천장 조명과 창밖의 고층 건물이 보입니다.",
+    "location_type": "실내",
+    "time_of_day": "낮",
+    "weather": "불명",
+    "people": "1",
+    "atmosphere": [
+      "차분함",
+      "정적인",
+      "실내"
+    ],
+    "confidence": {
+      "location_type": 0.9,
+      "time_of_day": 0.7,
+      "weather": 0.3
+    },
+    "unreadable": false,
+    "animals": [],
+    "notable": "카메라를 정면으로 응시하는 인물의 상반신이 화면 중앙에 위치함",
+    "objects": [
+      "조명",
+      "창문",
+      "사원증"
+    ],
+    "plants": [],
+    "season_hint": "불명",
+    "surface": "불명",
+    "time_evidence": "창밖으로 보이는 외부 전경과 건물이 밝음",
+    "weather_evidence": "창밖으로 건물이 보이나 하늘이 직접 보이지 않아 기상 상태 판별 불가",
+    "_elapsed": "1분 15초",
+    "_sort": 75.0
+  },
+  {
+    "scene": "검은색 노출 천장에 선형 조명이 설치된 실내 공간에서 사람들이 모니터 앞에 앉아 업무나 학습을 하고 있다.",
+    "location_type": "실내",
+    "time_of_day": "불명",
+    "weather": "불명",
+    "people": "2~5",
+    "atmosphere": [
+      "차분함",
+      "현대적",
+      "정적인"
+    ],
+    "confidence": {
+      "location_type": 0.9,
+      "time_of_day": 0.1,
+      "weather": 0.1
+    },
+    "unreadable": false,
+    "animals": [],
+    "notable": "검은색 노출 천장과 일렬로 배치된 밝은 선형 LED 조명",
+    "objects": [
+      "모니터",
+      "조명",
+      "책상",
+      "컴퓨터"
+    ],
+    "plants": [],
+    "season_hint": "불명",
+    "surface": "불명",
+    "time_evidence": "실내 조명이 켜져 있으나 외부 창문이 직접 보이지 않아 시간대 판별 불가",
+    "weather_evidence": "실내 공간이므로 외부 날씨를 관찰할 수 없음",
+    "_elapsed": "1분 30초",
+    "_sort": 89.8
+  },
+  {
+    "scene": "노출형 천장에 여러 개의 일자형 LED 조명과 배관, 그리고 모니터가 매달려 있는 실내 모습입니다.",
+    "location_type": "실내",
+    "time_of_day": "불명",
+    "weather": "불명",
+    "people": "없음",
+    "atmosphere": [
+      "인공적",
+      "정적인",
+      "어두운"
+    ],
+    "confidence": {
+      "location_type": 0.9,
+      "time_of_day": 0.1,
+      "weather": 0.1
+    },
+    "unreadable": false,
+    "animals": [],
+    "notable": "천장에 모니터와 배관이 노출되어 설치되어 있음",
+    "objects": [
+      "LED 조명",
+      "배관",
+      "모니터"
+    ],
+    "plants": [],
+    "season_hint": "불명",
+    "surface": "불명",
+    "time_evidence": "실내 천장만 촬영되어 외부 시간대를 파악할 수 없음",
+    "weather_evidence": "실내 촬영으로 외부 날씨 확인 불가",
+    "_elapsed": "1분 30초",
+    "_sort": 90.07
+  },
+  {
+    "scene": "실내에서 한 사람이 창문을 등지고 앉아 있으며 창밖으로 맞은편 고층 건물의 외벽이 보입니다.",
+    "location_type": "실내",
+    "time_of_day": "낮",
+    "weather": "불명",
+    "people": "1",
+    "atmosphere": [
+      "차분함",
+      "실내",
+      "정적인"
+    ],
+    "confidence": {
+      "location_type": 0.9,
+      "time_of_day": 0.8,
+      "weather": 0.3
+    },
+    "unreadable": false,
+    "animals": [],
+    "notable": "실내 창가 자리에서 촬영되어 맞은편 빌딩이 배경으로 보임",
+    "objects": [
+      "창문",
+      "무선 이어폰",
+      "천장 조명"
+    ],
+    "plants": [],
+    "season_hint": "불명",
+    "surface": "불명",
+    "time_evidence": "창밖으로 보이는 맞은편 건물과 외부 전경이 밝음",
+    "weather_evidence": "창밖이 밝으나 하늘이 직접 보이지 않아 정확한 날씨 판별 불가",
+    "_elapsed": "1분 47초",
+    "_sort": 107.0
+  }
+]
