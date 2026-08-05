@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/services/profile_image_store.dart';
 import '../../../data/models/auth_model.dart';
 import '../../viewmodels/auth_view_model.dart';
+import '../../widgets/profile_avatar_picker.dart';
 
 /// 내 정보 수정. GET/PATCH /users/me, PATCH /users/me/password
 class ProfileEditScreen extends StatefulWidget {
@@ -255,31 +257,14 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         padding: const EdgeInsets.all(24.0),
         child: Column(
           children: [
-            // Profile Image Edit
-            Stack(
-              children: [
-                Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEFE5D8),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 4),
-                  ),
-                  child: const Center(
-                    child: Text('프로필 사진\nor browse fi', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: Color(0xFF8D6E63))),
-                  ),
-                ),
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(color: Color(0xFFC67C4E), shape: BoxShape.circle),
-                    child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
-                  ),
-                ),
-              ],
+            // 프로필 사진. 눌러서 갤러리·카메라로 등록하거나 삭제한다.
+            //
+            // 사진은 이 기기에만 저장된다. 서버 `UpdateMemberRequest` 에는
+            // profileImage 항목이 아예 없어서 올릴 곳이 없다. 항목이 생기면
+            // onChanged 에서 업로드를 이어 붙이면 된다.
+            ProfileAvatarPicker(
+              imageKey: ProfileImageStore.userKey,
+              fallbackImageUrl: authViewModel.user?.profileImageUrl,
             ),
             const SizedBox(height: 40),
             

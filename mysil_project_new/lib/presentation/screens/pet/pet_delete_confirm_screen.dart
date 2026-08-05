@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../../viewmodels/pet_view_model.dart';
 
 class PetDeleteConfirmScreen extends StatelessWidget {
   const PetDeleteConfirmScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final affinity = context.watch<PetViewModel>().affinity;
     return Scaffold(
       backgroundColor: Colors.black.withValues(alpha: 0.5), // Simulated overlay
       body: Center(
@@ -45,14 +49,21 @@ class PetDeleteConfirmScreen extends StatelessWidget {
                   color: const Color(0xFFFFF1F0),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Column(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('· 산책 기록 128회 · 214km', style: TextStyle(color: Color(0xFFD32F2F), fontSize: 14)),
-                    SizedBox(height: 8),
-                    Text('· 저장된 영상 12개 · 감성 일지 34편', style: TextStyle(color: Color(0xFFD32F2F), fontSize: 14)),
-                    SizedBox(height: 8),
-                    Text('· 친밀도 80% · 기기 연결 해제', style: TextStyle(color: Color(0xFFD32F2F), fontSize: 14)),
+                    const Text('· 산책 기록 128회 · 214km', style: TextStyle(color: Color(0xFFD32F2F), fontSize: 14)),
+                    const SizedBox(height: 8),
+                    const Text('· 저장된 영상 12개 · 감성 일지 34편', style: TextStyle(color: Color(0xFFD32F2F), fontSize: 14)),
+                    const SizedBox(height: 8),
+                    // 친밀도는 GET /pets/{petId} 의 실제 값. 못 불러왔으면
+                    // 숫자를 지어내지 않는다(삭제는 되돌릴 수 없다).
+                    Text(
+                      affinity == null
+                          ? '· 쌓아 온 친밀도 · 기기 연결 해제'
+                          : '· 친밀도 ${affinity.score}% · 기기 연결 해제',
+                      style: const TextStyle(color: Color(0xFFD32F2F), fontSize: 14),
+                    ),
                   ],
                 ),
               ),
