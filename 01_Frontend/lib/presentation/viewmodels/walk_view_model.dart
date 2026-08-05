@@ -69,16 +69,19 @@ class WalkViewModel extends BaseViewModel {
 
   /// 좌표를 저장할지 판단하는 기준. 명세서 2.4 "배치 처리 속도" 개정판이다.
   ///
-  ///   일반 산책: 측정 1초 간격 / 최소 이동거리 1m
+  ///   일반 산책: 측정 3초 간격 / accuracy 기반 최소 이동거리 3~8m
   ///   accuracy 가 30~50m 보다 큰 부정확한 좌표는 제외
   ///
-  /// **측정 간격(1초)은 좌표를 만들어 보내는 쪽([WalkRouteSource])이 지킨다.**
+  /// **측정 간격(3초)은 좌표를 만들어 보내는 쪽([WalkRouteSource])이 지킨다.**
   /// 여기서는 이미 들어온 좌표를 "저장할지" 만 판단한다. 측정 주기와 서버 전송
-  /// 주기는 서로 별개다(1초 측정 / 30초 전송).
+  /// 주기는 서로 별개다(3초 측정 / 30초 전송).
   ///
-  /// 보행 속도 1.2~1.5m/s에서 매초 경로가 갱신되게 1m로 둔다.
-  /// OS에는 거리 제한 없이 요청하되 저장 단계에서 작은 GPS 흔들림은 거른다.
-  static const double _minMoveMeters = 1;
+  /// GPS가 정확할 때 적용하는 최소 이동거리. 3초 보행 시 약 3~5m 이동하므로
+  /// 경로 반응성을 유지하면서 제자리의 작은 흔들림은 제외한다.
+  static const double _minMoveMeters = 3;
+
+  /// 정확도가 낮다고 임계값을 무한히 키우면 정상 경로까지 끊기므로 상한을 둔다.
+  static const double _maxAdaptiveMoveMeters = 8;
 
   /// 이보다 부정확한 좌표는 버린다. 명세서의 30~50m 구간에서 느슨한 쪽을 잡았다.
   /// 시연은 실외 안드로이드 휴대폰이라 보통 5~20m 로 들어오지만, 건물 사이나
@@ -302,8 +305,20 @@ class WalkViewModel extends BaseViewModel {
       lat2: point.latitude,
       lng2: point.longitude,
     );
-    if (moved < _minMoveMeters) {
-      _lastRejectReason = '이동 ${moved.toStringAsFixed(1)}m (1m 이상 필요)';
+    // accuracy는 실제 위치가 포함될 가능성이 높은 오차 반경이다. 현재 좌표나
+    // 직전 좌표의 오차가 크면 최소 이동거리도 함께 키워, 정지 상태의 GPS
+    // Drift가 실제 이동 거리로 누적되는 것을 줄인다.
+    final effectiveAccuracy = <double>[
+      point.accuracy ?? _minMoveMeters,
+      last.accuracy ?? _minMoveMeters,
+    ].reduce((a, b) => a > b ? a : b);
+    final requiredMove = (effectiveAccuracy * 0.5).clamp(
+      _minMoveMeters,
+      _maxAdaptiveMoveMeters,
+    );
+    if (moved < requiredMove) {
+      _lastRejectReason =
+          '이동 ${moved.toStringAsFixed(1)}m (${requiredMove.toStringAsFixed(1)}m 이상 필요)';
       return false;
     }
 

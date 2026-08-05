@@ -30,7 +30,7 @@ void main() {
       accuracy: 5,
     ));
     source.add(WalkLocationPoint(
-      latitude: 37.00002,
+      latitude: 37.00004,
       longitude: 127.0,
       sequence: 2,
       recordedAt: startedAt.add(const Duration(seconds: 1)),

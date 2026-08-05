@@ -23,26 +23,26 @@ enum GpsUnavailableReason {
 /// 거리·평균 페이스·발자국 수가 모두 사용자가 실제로 걸은 값이 된다.
 ///
 /// 수집 규칙은 명세서 2.4 "배치 처리 속도"를 따른다.
-///   측정 1초 간격 / 이동거리 제한 없음 / accuracy 가 나쁜 좌표는 제외
+///   측정 3초 간격 / 최소 이동거리 2m / accuracy 가 나쁜 좌표는 제외
 ///
 /// 역할을 나눠 두었다.
-/// - **여기**: OS 에게 1초마다 위치를 요청한다.
-/// - **[WalkViewModel]**: 들어온 좌표를 1m·accuracy 로 한 번 더 걸러 저장한다.
+/// - **여기**: OS 에게 3초·2m 조건으로 위치를 요청한다.
+/// - **[WalkViewModel]**: accuracy 에 따라 저장 기준을 조절해 흔들림을 거른다.
 ///
 /// OS 가 요청을 항상 정확히 지키지는 않기 때문에 양쪽에서 거른다. 서버 전송은
 /// 이것과 별개로 뷰모델이 30초마다 묶어서 한다.
 class DeviceGpsWalkRouteSource implements WalkRouteSource {
   DeviceGpsWalkRouteSource();
 
-  /// 산책 중 지도와 상태가 끊겨 보이지 않도록 1초마다 위치를 요청한다.
-  static const Duration interval = Duration(seconds: 1);
+  /// 지도 반응성과 배터리 소모 사이의 절충값. 일반 보행이면 약 3~5m마다 온다.
+  static const Duration interval = Duration(seconds: 3);
 
-  /// 정지 중에도 GPS 수신 상태를 확인할 수 있도록 OS 단계 거리 제한은 두지 않는다.
-  static const int distanceFilterMeters = 0;
+  /// 제자리 GPS 흔들림을 OS 단계에서 먼저 줄인다.
+  static const int distanceFilterMeters = 2;
 
   /// 좌표가 이만큼 안 오면 멈춘 것으로 보고 직접 물어본다.
-  /// 측정 간격(1초)보다 넉넉히 잡아, 정상 지연을 실패로 오인하지 않는다.
-  static const Duration _stallThreshold = Duration(seconds: 5);
+  /// 측정 간격(3초)보다 넉넉히 잡아, 정상 지연을 실패로 오인하지 않는다.
+  static const Duration _stallThreshold = Duration(seconds: 12);
 
   StreamController<WalkLocationPoint>? _controller;
   StreamSubscription<Position>? _positionSub;

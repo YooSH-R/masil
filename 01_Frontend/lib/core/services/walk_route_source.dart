@@ -55,9 +55,9 @@ class MockWalkRouteSource implements WalkRouteSource {
     List<({double lat, double lng})>? path,
   }) : _path = path ?? _defaultPath;
 
-  /// 실제 GPS와 같은 1초 간격으로 흘려 화면 갱신 동작을 검증한다.
+  /// 실제 GPS와 같은 3초 간격으로 흘려 화면 갱신 동작을 검증한다.
   /// 서버 전송은 이것과 별개로 [WalkViewModel]이 30초마다 묶어서 보낸다.
-  static const Duration defaultInterval = Duration(seconds: 1);
+  static const Duration defaultInterval = Duration(seconds: 3);
 
   final Duration interval;
   final List<({double lat, double lng})> _path;
