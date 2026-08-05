@@ -43,6 +43,8 @@ helm upgrade --install alloy grafana/alloy \
   --wait --timeout 10m
 
 kubectl apply -n s15a203-dev -f "$SCRIPT_DIR/../dev/service-monitor.yaml"
+kubectl apply -f "$SCRIPT_DIR/dashboard-mysil-overview.yaml"
+sh "$SCRIPT_DIR/import-spring-boot-dashboard.sh"
 
 echo "Monitoring stack is ready."
 echo "Grafana admin password:"
