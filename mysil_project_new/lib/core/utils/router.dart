@@ -19,7 +19,8 @@ import '../../presentation/screens/walk/walk_summary_screen.dart';
 import '../../presentation/screens/walk/walk_dashboard_screen.dart';
 import '../../presentation/screens/walk/walk_path_detail_screen.dart';
 import '../../presentation/screens/walk/walk_path_exception_screen.dart';
-import '../../presentation/screens/walk/ai_photo_style_screen.dart';
+import '../../presentation/screens/walk/ai_photo_picker_screen.dart';
+import '../../presentation/screens/walk/walk_log_failed_screen.dart';
 import '../../presentation/screens/indoor/indoor_home_screen.dart';
 import '../../presentation/screens/indoor/charging_sleep_screen.dart';
 import '../../presentation/screens/indoor/autonomous_roaming_screen.dart';
@@ -130,8 +131,20 @@ final GoRouter router = GoRouter(
               ],
             ),
             GoRoute(
+              path: 'log-failed',
+              // 감성 일지 생성이 실패했을 때. walkId 를 extra 로 넘긴다.
+              builder: (context, state) => WalkLogFailedScreen(
+                walkId: state.extra is int ? state.extra as int : null,
+              ),
+            ),
+            GoRoute(
               path: 'ai-photo',
-              builder: (context, state) => const AiPhotoStyleScreen(),
+              // 어떤 산책의 사진인지는 path-detail 과 같은 방식으로 extra 로 넘긴다.
+              //   context.push('/walk/ai-photo', extra: walkId)
+              // 넘기지 않으면 이미 불러와 둔 일지 상세의 사진을 쓴다.
+              builder: (context, state) => AiPhotoPickerScreen(
+                walkId: state.extra is int ? state.extra as int : null,
+              ),
             ),
           ],
         ),

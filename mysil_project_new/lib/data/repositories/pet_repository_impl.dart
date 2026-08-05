@@ -22,11 +22,53 @@ class PetRepositoryImpl implements PetRepository {
     final data = await _client.post(
       ApiEndpoints.pets,
       data: {'name': name, 'profileImage': profileImage},
-      idempotencyKey: 'create-pet-$name',
+      // **이름으로 키를 만들면 안 된다.** 서버는 같은 멱등키를 "이미 처리한
+      // 요청"으로 보고 기존 펫을 그대로 돌려준다(pet_creation_requests).
+      // 그래서 이름이 같은 펫을 두 마리 만들 수 없고, 사용자에게는 "추가가
+      // 안 된다"로 보인다. 2026-08-04 에 실제로 겪었다.
+      //
+      // 멱등키가 묶어야 하는 것은 **같은 요청의 재시도**다. 사용자가 `추가` 를
+      // 누르는 행위 하나가 곧 하나의 요청이므로, 호출마다 새 키를 만든다.
+      // (dio 가 네트워크 오류로 재시도할 때는 같은 Options 를 재사용하므로
+      //  같은 키가 나가고, 그때는 중복 생성이 제대로 막힌다)
+      idempotencyKey: 'create-pet-${_freshRequestId()}',
     );
     final pet = PetModel.fromJson(Json.asMap(data));
     await _cache.savePetId(pet.id);
     return pet;
+  }
+
+  /// 요청 하나를 구분하는 값. 서버 패턴(`^[A-Za-z0-9._:-]+$`)에 맞는 문자만 쓴다.
+  String _freshRequestId() {
+    final micros = DateTime.now().microsecondsSinceEpoch;
+    // 같은 마이크로초에 두 번 불릴 경우까지 대비해 순번을 덧붙인다.
+    _requestSeq += 1;
+    return '$micros-$_requestSeq';
+  }
+
+  int _requestSeq = 0;
+
+  @override
+  Future<List<Pet>> getPets() async {
+    final ids = await _cache.readKnownPetIds();
+    if (ids.isEmpty) return const [];
+
+    final pets = <Pet>[];
+    for (final id in ids) {
+      try {
+        pets.add(await getPet(id));
+      } on ApiException catch (e) {
+        // 이미 지워진 펫이면 목록에서 뺀다. 그러지 않으면 매번 404 를 부른다.
+        if (e.code == ApiErrorCode.petNotFound || e.isNotFound) {
+          await _cache.forgetPetId(id);
+          continue;
+        }
+        // 그 밖의 오류(네트워크 등)는 이 펫만 건너뛴다. 한 마리를 못 받았다고
+        // 목록 전체를 실패로 만들지 않는다.
+        continue;
+      }
+    }
+    return pets;
   }
 
   @override
@@ -38,13 +80,14 @@ class PetRepositoryImpl implements PetRepository {
   @override
   Future<Pet> updatePet({
     required int petId,
-    String? name,
+    required String name,
     String? profileImage,
   }) async {
     final data = await _client.patch(
       ApiEndpoints.pet(petId),
+      // name 은 서버에서 required 다. 조건부로 빼면 사진만 바꿀 때 400 이 난다.
       data: {
-        if (name != null) 'name': name,
+        'name': name,
         if (profileImage != null) 'profileImage': profileImage,
       },
     );

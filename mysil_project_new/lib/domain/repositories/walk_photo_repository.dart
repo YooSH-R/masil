@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../entities/walk_photo.dart';
 
 /// 명세서 2.5 사진·GPT 처리 API.
@@ -33,4 +35,11 @@ abstract class WalkPhotoRepository {
 
   /// GET /photos/{photoId}/content — 화면에서 바로 쓸 절대 URL
   String contentUrl(int photoId);
+
+  /// GET /photos/{photoId}/content — 사진 원본 바이트.
+  ///
+  /// 갤러리 저장처럼 URL 이 아니라 실제 바이트가 필요할 때 쓴다. [contentUrl] 은
+  /// 인증 헤더가 붙지 않아 `Image.network` 로는 못 받는 경우가 있는데, 이 쪽은
+  /// ApiClient(=dio + AuthInterceptor)를 지나므로 토큰이 함께 나간다.
+  Future<Uint8List> photoBytes(int photoId);
 }

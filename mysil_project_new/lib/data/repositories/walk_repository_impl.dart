@@ -70,6 +70,17 @@ class WalkRepositoryImpl implements WalkRepository {
   }
 
   @override
+  Future<Walk> endWalk(int walkId) async {
+    final data = await _client.post(
+      ApiEndpoints.walkEnd(walkId),
+      data: {'endedAt': DateTime.now().toUtc().toIso8601String()},
+      // 같은 산책을 두 번 종료해도 한 번만 처리되게 한다(버튼 중복 탭·재시도).
+      idempotencyKey: 'walk-end-$walkId',
+    );
+    return WalkModel.fromJson(Json.asMap(data));
+  }
+
+  @override
   Future<Walk> getWalk(int walkId) async {
     final data = await _client.get(ApiEndpoints.walk(walkId));
     return WalkModel.fromJson(Json.asMap(data));

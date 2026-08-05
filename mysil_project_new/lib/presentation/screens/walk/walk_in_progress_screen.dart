@@ -6,11 +6,14 @@ import '../../../domain/entities/walk.dart';
 import '../../viewmodels/walk_view_model.dart';
 import '../../widgets/walk_route_map.dart';
 
-/// 산책 중 화면. 카카오맵 위에 마실이가 지나온 경로를 굵은 선으로 그린다.
+/// 산책 중 화면. 카카오맵 위에 지나온 경로를 굵은 선으로 그린다.
 ///
-/// 좌표는 [WalkViewModel.routePoints] 에서만 가져온다. 그 값을 채우는 주체는
-/// [WalkRouteSource] 구현체이므로, 백엔드 GPS 푸시가 붙어도 이 화면은
-/// 손대지 않는다.
+/// 좌표는 **휴대폰 자체 GPS** 에서 온다([DeviceGpsWalkRouteSource]). 그래서
+/// 거리·평균 페이스·발자국이 사용자가 실제로 걸은 값이다.
+///
+/// 이 화면은 [WalkViewModel.routePoints] 만 본다. 값을 채우는 주체는
+/// [WalkRouteSource] 구현체이므로, 나중에 마실이 기기의 GPS 푸시로 바꿔도
+/// 이 화면은 손대지 않는다.
 class WalkInProgressScreen extends StatefulWidget {
   const WalkInProgressScreen({super.key});
 
@@ -18,10 +21,12 @@ class WalkInProgressScreen extends StatefulWidget {
   State<WalkInProgressScreen> createState() => _WalkInProgressScreenState();
 }
 
-class _WalkInProgressScreenState extends State<WalkInProgressScreen> {
+class _WalkInProgressScreenState extends State<WalkInProgressScreen>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // 화면에 들어오면 경로 수신을 시작한다. 소스가 주입되지 않았으면
     // (= 백엔드 미연동) 아무 일도 일어나지 않고 지도만 뜬다.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -36,6 +41,30 @@ class _WalkInProgressScreenState extends State<WalkInProgressScreen> {
   }
 
   @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// 좌표 전송은 30초 배치라서, 그 30초가 차기 전에 앱이 내려가면 모아둔 좌표가
+  /// 그대로 남는다. 안드로이드는 백그라운드로 가면 배터리 최적화(Doze)가 Timer
+  /// 를 늦추거나 멈추므로, 화면이 내려가는 순간 한 번 밀어 넣는다.
+  ///
+  /// 실패해도 버퍼에 남아 돌아왔을 때 다시 올라간다.
+  ///
+  /// 참고: 백그라운드에서도 계속 좌표를 "수집" 하려면 Foreground Service 가
+  /// 필요하다. 지금은 마실이 기기가 좌표를 보내주고 앱은 전송만 맡으므로
+  /// 여기까지로 충분하다.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!mounted) return;
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      context.read<WalkViewModel>().flushLocations();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final walkVm = context.watch<WalkViewModel>();
     final points = walkVm.routePoints;
@@ -47,7 +76,12 @@ class _WalkInProgressScreenState extends State<WalkInProgressScreen> {
           children: [
             _buildHeader(walkVm),
             _buildStatsCard(walkVm),
-            Expanded(child: _buildMapCard(points)),
+            Expanded(
+                child: _buildMapCard(
+                    points,
+                    // 위치가 막힌 이유가 있으면 그걸, 없으면 좌표가 걸러지는
+                    // 이유(진단)를 보여준다. 둘 다 없으면 기본 안내가 나온다.
+                    walkVm.routeUnavailableMessage ?? walkVm.gpsDiagnostic)),
             _buildControls(walkVm),
           ],
         ),
@@ -57,6 +91,7 @@ class _WalkInProgressScreenState extends State<WalkInProgressScreen> {
 
   Widget _buildHeader(WalkViewModel walkVm) {
     final isReceiving = walkVm.hasRoute;
+    final blocked = walkVm.routeUnavailableMessage != null;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 10),
       child: Row(
@@ -70,20 +105,37 @@ class _WalkInProgressScreenState extends State<WalkInProgressScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: isReceiving
-                  ? const Color(0xFFE8F5E9)
-                  : const Color(0xFFF0F0F0),
+              color: blocked
+                  ? const Color(0xFFFFEBEE)
+                  : isReceiving
+                      ? const Color(0xFFE8F5E9)
+                      : const Color(0xFFF0F0F0),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
               children: [
-                Icon(Icons.circle,
-                    color: isReceiving ? Colors.green : Colors.grey, size: 8),
+                Icon(
+                  blocked ? Icons.location_off : Icons.circle,
+                  color: blocked
+                      ? const Color(0xFFD32F2F)
+                      : isReceiving
+                          ? Colors.green
+                          : Colors.grey,
+                  size: blocked ? 12 : 8,
+                ),
                 const SizedBox(width: 6),
                 Text(
-                  isReceiving ? '위치 수신 중' : '위치 대기 중',
+                  blocked
+                      ? '위치 꺼짐'
+                      : isReceiving
+                          ? 'GPS 기록 중'
+                          : 'GPS 찾는 중',
                   style: TextStyle(
-                      color: isReceiving ? Colors.green : Colors.grey,
+                      color: blocked
+                          ? const Color(0xFFD32F2F)
+                          : isReceiving
+                              ? Colors.green
+                              : Colors.grey,
                       fontSize: 11,
                       fontWeight: FontWeight.bold),
                 ),
@@ -139,7 +191,8 @@ class _WalkInProgressScreenState extends State<WalkInProgressScreen> {
     );
   }
 
-  Widget _buildMapCard(List<WalkLocationPoint> points) {
+  Widget _buildMapCard(
+      List<WalkLocationPoint> points, String? unavailableMessage) {
     // 주의: 이 컨테이너에 clipBehavior/borderRadius 를 걸지 않는다.
     // KakaoMap 은 WebView(안드로이드 플랫폼 뷰)라서 클리핑을 걸면 렌더링이
     // 비어버린다(지도가 안 보이고 배경색만 나옴).
@@ -150,11 +203,11 @@ class _WalkInProgressScreenState extends State<WalkInProgressScreen> {
         children: [
           Positioned.fill(child: _buildMap(points)),
           if (points.isEmpty)
-            const Positioned(
+            Positioned(
               bottom: 16,
               left: 16,
               right: 16,
-              child: _RouteHintBadge(),
+              child: _RouteHintBadge(unavailableMessage: unavailableMessage),
             ),
         ],
       ),
@@ -195,8 +248,9 @@ class _WalkInProgressScreenState extends State<WalkInProgressScreen> {
               height: 60,
               child: ElevatedButton(
                 onPressed: () async {
-                  walkVm.stopWatchingWalk();
-                  await walkVm.stopRouteTracking();
+                  // 남은 좌표를 다 올린 뒤 서버에 종료를 알린다.
+                  // 서버는 이 시점부터 감성 사진·일지를 만든다.
+                  await walkVm.endWalk();
                   if (!mounted) return;
                   context.push('/walk/summary');
                 },
@@ -263,11 +317,18 @@ class _WalkInProgressScreenState extends State<WalkInProgressScreen> {
 }
 
 /// 아직 좌표가 없을 때 지도 위에 띄우는 안내.
+///
+/// 위치가 막힌 경우([unavailableMessage])와 그냥 아직 안 잡힌 경우를 구분한다.
+/// 권한이 거부됐는데 "곧 그려져요"라고만 하면 사용자는 계속 기다리게 된다.
 class _RouteHintBadge extends StatelessWidget {
-  const _RouteHintBadge();
+  const _RouteHintBadge({this.unavailableMessage});
+
+  final String? unavailableMessage;
 
   @override
   Widget build(BuildContext context) {
+    final blocked = unavailableMessage != null;
+
     return Center(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -275,16 +336,22 @@ class _RouteHintBadge extends StatelessWidget {
           color: Colors.white.withValues(alpha: 0.92),
           borderRadius: BorderRadius.circular(20),
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.pets, color: Color(0xFFC67C4E), size: 16),
-            SizedBox(width: 8),
+            Icon(blocked ? Icons.location_off : Icons.my_location,
+                color: blocked
+                    ? const Color(0xFFD32F2F)
+                    : const Color(0xFFC67C4E),
+                size: 16),
+            const SizedBox(width: 8),
             Flexible(
               child: Text(
-                '마실이가 움직이면 경로가 그려져요',
+                unavailableMessage ?? 'GPS 신호를 찾고 있어요. 걷기 시작하면 경로가 그려져요',
                 style: TextStyle(
-                    color: Color(0xFF5D4037),
+                    color: blocked
+                        ? const Color(0xFFD32F2F)
+                        : const Color(0xFF5D4037),
                     fontSize: 11,
                     fontWeight: FontWeight.w600),
               ),

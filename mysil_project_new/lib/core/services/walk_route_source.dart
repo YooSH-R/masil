@@ -34,6 +34,15 @@ abstract class WalkRouteSource {
 
   /// 구독 정리. 화면을 떠날 때 호출된다.
   Future<void> stop();
+
+  /// 좌표를 받을 수 없는 이유를 사용자 문구로. 받을 수 있으면 null.
+  ///
+  /// 위치 권한 거부처럼 **사용자가 직접 풀어줘야 하는** 상황을 화면이 안내할 수
+  /// 있게 한다. 이게 없으면 권한이 막혔을 때도 "위치 대기 중"만 계속 떠서
+  /// 사용자가 무엇을 해야 하는지 알 수 없다.
+  ///
+  /// 값은 [points] 를 부른 뒤에 정해진다(권한 확인이 비동기라서).
+  String? get unavailableMessage;
 }
 
 /// 백엔드 GPS 푸시가 준비되기 전까지 화면을 검증하기 위한 임시 소스.
@@ -42,9 +51,19 @@ abstract class WalkRouteSource {
 /// 이 클래스는 지우거나 테스트용으로만 남긴다.
 class MockWalkRouteSource implements WalkRouteSource {
   MockWalkRouteSource({
-    this.interval = const Duration(seconds: 2),
+    this.interval = defaultInterval,
     List<({double lat, double lng})>? path,
   }) : _path = path ?? _defaultPath;
+
+  /// 좌표 측정 간격. 명세서 2.4 "배치 처리 속도" 의 일반 산책 권장값(5초)이다.
+  ///
+  /// 1초 단위는 좌표 노이즈와 배터리 사용량만 커지고, 보행 속도 1.2~1.5m/s 면
+  /// 5초에 6~8m 씩 벌어져 경로를 그리기에 충분하다. 서버 전송은 이것과 별개로
+  /// [WalkViewModel] 이 30초마다 묶어서 보낸다.
+  ///
+  /// 실제 GPS 소스를 붙일 때도 이 값을 기준으로 맞춘다(안드로이드는 가능한 한
+  /// 긴 간격 + 배치 처리를 권장한다).
+  static const Duration defaultInterval = Duration(seconds: 5);
 
   final Duration interval;
   final List<({double lat, double lng})> _path;
@@ -93,6 +112,10 @@ class MockWalkRouteSource implements WalkRouteSource {
 
     return controller.stream;
   }
+
+  /// 목 소스는 항상 좌표를 흘려보내므로 막히는 경우가 없다.
+  @override
+  String? get unavailableMessage => null;
 
   @override
   Future<void> stop() async {

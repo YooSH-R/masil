@@ -3,6 +3,27 @@ import '../../domain/entities/walk_diary.dart';
 import 'walk_model.dart';
 import 'walk_photo_model.dart';
 
+/// 일지 생성 상태 문자열 → enum.
+///
+/// 백엔드가 아직 개발 중이라 어떤 낱말을 쓸지 확정되지 않았다. 흔히 쓰는 값을
+/// 모두 받아둬서, 서버가 붙었을 때 값이 조금 달라도 화면이 그대로 동작한다.
+/// (여기에 없는 값이면 [DiaryGenerationStatus.unknown] 이 되고, 그때는 사진
+/// 유무로 판단한다 — [WalkDiary.isGenerating] 참고)
+const _diaryStatusMapping = <String, DiaryGenerationStatus>{
+  'PENDING': DiaryGenerationStatus.generating,
+  'PROCESSING': DiaryGenerationStatus.generating,
+  'GENERATING': DiaryGenerationStatus.generating,
+  'IN_PROGRESS': DiaryGenerationStatus.generating,
+  'RECEIVED': DiaryGenerationStatus.generating,
+  'COMPLETED': DiaryGenerationStatus.completed,
+  'DONE': DiaryGenerationStatus.completed,
+  'SUCCESS': DiaryGenerationStatus.completed,
+  'FAILED': DiaryGenerationStatus.failed,
+  'FAILURE': DiaryGenerationStatus.failed,
+  'ERROR': DiaryGenerationStatus.failed,
+  'TIMEOUT': DiaryGenerationStatus.failed,
+};
+
 class WalkDiaryModel extends WalkDiary {
   const WalkDiaryModel({
     required super.walkId,
@@ -13,6 +34,7 @@ class WalkDiaryModel extends WalkDiary {
     super.distanceMeters,
     super.route,
     super.photos,
+    super.status,
   });
 
   factory WalkDiaryModel.fromJson(Map<String, dynamic> json) {
@@ -31,6 +53,12 @@ class WalkDiaryModel extends WalkDiary {
       photos: Json.asMapList(json['photos'])
           .map((p) => WalkPhotoModel.fromJson(p, fallbackWalkId: walkId))
           .toList(growable: false),
+      // 필드 이름도 확정되지 않아 후보를 순서대로 본다.
+      status: Json.asEnum(
+        json['status'] ?? json['diaryStatus'] ?? json['generationStatus'],
+        _diaryStatusMapping,
+        DiaryGenerationStatus.unknown,
+      ),
     );
   }
 }

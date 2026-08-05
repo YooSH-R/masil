@@ -226,9 +226,19 @@ class _SplashScreenState extends State<SplashScreen>
                     )),
               ]),
             ),
-            // 안내 문구 (bottom:28) — 펄스
+            // 안내 문구 — 펄스
+            //
+            // 첫 번째와 두 번째 발자국 **사이**에 놓는다.
+            // 발자국은 산책로 레이어(bottom:0, height 250*sy)의 로컬 좌표로
+            // 찍히고 그 painter 는 ky = height/250 = sy 를 쓴다. 그래서 로컬 y 를
+            // 화면 하단 기준으로 바꾸면 (250 - y) * sy 다.
+            //   1번 발자국 y=196 → 54*sy
+            //   2번 발자국 y=142 → 108*sy
+            // 두 값의 중간이 81*sy 다. 발자국이 위아래로 각 20 단위쯤을 차지하니
+            // 이 위치면 양쪽 모두와 겹치지 않는다.
+            // 발자국 좌표(_PathPainter 의 paws)를 바꾸면 여기도 함께 고쳐야 한다.
             Positioned(
-              bottom: 28 * sy,
+              bottom: 81 * sy,
               left: 0,
               right: 0,
               child: AnimatedBuilder(
@@ -445,12 +455,20 @@ class _PathPainter extends CustomPainter {
       ..close();
     canvas.drawPath(path, Paint()..color = const Color(0xFFF3E3C6));
 
-    // 발자국: (x, y, rotationDeg, scale) — 2b 좌표
+    // 발자국: (x, y, rotationDeg, scale) — 2b 좌표. y 는 위로 갈수록 작아진다.
+    //
+    // 1번과 2번 사이에 안내 문구('탭하고 마실이 만나러 가기')가 들어가므로
+    // 그 간격을 넓혀 뒀다(34 → 54). 2번만 올리면 3번(120)과 붙어버려서
+    // 3·4번도 같이 밀어 간격을 비슷하게 유지한다.
+    //   이전: 196 / 162 / 120 / 84   (간격 34, 42, 36)
+    //   지금: 196 / 142 / 108 / 76   (간격 54, 34, 32)
+    // 문구 위치는 화면 쪽 Positioned(bottom) 이 잡는다. 여기를 바꾸면 그 값도
+    // 함께 확인해야 한다.
     const paws = [
       (148.0, 196.0, -14.0, .5),
-      (148.0, 162.0, 8.0, .46),
-      (176.0, 120.0, -6.0, .42),
-      (204.0, 84.0, 2.0, .38),
+      (148.0, 142.0, 8.0, .46),
+      (176.0, 108.0, -6.0, .42),
+      (204.0, 76.0, 2.0, .38),
     ];
     for (var i = 0; i < paws.length; i++) {
       final (x, y, deg, s) = paws[i];

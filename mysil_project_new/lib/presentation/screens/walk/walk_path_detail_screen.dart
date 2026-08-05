@@ -3,7 +3,10 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/services/sample_walk_diaries.dart';
+import '../../../domain/entities/walk_photo.dart';
+import '../../viewmodels/walk_diary_view_model.dart';
 import '../../viewmodels/walk_view_model.dart';
+import '../../widgets/walk_photo_image.dart';
 import '../../widgets/walk_route_map.dart';
 
 /// 지난 산책의 경로 상세. GET /walks/{walkId}/summary 의 route 를
@@ -26,7 +29,14 @@ class _WalkPathDetailScreenState extends State<WalkPathDetailScreen> {
       if (!mounted) return;
       final walkVm = context.read<WalkViewModel>();
       final id = widget.walkId ?? walkVm.currentWalk?.walkId;
-      if (id != null) walkVm.loadSummary(id);
+      if (id == null) return;
+
+      walkVm.loadSummary(id);
+      // 감성 사진은 산책일지 상세에 들어 있다. 7월 예시 기록은 서버에 없어서
+      // 조회하면 401 만 나므로 건너뛴다(아래에서 asset 그림을 쓴다).
+      if (!SampleWalkDiaries.isSampleId(id)) {
+        context.read<WalkDiaryViewModel>().loadDetail(id);
+      }
     });
   }
 
@@ -48,6 +58,13 @@ class _WalkPathDetailScreenState extends State<WalkPathDetailScreen> {
     final sampleImage = shownWalkId == null
         ? null
         : SampleWalkDiaries.imageAssetOf(shownWalkId);
+
+    // 서버가 만들어 준 감성 사진. 일지 상세가 **이 산책의 것일 때만** 쓴다.
+    // (다른 산책을 보다가 넘어온 경우 남아 있는 상세를 잘못 그리지 않게)
+    final detail = context.watch<WalkDiaryViewModel>().detail;
+    final photos = (detail != null && detail.walkId == shownWalkId)
+        ? detail.photos
+        : const <WalkPhoto>[];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F3E7),
@@ -79,7 +96,6 @@ class _WalkPathDetailScreenState extends State<WalkPathDetailScreen> {
                     child: WalkRouteMap(
                       points: route,
                       fitWholeRoute: true,
-                      showStartEndMarkers: true,
                     ),
                   ),
                   if (route.isEmpty)
@@ -152,45 +168,31 @@ class _WalkPathDetailScreenState extends State<WalkPathDetailScreen> {
               child: Text('이 산책의 감성 사진', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF5D4037))),
             ),
             const SizedBox(height: 8),
-            const Align(
+            Align(
               alignment: Alignment.centerLeft,
-              child: Text('산책 중 찍은 사진을 감성 스타일로 바꿔 보세요', style: TextStyle(color: Color(0xFF8D6E63))),
+              child: Text(
+                photos.isEmpty
+                    ? '산책이 끝나면 마실이가 찍은 장면으로 사진을 만들어요'
+                    : '마실이가 ${photos.length}장을 만들어 뒀어요. 골라서 저장해 보세요',
+                style: const TextStyle(color: Color(0xFF8D6E63)),
+              ),
             ),
             const SizedBox(height: 20),
-            
-            // Style Card
+
+            // 감성 사진 카드
             _buildWhiteCard(
               child: Column(
                 children: [
-                  Container(
-                    height: 180,
-                    width: double.infinity,
-                    clipBehavior: Clip.antiAlias,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFDF7F0),
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: const Color(0xFFF0E0D0)),
-                    ),
-                    // 7월 예시 기록은 asset 그림을 보여준다. 실제 기록은 서버가
-                    // GPT 처리한 사진을 내려주면 그때 연결한다(명세서 2.5).
-                    child: sampleImage == null
-                        ? const Center(
-                            child: Icon(Icons.image_outlined,
-                                size: 40, color: Color(0xFFD7CCC8)))
-                        : Image.asset(
-                            sampleImage,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Center(
-                                child: Icon(Icons.broken_image_outlined,
-                                    size: 40, color: Color(0xFFD7CCC8))),
-                          ),
-                  ),
+                  _buildPhotoStrip(photos, sampleImage),
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
                     height: 60,
                     child: ElevatedButton(
-                      onPressed: () => context.push('/walk/ai-photo'),
+                      // 어떤 산책의 사진인지 함께 넘긴다. 안 넘기면 고르기 화면이
+                      // 엉뚱한(또는 비어 있는) 일지를 보게 된다.
+                      onPressed: () =>
+                          context.push('/walk/ai-photo', extra: shownWalkId),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFC67C4E),
                         foregroundColor: Colors.white,
@@ -215,6 +217,74 @@ class _WalkPathDetailScreenState extends State<WalkPathDetailScreen> {
       ),
     );
   }
+
+  /// 감성 사진 미리보기.
+  ///
+  /// 서버 사진이 여러 장 오므로 옆으로 넘겨 보는 줄로 그린다. 몇 장이 오든
+  /// 늘어나고, 한 장만 와도 어색하지 않다.
+  ///
+  /// 7월 예시 기록([sampleImage])은 서버에 없어서 asset 그림 한 장을 쓴다.
+  /// 둘 다 없으면 빈 자리 안내를 보여준다.
+  Widget _buildPhotoStrip(List<WalkPhoto> photos, String? sampleImage) {
+    const height = 180.0;
+
+    if (photos.isEmpty) {
+      return Container(
+        height: height,
+        width: double.infinity,
+        clipBehavior: Clip.antiAlias,
+        decoration: _photoBoxDecoration,
+        child: sampleImage == null
+            ? const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.auto_awesome, size: 36, color: Color(0xFFD7CCC8)),
+                    SizedBox(height: 10),
+                    Text('아직 사진이 없어요',
+                        style: TextStyle(
+                            fontSize: 13, color: Color(0xFF8D6E63))),
+                  ],
+                ),
+              )
+            : Image.asset(
+                sampleImage,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Center(
+                    child: Icon(Icons.broken_image_outlined,
+                        size: 40, color: Color(0xFFD7CCC8))),
+              ),
+      );
+    }
+
+    return SizedBox(
+      height: height,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: photos.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final photo = photos[index];
+          return GestureDetector(
+            // 사진을 눌러도 고르기 화면으로 간다. 거기서 저장할 수 있다.
+            onTap: () => context.push('/walk/ai-photo', extra: photo.walkId),
+            child: Container(
+              width: 150,
+              clipBehavior: Clip.antiAlias,
+              decoration: _photoBoxDecoration,
+              child: WalkPhotoImage(photo: photo),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  static final BoxDecoration _photoBoxDecoration = BoxDecoration(
+    color: const Color(0xFFFDF7F0),
+    borderRadius: BorderRadius.circular(15),
+    border: Border.all(color: const Color(0xFFF0E0D0)),
+  );
 
   /// 1km 당 분'초". 거리·시간이 없으면 --'--".
   static String _paceLabel(int meters, int seconds) {
