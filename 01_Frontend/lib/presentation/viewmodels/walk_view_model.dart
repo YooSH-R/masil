@@ -37,6 +37,10 @@ class WalkViewModel extends BaseViewModel {
   final Set<int> _seenSequences = {};
   StreamSubscription<WalkLocationPoint>? _routeSub;
 
+  /// 서버 산책 API가 없어도 사용자가 시작 버튼을 누른 뒤 종료할 때까지 유지되는
+  /// 로컬 산책 상태. GPS 권한 문제로 스트림이 닫혀도 산책 중 표시는 유지한다.
+  bool _localWalkActive = false;
+
   /// 화면에 흐르는 경과 시간. 1초마다 갱신된다.
   Timer? _elapsedTimer;
   DateTime? _trackingStartedAt;
@@ -65,16 +69,16 @@ class WalkViewModel extends BaseViewModel {
 
   /// 좌표를 저장할지 판단하는 기준. 명세서 2.4 "배치 처리 속도" 개정판이다.
   ///
-  ///   일반 산책: 측정 5초 간격 / 최소 이동거리 5m
+  ///   일반 산책: 측정 1초 간격 / 최소 이동거리 1m
   ///   accuracy 가 30~50m 보다 큰 부정확한 좌표는 제외
   ///
-  /// **측정 간격(5초)은 좌표를 만들어 보내는 쪽([WalkRouteSource])이 지킨다.**
+  /// **측정 간격(1초)은 좌표를 만들어 보내는 쪽([WalkRouteSource])이 지킨다.**
   /// 여기서는 이미 들어온 좌표를 "저장할지" 만 판단한다. 측정 주기와 서버 전송
-  /// 주기는 명세서대로 별개다(5초 측정 / 30초 전송).
+  /// 주기는 서로 별개다(1초 측정 / 30초 전송).
   ///
-  /// 보행 속도 1.2~1.5m/s 면 5초에 6~8m 를 움직이므로 걷는 동안에는 대부분
-  /// 통과하고, 제자리에 서 있을 때 찍히는 GPS 흔들림만 걸러진다.
-  static const double _minMoveMeters = 5;
+  /// 보행 속도 1.2~1.5m/s에서 매초 경로가 갱신되게 1m로 둔다.
+  /// OS에는 거리 제한 없이 요청하되 저장 단계에서 작은 GPS 흔들림은 거른다.
+  static const double _minMoveMeters = 1;
 
   /// 이보다 부정확한 좌표는 버린다. 명세서의 30~50m 구간에서 느슨한 쪽을 잡았다.
   /// 시연은 실외 안드로이드 휴대폰이라 보통 5~20m 로 들어오지만, 건물 사이나
@@ -114,7 +118,8 @@ class WalkViewModel extends BaseViewModel {
   Walk? get currentWalk => _currentWalk;
   WalkSummary? get summary => _summary;
   bool get hasProposal => _proposal != null && !_proposal!.isExpired;
-  bool get isWalking => _currentWalk?.status == WalkStatus.active;
+  bool get isWalking =>
+      _localWalkActive || _currentWalk?.status == WalkStatus.active;
   int get pendingPointCount => _pendingPoints.length;
 
   /// 지금 서버로 좌표를 보내는 중인지.
@@ -168,10 +173,17 @@ class WalkViewModel extends BaseViewModel {
     // null 이라고 추적을 막으면 화면이 0:00 에서 멈춰버리므로 그대로 넘긴다.
     // 판단은 소스 구현이 한다.
     final id = walkId ?? _currentWalk?.walkId;
-    if (source == null || _routeSub != null) return;
+    if (_routeSub != null) return;
 
-    _trackingStartedAt = DateTime.now();
-    _elapsed = Duration.zero;
+    // 종료한 산책의 경로는 요약 화면에서 쓸 수 있게 남겨 두고, 다음 산책이
+    // 실제로 시작되는 이 시점에 비운다. 화면을 잠깐 나갔다 돌아온 경우에는
+    // _localWalkActive가 true라서 현재 산책 경로가 그대로 이어진다.
+    if (!_localWalkActive) {
+      _resetPoints();
+      _localWalkActive = true;
+    }
+
+    _trackingStartedAt ??= DateTime.now();
 
     _elapsedTimer?.cancel();
     _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -185,6 +197,11 @@ class WalkViewModel extends BaseViewModel {
     // 산책 세션(walkId)이 없으면 flushLocations 내부에서 그냥 넘어간다.
     _uploadTimer?.cancel();
     _uploadTimer = Timer.periodic(_uploadInterval, (_) => flushLocations());
+
+    if (source == null) {
+      safeNotify();
+      return;
+    }
 
     _routeSub = source.points(id).listen(
       _onPointReceived,
@@ -286,7 +303,7 @@ class WalkViewModel extends BaseViewModel {
       lng2: point.longitude,
     );
     if (moved < _minMoveMeters) {
-      _lastRejectReason = '이동 ${moved.round()}m (5m 이상 필요)';
+      _lastRejectReason = '이동 ${moved.toStringAsFixed(1)}m (1m 이상 필요)';
       return false;
     }
 
@@ -323,7 +340,8 @@ class WalkViewModel extends BaseViewModel {
 
   /// POST /walk-proposals/{proposalId}/responses — 수락
   /// 수락 후 곧바로 POST /walks 로 세션을 만든다(명세서 6.2 → 6.3).
-  Future<Walk?> acceptProposal({required int petId, required int robotId}) async {
+  Future<Walk?> acceptProposal(
+      {required int petId, required int robotId}) async {
     final proposal = _proposal;
     if (proposal == null) return null;
 
@@ -440,13 +458,17 @@ class WalkViewModel extends BaseViewModel {
     // 서버 기록이 생기면 그쪽이 우선되고 이건 캐시로 남는다.
     await _saveLocalRecord();
 
+    _localWalkActive = false;
+    safeNotify();
+
     final walkId = _currentWalk?.walkId;
     if (walkId == null) return;
 
     // 좌표가 아직 남아 있으면(전송 실패) 한 번 더 시도한다.
     if (_pendingPoints.isNotEmpty) await flushLocations();
 
-    final walk = await guard(() => _walkRepository.endWalk(walkId), silent: true);
+    final walk =
+        await guard(() => _walkRepository.endWalk(walkId), silent: true);
     if (walk == null) return;
 
     _currentWalk = walk;
@@ -461,8 +483,8 @@ class WalkViewModel extends BaseViewModel {
   Future<void> _saveLocalRecord() async {
     if (_routePoints.length < 2) return;
 
-    final startedAt = _trackingStartedAt ??
-        _routePoints.first.recordedAt.toLocal();
+    final startedAt =
+        _trackingStartedAt ?? _routePoints.first.recordedAt.toLocal();
 
     _lastSavedRecordId = await _recordStore.save(
       startedAt: startedAt,
@@ -561,6 +583,8 @@ class WalkViewModel extends BaseViewModel {
     _sequence = 0;
     _elapsed = Duration.zero;
     _trackingStartedAt = null;
+    _receivedCount = 0;
+    _lastRejectReason = null;
   }
 
   @override

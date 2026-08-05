@@ -9,6 +9,7 @@ import com.ssafy.backend.pet.infrastructure.persistence.PetRobotStatusProjection
 import com.ssafy.backend.pet.infrastructure.persistence.SpringDataPetCreationRequestRepository;
 import com.ssafy.backend.pet.infrastructure.persistence.SpringDataPetRepository;
 import com.ssafy.backend.user.infrastructure.persistence.SpringDataUserRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,17 +26,22 @@ public class PetService {
     private final SpringDataPetCreationRequestRepository creationRequestRepository;
     private final SpringDataUserRepository userRepository;
     private final PetCreationTransactionService creationTransactionService;
+    private final Long localTestPetId;
 
     public PetService(
             SpringDataPetRepository petRepository,
             SpringDataPetCreationRequestRepository creationRequestRepository,
             SpringDataUserRepository userRepository,
-            PetCreationTransactionService creationTransactionService
+            PetCreationTransactionService creationTransactionService,
+            @Value("${pet.local-test-pet-id:}") String localTestPetId
     ) {
         this.petRepository = petRepository;
         this.creationRequestRepository = creationRequestRepository;
         this.userRepository = userRepository;
         this.creationTransactionService = creationTransactionService;
+        this.localTestPetId = localTestPetId.isBlank()
+                ? null
+                : Long.valueOf(localTestPetId);
     }
 
     public PetCreatedResult create(
@@ -82,7 +88,20 @@ public class PetService {
 
     @Transactional(readOnly = true)
     public PetProfileResult getProfile(Long userId, Long petId) {
-        return toProfileResult(findOwnedPet(petId, userId));
+        PetJpaEntity pet = petRepository
+                .findOwnedWithAffinity(petId, userId)
+                .orElseGet(this::findLocalTestPet);
+        return toProfileResult(pet);
+    }
+
+    private PetJpaEntity findLocalTestPet() {
+        if (localTestPetId == null) {
+            throw new BusinessException(ErrorCode.PET_NOT_FOUND);
+        }
+        return petRepository.findById(localTestPetId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.PET_NOT_FOUND
+                ));
     }
 
     @Transactional

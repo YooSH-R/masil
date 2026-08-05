@@ -274,18 +274,6 @@ CREATE INDEX idx_walks_pairing_completed_ended
 CREATE INDEX idx_walks_pairing_lookup
     ON walks (robot_pairing_id, id);
 
-CREATE TABLE walk_diaries (
-    walk_id BIGINT PRIMARY KEY REFERENCES walks(id) ON DELETE CASCADE,
-    walk_date DATE NOT NULL,
-    session_no INTEGER NOT NULL,
-    object_prefix VARCHAR(500) NOT NULL UNIQUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT walk_diaries_session_check CHECK (session_no > 0)
-);
-
-CREATE INDEX idx_walk_diaries_feed_order
-    ON walk_diaries (walk_date DESC, session_no ASC, walk_id ASC);
-
 CREATE TABLE robot_photos (
     id UUID PRIMARY KEY,
     robot_id BIGINT NOT NULL REFERENCES robots(id),

@@ -6,7 +6,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Pattern;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -33,14 +33,21 @@ public class WalkDiaryController {
 
     @Operation(summary = "산책일지 상세 조회")
     @SecurityRequirement(name = "bearerAuth")
-    @GetMapping("/walks/{walkId}/diary")
+    @GetMapping("/walk-diaries/{deviceId}/{walkDate}/{session}")
     public ApiResponse<WalkDiaryService.DiaryDetail> getDiary(
             @AuthenticationPrincipal UserPrincipal principal,
-            @PathVariable @Positive long walkId
+            @PathVariable
+            @Pattern(regexp = "[A-Za-z0-9_-]{1,100}") String deviceId,
+            @PathVariable
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate walkDate,
+            @PathVariable @Min(1) @Max(6) int session
     ) {
         return ApiResponse.success(service.getDiary(
                 principal.userId(),
-                walkId
+                deviceId,
+                walkDate,
+                session
         ));
     }
 

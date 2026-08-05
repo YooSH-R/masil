@@ -38,9 +38,11 @@ class ApiEndpoints {
   static String robotPairing(int robotId) => '/robots/$robotId/pairing';
 
   // 2.3 교감·친밀도
-  static String robotInteractions(int robotId) => '/robots/$robotId/interactions';
+  static String robotInteractions(int robotId) =>
+      '/robots/$robotId/interactions';
   static String petAffinity(int petId) => '/pets/$petId/affinity';
-  static String petAffinityHistory(int petId) => '/pets/$petId/affinity/history';
+  static String petAffinityHistory(int petId) =>
+      '/pets/$petId/affinity/history';
 
   // 2.4 산책
   static const String currentWalkProposal = '/walk-proposals/current';
@@ -49,13 +51,15 @@ class ApiEndpoints {
   static const String walks = '/walks';
   static String walk(int walkId) => '/walks/$walkId';
   static String walkStart(int walkId) => '/walks/$walkId/start';
-  static String walkLocationsBatch(int walkId) => '/walks/$walkId/locations/batch';
+  static String walkLocationsBatch(int walkId) =>
+      '/walks/$walkId/locations/batch';
   static String walkEnd(int walkId) => '/walks/$walkId/end';
   static String walkSummary(int walkId) => '/walks/$walkId/summary';
 
   // 2.5 사진·GPT 처리
   static String walkPhotos(int walkId) => '/walks/$walkId/photos';
-  static String walkPhoto(int walkId, int photoId) => '/walks/$walkId/photos/$photoId';
+  static String walkPhoto(int walkId, int photoId) =>
+      '/walks/$walkId/photos/$photoId';
   static String photoContent(int photoId) => '/photos/$photoId/content';
   static String walkPhotoRetry(int walkId, int photoId) =>
       '/walks/$walkId/photos/$photoId/retry';
@@ -63,6 +67,8 @@ class ApiEndpoints {
   // 2.6 산책일지·알림
   static String walkDiary(int walkId) => '/walks/$walkId/diary';
   static const String walkDiaries = '/walk-diaries';
+  static String s3WalkDiary(String deviceId, String walkDate, int session) =>
+      '/walk-diaries/${Uri.encodeComponent(deviceId)}/$walkDate/$session';
   static String pushToken(String deviceId) => '/users/me/push-tokens/$deviceId';
   static const String notifications = '/notifications';
 }

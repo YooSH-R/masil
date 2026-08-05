@@ -63,7 +63,17 @@ class _WalkRouteMapState extends State<WalkRouteMap> {
   Future<void> _sync() async {
     final controller = _controller;
     final points = widget.points;
-    if (controller == null || points.isEmpty || !mounted) return;
+    if (controller == null || !mounted) return;
+
+    // 새 산책이 시작되어 points가 비면 WebView 안에 남아 있는 이전 산책의
+    // 폴리라인과 마커도 직접 지운다. Flutter 위젯만 갱신해서는 지도 오버레이가
+    // 자동으로 없어지지 않는다.
+    if (points.isEmpty) {
+      _drawnCount = 0;
+      controller.clearPolyline(polylineIds: const [_routeId]);
+      controller.clearMarker(markerIds: const [_startId, _endId]);
+      return;
+    }
 
     _drawnCount = points.length;
     final path = points
@@ -143,8 +153,8 @@ class _WalkRouteMapState extends State<WalkRouteMap> {
   static MarkerIcon? _cachedStart;
   static MarkerIcon? _cachedEnd;
 
-  Future<MarkerIcon> _startIcon() async =>
-      _cachedStart ??= await MarkerIcon.fromAsset('assets/images/pin_start.png');
+  Future<MarkerIcon> _startIcon() async => _cachedStart ??=
+      await MarkerIcon.fromAsset('assets/images/pin_start.png');
 
   Future<MarkerIcon> _endIcon() async =>
       _cachedEnd ??= await MarkerIcon.fromAsset('assets/images/pin_end.png');

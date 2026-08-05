@@ -132,7 +132,8 @@ class WalkDiaryViewModel extends BaseViewModel {
 
   /// [anchor] 가 속한 달의 집계.
   WalkStats statsForMonth(DateTime anchor) {
-    return _aggregate((at) => at.year == anchor.year && at.month == anchor.month);
+    return _aggregate(
+        (at) => at.year == anchor.year && at.month == anchor.month);
   }
 
   WalkStats _aggregate(bool Function(DateTime walkedAt) inRange) {
@@ -146,8 +147,7 @@ class WalkDiaryViewModel extends BaseViewModel {
       meters += item.distanceMeters ?? 0;
       seconds += item.durationSeconds ?? 0;
     }
-    return WalkStats(
-        count: count, totalMeters: meters, totalSeconds: seconds);
+    return WalkStats(count: count, totalMeters: meters, totalSeconds: seconds);
   }
 
   /// 날짜를 선택했을 때: 상세(경로 포함)를 불러오고 첫 좌표로 장소명을 구한다.
@@ -196,6 +196,36 @@ class WalkDiaryViewModel extends BaseViewModel {
       longitude: route.first.longitude,
     );
     _placeNames[walkId] = name;
+    safeNotify();
+  }
+
+  /// 피드에서 날짜를 선택했을 때 출처에 맞는 상세를 불러온다.
+  ///
+  /// S3 일지는 walkId가 없으므로 deviceId/date/session 조합을 사용한다.
+  /// 상세 응답의 Presigned URL과 Markdown을 피드 항목에 합쳐 기존 화면이
+  /// 그대로 이미지와 본문을 표시할 수 있게 한다.
+  Future<void> selectFeedItem(WalkDiaryFeedItem item) async {
+    if (!item.isS3Diary) {
+      await selectWalk(item.walkId);
+      return;
+    }
+
+    final content = await guard(
+      () => _diaryRepository.getS3Diary(
+        deviceId: item.deviceId!,
+        walkDate: item.walkedAt!,
+        session: item.session!,
+      ),
+    );
+    if (content == null) return;
+
+    final index = _feed.indexWhere((entry) => entry.walkId == item.walkId);
+    if (index == -1) return;
+    _feed[index] = _feed[index].copyWith(
+      thumbnailUrl: content.imageUrl,
+      summary: content.markdown,
+    );
+    _placeNames[item.walkId] = null;
     safeNotify();
   }
 
