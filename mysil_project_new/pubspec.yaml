@@ -1,7 +1,12 @@
 name: mysil_project_new
 description: A new Flutter project.
 publish_to: 'none'
-version: 1.0.0+1
+# version 뒤의 `+N` 이 안드로이드 versionCode 다.
+#
+# **APK 를 새로 뽑을 때마다 이 숫자를 올려야 한다.** 같은 값이면 설치 관리자가
+# 업데이트로 보지 않아서, 시연자가 앱을 지우고 다시 깔아야 한다.
+# (버전은 마이페이지 맨 아래에 표시되니 설치 후 확인할 수 있다)
+version: 1.0.1+2
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -23,6 +28,19 @@ dependencies:
   google_fonts: ^8.2.0
   kakao_map_plugin: ^0.4.0
   mobile_scanner: ^7.4.0
+  # 감성 사진을 시연 기기 갤러리에 저장한다(산책일지에서 마음에 드는 사진 고르기).
+  # image_gallery_saver 는 관리가 멈춰서 MediaStore 기반인 gal 을 쓴다.
+  gal: ^2.3.3
+  # 프로필 사진 등록(회원·펫). 갤러리에서 고르거나 카메라로 찍는다.
+  image_picker: ^1.2.3
+  # 고른 사진을 앱 전용 폴더에 복사해 둔다. image_picker 가 주는 경로는 캐시
+  # 폴더라서 OS 가 언제든 지울 수 있다.
+  path_provider: ^2.1.6
+  # 산책 경로를 휴대폰 자체 GPS 로 기록한다(DeviceGpsWalkRouteSource).
+  geolocator: ^14.0.2
+  # 앱에 버전을 표시한다. 시연 중 APK 를 여러 번 교체하는데, 화면에서 버전을
+  # 볼 수 없으면 업데이트가 됐는지 확인할 방법이 없다.
+  package_info_plus: ^9.0.1
 
 # kakao_map_plugin 0.4.0 은 자기 compileSdk 를 35 로 고정해 두었는데,
 # webview_flutter_android 4.11+ 는 의존하는 쪽에 compileSdk 36 이상을 요구한다.

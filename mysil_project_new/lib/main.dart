@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import 'core/config/map_config.dart';
 import 'core/network/dio_client.dart';
 import 'core/services/place_name_resolver.dart';
-import 'core/services/walk_route_source.dart';
+import 'core/services/device_gps_walk_route_source.dart';
 import 'core/storage/session_cache.dart';
 import 'core/storage/token_storage.dart';
 import 'core/utils/router.dart';
@@ -19,6 +19,7 @@ import 'data/repositories/walk_repository_impl.dart';
 import 'presentation/viewmodels/auth_view_model.dart';
 import 'presentation/viewmodels/notification_view_model.dart';
 import 'presentation/viewmodels/pet_view_model.dart';
+import 'presentation/viewmodels/profile_image_view_model.dart';
 import 'presentation/viewmodels/robot_view_model.dart';
 import 'presentation/viewmodels/walk_diary_view_model.dart';
 import 'presentation/viewmodels/walk_photo_view_model.dart';
@@ -82,13 +83,15 @@ void main() {
         ChangeNotifierProvider(create: (_) => PetViewModel(petRepository)),
         ChangeNotifierProvider(create: (_) => RobotViewModel(robotRepository)),
         // routeSource: 산책 중 이동경로가 들어오는 입구.
-        // 백엔드가 마실이 디바이스의 GPS 푸시를 붙이면, WalkRouteSource 를
-        // 구현한 클래스(예: MqttWalkRouteSource)로 이 한 줄만 바꾸면 된다.
-        // 화면·폴리라인·시간 표시는 그대로 동작한다.
+        //
+        // **휴대폰 자체 GPS** 를 쓴다. 거리·평균 페이스·발자국이 모두 사용자가
+        // 실제로 걸은 값이 된다. 마실이 기기의 GPS 푸시로 바꾸려면 이 한 줄만
+        // 다른 WalkRouteSource 구현으로 교체하면 되고, 화면·폴리라인·시간
+        // 표시는 그대로 동작한다. (테스트용 고정 경로는 MockWalkRouteSource)
         ChangeNotifierProvider(
           create: (_) => WalkViewModel(
             walkRepository,
-            routeSource: MockWalkRouteSource(),
+            routeSource: DeviceGpsWalkRouteSource(),
           ),
         ),
         ChangeNotifierProvider(
@@ -101,6 +104,9 @@ void main() {
         ChangeNotifierProvider(
           create: (_) => NotificationViewModel(notificationRepository),
         ),
+        // 프로필 사진(회원·펫). 등록하는 화면과 보여주는 화면이 달라서, 한곳에서
+        // 들고 있어야 한쪽에서 바꾼 사진이 다른 쪽에도 바로 반영된다.
+        ChangeNotifierProvider(create: (_) => ProfileImageViewModel()),
       ],
       child: const MysilApp(),
     ),
