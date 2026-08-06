@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/utils/korea_time.dart';
 import '../../viewmodels/walk_diary_view_model.dart';
 
 /// 산책 리포트. 일/주/월 집계와 요일별 거리를 보여준다.
@@ -36,7 +37,7 @@ class _WalkDashboardScreenState extends State<WalkDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final diaryVm = context.watch<WalkDiaryViewModel>();
-    final now = DateTime.now();
+    final now = KoreaTime.now();
 
     final stats = switch (_selectedTab) {
       0 => diaryVm.statsForDay(now),
@@ -57,7 +58,9 @@ class _WalkDashboardScreenState extends State<WalkDashboardScreen> {
           icon: const Icon(Icons.chevron_left, color: Color(0xFF5D4037)),
           onPressed: () => context.pop(),
         ),
-        title: const Text('산책 리포트', style: TextStyle(color: Color(0xFF5D4037), fontWeight: FontWeight.bold)),
+        title: const Text('산책 리포트',
+            style: TextStyle(
+                color: Color(0xFF5D4037), fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
@@ -68,7 +71,9 @@ class _WalkDashboardScreenState extends State<WalkDashboardScreen> {
             Container(
               height: 60,
               padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(color: const Color(0xFFEFE5D8), borderRadius: BorderRadius.circular(20)),
+              decoration: BoxDecoration(
+                  color: const Color(0xFFEFE5D8),
+                  borderRadius: BorderRadius.circular(20)),
               child: Row(
                 children: [
                   _buildTabItem(0, '일'),
@@ -78,7 +83,7 @@ class _WalkDashboardScreenState extends State<WalkDashboardScreen> {
               ),
             ),
             const SizedBox(height: 32),
-            
+
             // Stats Grid — 선택한 기간의 실제 집계
             Row(
               children: [
@@ -97,90 +102,105 @@ class _WalkDashboardScreenState extends State<WalkDashboardScreen> {
             if (stats.count == 0)
               const _NoRecordNotice()
             else ...[
-            // Bar Chart Section
-            _buildWhiteCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('요일별 거리', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF5D4037))),
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    height: 180,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        // 가장 많이 걸은 요일을 100% 로 두고 나머지를 비례로 그린다.
-                        // 절대 기준이 없으면 하루만 걸었을 때 막대가 안 보인다.
-                        for (var i = 0; i < 7; i++)
-                          _buildBar(
-                            _weekdayLabels[i],
-                            _barRatio(weekMeters, i),
-                          ),
-                      ],
+              // Bar Chart Section
+              _buildWhiteCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('요일별 거리',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Color(0xFF5D4037))),
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      height: 180,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          // 가장 많이 걸은 요일을 100% 로 두고 나머지를 비례로 그린다.
+                          // 절대 기준이 없으면 하루만 걸었을 때 막대가 안 보인다.
+                          for (var i = 0; i < 7; i++)
+                            _buildBar(
+                              _weekdayLabels[i],
+                              _barRatio(weekMeters, i),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            
-            // Goal Progress
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(25)),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('이번 주 목표', style: TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        RichText(
-                          text: TextSpan(
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF5D4037)),
-                            children: [
-                              TextSpan(
-                                  text:
-                                      '${(WalkDashboardScreen.weeklyGoalMeters / 1000).toStringAsFixed(0)}km 중 '),
-                              TextSpan(
-                                  text:
-                                      '${(weekStats.totalMeters / 1000).toStringAsFixed(1)}km 달성 ',
-                                  style: const TextStyle(color: Color(0xFFC67C4E))),
-                              const TextSpan(text: '👏'),
-                            ],
+              const SizedBox(height: 16),
+
+              // Goal Progress
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(25)),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('이번 주 목표',
+                              style: TextStyle(
+                                  color: Color(0xFF2E7D32),
+                                  fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          RichText(
+                            text: TextSpan(
+                              style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF5D4037)),
+                              children: [
+                                TextSpan(
+                                    text:
+                                        '${(WalkDashboardScreen.weeklyGoalMeters / 1000).toStringAsFixed(0)}km 중 '),
+                                TextSpan(
+                                    text:
+                                        '${(weekStats.totalMeters / 1000).toStringAsFixed(1)}km 달성 ',
+                                    style: const TextStyle(
+                                        color: Color(0xFFC67C4E))),
+                                const TextSpan(text: '👏'),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  SizedBox(
-                    width: 70,
-                    height: 70,
-                    child: Stack(
-                      children: [
-                        Center(
-                          child: CircularProgressIndicator(
-                            value: _goalRatio(weekStats.totalMeters),
-                            strokeWidth: 8,
-                            backgroundColor: Colors.white,
-                            valueColor: AlwaysStoppedAnimation<Color>(const Color(0xFF558B2F).withValues(alpha: 0.6)),
+                    SizedBox(
+                      width: 70,
+                      height: 70,
+                      child: Stack(
+                        children: [
+                          Center(
+                            child: CircularProgressIndicator(
+                              value: _goalRatio(weekStats.totalMeters),
+                              strokeWidth: 8,
+                              backgroundColor: Colors.white,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                  const Color(0xFF558B2F)
+                                      .withValues(alpha: 0.6)),
+                            ),
                           ),
-                        ),
-                        Center(
-                            child: Text(
-                                '${(_goalRatio(weekStats.totalMeters) * 100).round()}%',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF2E7D32)))),
-                      ],
+                          Center(
+                              child: Text(
+                                  '${(_goalRatio(weekStats.totalMeters) * 100).round()}%',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF2E7D32)))),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
             ],
 
             const SizedBox(height: 32),
@@ -194,7 +214,8 @@ class _WalkDashboardScreenState extends State<WalkDashboardScreen> {
                   Expanded(
                     child: Text(
                       '기간에 기록이 없으면 "아직 산책 기록이 없어요"를 표시하고, 비정상 GPS 값은 집계에서 자동 제외해요.',
-                      style: TextStyle(color: Colors.grey, fontSize: 11, height: 1.4),
+                      style: TextStyle(
+                          color: Colors.grey, fontSize: 11, height: 1.4),
                     ),
                   ),
                 ],
@@ -207,7 +228,15 @@ class _WalkDashboardScreenState extends State<WalkDashboardScreen> {
     );
   }
 
-  static const List<String> _weekdayLabels = ['월', '화', '수', '목', '금', '토', '일'];
+  static const List<String> _weekdayLabels = [
+    '월',
+    '화',
+    '수',
+    '목',
+    '금',
+    '토',
+    '일'
+  ];
 
   /// `3:20` 형태. 1시간 미만이면 `0:45`.
   static String _hourMinute(int totalSeconds) {
@@ -241,7 +270,10 @@ class _WalkDashboardScreenState extends State<WalkDashboardScreen> {
           child: Center(
             child: Text(
               label,
-              style: TextStyle(color: isSelected ? Colors.white : Colors.grey, fontWeight: FontWeight.bold, fontSize: 16),
+              style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.grey,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16),
             ),
           ),
         ),
@@ -253,12 +285,18 @@ class _WalkDashboardScreenState extends State<WalkDashboardScreen> {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 20),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+        decoration: BoxDecoration(
+            color: Colors.white, borderRadius: BorderRadius.circular(20)),
         child: Column(
           children: [
-            Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF5D4037))),
+            Text(value,
+                style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF5D4037))),
             const SizedBox(height: 4),
-            Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+            Text(label,
+                style: const TextStyle(color: Colors.grey, fontSize: 12)),
           ],
         ),
       ),
@@ -274,14 +312,18 @@ class _WalkDashboardScreenState extends State<WalkDashboardScreen> {
             child: Container(
               width: 35,
               decoration: BoxDecoration(
-                color: heightFactor > 0.8 ? const Color(0xFFC67C4E) : const Color(0xFFEFE5D8),
+                color: heightFactor > 0.8
+                    ? const Color(0xFFC67C4E)
+                    : const Color(0xFFEFE5D8),
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
           ),
         ),
         const SizedBox(height: 12),
-        Text(day, style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
+        Text(day,
+            style: const TextStyle(
+                color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
       ],
     );
   }
@@ -290,7 +332,8 @@ class _WalkDashboardScreenState extends State<WalkDashboardScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(25)),
+      decoration: BoxDecoration(
+          color: Colors.white, borderRadius: BorderRadius.circular(25)),
       child: child,
     );
   }
@@ -329,8 +372,8 @@ class _NoRecordNotice extends StatelessWidget {
           const Text(
             '마실이와 한 바퀴 다녀오면\n여기에 기록이 쌓여요',
             textAlign: TextAlign.center,
-            style: TextStyle(
-                color: Color(0xFF8D6E63), fontSize: 14, height: 1.5),
+            style:
+                TextStyle(color: Color(0xFF8D6E63), fontSize: 14, height: 1.5),
           ),
         ],
       ),

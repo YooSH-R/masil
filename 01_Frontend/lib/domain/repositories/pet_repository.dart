@@ -8,9 +8,8 @@ abstract class PetRepository {
 
   /// 이 앱이 아는 펫 전부.
   ///
-  /// 서버에 `GET /pets` 가 없어서, 만들 때 저장해 둔 id 를 하나씩
-  /// `GET /pets/{petId}` 로 조회해 모은다. 이미 삭제된 펫(404)은 목록에서
-  /// 빼고 건너뛴다.
+  /// `GET /pets`로 로그인 사용자의 실제 펫을 조회한다. 구버전 서버에서는
+  /// 만들 때 저장해 둔 id를 하나씩 조회하는 방식으로 호환한다.
   Future<List<Pet>> getPets();
 
   /// GET /pets/{petId} — 펫 프로필 조회
@@ -34,7 +33,7 @@ abstract class PetRepository {
   /// GET /pets/{petId}/affinity/history — 친밀도 변화 이력
   Future<List<AffinityHistoryEntry>> getAffinityHistory(int petId, {int? limit});
 
-  /// 마지막으로 사용한 펫. 목록 조회 API가 없어 로컬 캐시의 petId로 조회한다.
+  /// 마지막으로 사용한 펫. 캐시가 없으면 서버의 내 펫 목록에서 복구한다.
   Future<Pet?> getCurrentPet();
 
   /// 이후 화면에서 쓸 기준 펫 지정.

@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.List;
 
 @Service
 public class PetService {
@@ -92,6 +93,13 @@ public class PetService {
                 .findOwnedWithAffinity(petId, userId)
                 .orElseGet(this::findLocalTestPet);
         return toProfileResult(pet);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PetProfileResult> getProfiles(Long userId) {
+        return petRepository.findAllOwnedWithAffinity(userId).stream()
+                .map(this::toProfileResult)
+                .toList();
     }
 
     private PetJpaEntity findLocalTestPet() {

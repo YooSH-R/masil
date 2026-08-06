@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/entities/walk.dart';
 import '../../domain/entities/walk_diary.dart';
 import '../utils/geo.dart';
+import '../utils/korea_time.dart';
 
 /// 끝낸 산책을 **이 기기에** 보관한다.
 ///
@@ -114,7 +115,7 @@ class WalkRecordStore {
       for (final r in await readAll())
         WalkDiaryFeedItem(
           walkId: r.walkId,
-          walkedAt: r.startedAt,
+          walkedAt: KoreaTime.fromNullableInstant(r.startedAt),
           durationSeconds: r.durationSeconds,
           distanceMeters: r.distanceMeters,
         ),

@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface SpringDataPetRepository extends JpaRepository<PetJpaEntity, Long> {
@@ -23,6 +24,18 @@ public interface SpringDataPetRepository extends JpaRepository<PetJpaEntity, Lon
             """)
     Optional<PetJpaEntity> findOwnedWithAffinity(
             @Param("petId") Long petId,
+            @Param("userId") Long userId
+    );
+
+    @Query("""
+            select pet
+            from PetJpaEntity pet
+            left join fetch pet.affinityState
+            where pet.userId = :userId
+              and pet.deletedAt is null
+            order by pet.id
+            """)
+    List<PetJpaEntity> findAllOwnedWithAffinity(
             @Param("userId") Long userId
     );
 

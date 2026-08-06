@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
+import java.util.List;
 
 @Validated
 @RestController
@@ -78,6 +79,19 @@ public class PetController {
         return ApiResponse.success(PetProfileResponse.from(
                 petService.getProfile(principal.userId(), petId)
         ));
+    }
+
+    @Operation(summary = "내 펫 목록 조회")
+    @SecurityRequirement(name = "bearerAuth")
+    @GetMapping
+    public ApiResponse<List<PetProfileResponse>> getProfiles(
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        return ApiResponse.success(
+                petService.getProfiles(principal.userId()).stream()
+                        .map(PetProfileResponse::from)
+                        .toList()
+        );
     }
 
     @Operation(summary = "펫 정보 수정")

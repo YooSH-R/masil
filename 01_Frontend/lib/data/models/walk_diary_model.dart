@@ -1,4 +1,5 @@
 import '../../core/utils/json_parse.dart';
+import '../../core/utils/korea_time.dart';
 import '../../domain/entities/walk_diary.dart';
 import 'walk_model.dart';
 import 'walk_photo_model.dart';
@@ -44,7 +45,9 @@ class WalkDiaryModel extends WalkDiary {
       walkId: walkId,
       petId: pet == null ? null : Json.asIntOrNull(pet['petId']),
       petName: pet == null ? null : Json.asStringOrNull(pet['name']),
-      walkedAt: Json.asDateTime(json['walkedAt']),
+      walkedAt: KoreaTime.fromNullableInstant(
+        Json.asDateTime(json['walkedAt']),
+      ),
       durationSeconds: Json.asIntOrNull(json['durationSeconds']),
       distanceMeters: Json.asIntOrNull(json['distanceMeters']),
       route: Json.asMapList(json['route'])
@@ -78,7 +81,9 @@ class WalkDiaryFeedItemModel extends WalkDiaryFeedItem {
   factory WalkDiaryFeedItemModel.fromJson(Map<String, dynamic> json) {
     return WalkDiaryFeedItemModel(
       walkId: Json.asInt(json['walkId']),
-      walkedAt: Json.asDateTime(json['walkedAt']),
+      walkedAt: KoreaTime.fromNullableInstant(
+        Json.asDateTime(json['walkedAt']),
+      ),
       durationSeconds: Json.asIntOrNull(json['durationSeconds']),
       distanceMeters: Json.asIntOrNull(json['distanceMeters']),
       thumbnailUrl: Json.asStringOrNull(json['thumbnailUrl']),
@@ -90,7 +95,7 @@ class WalkDiaryFeedItemModel extends WalkDiaryFeedItem {
 
   /// 새 S3 피드의 날짜별 묶음을 화면이 쓰는 일지 목록으로 펼친다.
   static List<WalkDiaryFeedItem> fromS3Day(Map<String, dynamic> json) {
-    final walkDate = Json.asDateTime(json['walkDate']);
+    final walkDate = _parseDateOnly(json['walkDate']);
     if (walkDate == null) return const [];
 
     return Json.asMapList(json['diaries']).map((diary) {
@@ -125,13 +130,27 @@ class WalkDiaryContentModel extends WalkDiaryContent {
   factory WalkDiaryContentModel.fromJson(Map<String, dynamic> json) {
     return WalkDiaryContentModel(
       deviceId: Json.asString(json['deviceId']),
-      walkDate: Json.asDateTime(json['walkDate']) ?? DateTime(1970),
+      walkDate: _parseDateOnly(json['walkDate']) ?? DateTime.utc(1970),
       session: Json.asInt(json['session']),
       imageUrl: Json.asString(json['imageUrl']),
       markdown: Json.asString(json['markdown']),
       imageUrlExpiresAt: Json.asDateTime(json['imageUrlExpiresAt']),
     );
   }
+}
+
+/// 서버의 LocalDate(`yyyy-MM-dd`)는 순간 시각이 아니다. 문자열의 연·월·일을
+/// UTC DateTime에 담아 어느 기기에서도 같은 달력 날짜로 비교되게 한다.
+DateTime? _parseDateOnly(Object? raw) {
+  final value = raw?.toString();
+  if (value == null) return null;
+  final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(value);
+  if (match == null) return null;
+  return DateTime.utc(
+    int.parse(match.group(1)!),
+    int.parse(match.group(2)!),
+    int.parse(match.group(3)!),
+  );
 }
 
 /// items/nextCursor/hasNext 형태의 목록 응답을 CursorPage로 변환.

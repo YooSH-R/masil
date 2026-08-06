@@ -21,9 +21,7 @@ class PetViewModel extends BaseViewModel {
   List<Pet> _pets = const [];
   List<Pet> get pets => _pets;
 
-  /// GET /pets/{petId} 를 아는 id 마다 호출해 목록을 만든다.
-  ///
-  /// 서버에 목록 API 가 없어서 이렇게 모은다([PetRepository.getPets] 참고).
+  /// GET /pets로 로그인 사용자의 실제 펫 목록을 불러온다.
   /// 목록을 불러오면 현재 펫도 그 안의 것으로 맞춰 둔다.
   Future<void> loadPets({bool silent = true}) async {
     final pets = await guard(() => _petRepository.getPets(), silent: silent);
