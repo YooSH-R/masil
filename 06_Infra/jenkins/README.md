@@ -66,7 +66,10 @@ the dump with `pg_restore --list`. It then reapplies the idempotent migration se
 so a previously missed migration is recovered. A migration failure leaves the
 current backend Deployment unchanged. Database restoration is an explicit
 administrator action; the pipeline does not automatically overwrite production
-data.
+data. After a new dump passes verification, dumps older than the configured
+`PROD_DB_BACKUP_RETENTION_DAYS` value (14 days by default) are deleted from the
+PVC. Long-term disaster recovery backups should be copied to external object
+storage instead of relying only on this PVC.
 
 Apply the development deployer Role before using this migration stage:
 

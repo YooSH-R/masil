@@ -22,6 +22,7 @@ pipeline {
         MANIFEST_DIR = '06_Infra/prod'
         MIGRATION_DIR = '06_Infra/postgres/init'
         PROD_HEALTH_URL = 'https://i15a203.p.ssafy.io/api/v3/api-docs'
+        PROD_DB_BACKUP_RETENTION_DAYS = '14'
     }
 
     stages {
@@ -243,13 +244,29 @@ pipeline {
                       sh -c '
                         set -eu
                         backup_file="$1"
-                        mkdir -p "$(dirname "$backup_file")"
+                        retention_days="$2"
+                        case "$retention_days" in
+                          ""|*[!0-9]*|0)
+                            echo "Invalid backup retention days: $retention_days" >&2
+                            exit 1
+                            ;;
+                        esac
+
+                        backup_dir="$(dirname "$backup_file")"
+                        mkdir -p "$backup_dir"
                         pg_dump -Fc \
                           -U "$POSTGRES_USER" \
                           -d "$POSTGRES_DB" \
                           -f "$backup_file"
                         pg_restore --list "$backup_file" > /dev/null
-                      ' sh "$backup_file"
+
+                        find "$backup_dir" \
+                          -type f \
+                          -name "mysil-prod-*.dump" \
+                          -mtime "+$retention_days" \
+                          -print \
+                          -delete
+                      ' sh "$backup_file" "$PROD_DB_BACKUP_RETENTION_DAYS"
 
                     echo "Verified pre-deploy DB backup: $backup_file"
 

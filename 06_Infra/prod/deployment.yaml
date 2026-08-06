@@ -25,11 +25,6 @@ spec:
         - name: backend
           image: __BACKEND_IMAGE__
           imagePullPolicy: IfNotPresent
-          envFrom:
-            - secretRef:
-                name: backend-auth-secret
-            - secretRef:
-                name: backend-db-secret
           ports:
             - name: http
               containerPort: 8080
@@ -94,6 +89,16 @@ spec:
                 secretKeyRef:
                   name: backend-s3-secret
                   key: AWS_SECRET_ACCESS_KEY
+            - name: GOOGLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: backend-auth-secret
+                  key: GOOGLE_CLIENT_ID
+            - name: KAKAO_NATIVE_APP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backend-auth-secret
+                  key: KAKAO_NATIVE_APP_KEY
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
