@@ -10,9 +10,9 @@ spec:
       - s15a203-prod
   selector:
     matchLabels:
-      app: backend
+      monitoring: backend
   endpoints:
-    - port: http
-      path: /api/actuator/prometheus
+    - port: management
+      path: /actuator/prometheus
       interval: 30s
       scrapeTimeout: 10s

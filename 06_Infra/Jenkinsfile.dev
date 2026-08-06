@@ -258,7 +258,8 @@ pipeline {
 
                         .tools/kubectl -n "$K8S_NAMESPACE" apply \
                           -f "$MANIFEST_DIR/service.yaml" \
-                          -f "$MANIFEST_DIR/ingress.yaml"
+                          -f "$MANIFEST_DIR/ingress.yaml" \
+                          -f "$MANIFEST_DIR/service-monitor.yaml"
 
                         .tools/kubectl -n "$K8S_NAMESPACE" rollout status \
                           deployment/backend --timeout=180s
@@ -276,6 +277,8 @@ pipeline {
                     .tools/kubectl -n "$K8S_NAMESPACE" get deployment backend
                     .tools/kubectl -n "$K8S_NAMESPACE" get pods -l app=backend -o wide
                     .tools/kubectl -n "$K8S_NAMESPACE" get service backend
+                    .tools/kubectl -n "$K8S_NAMESPACE" get service backend-metrics
+                    .tools/kubectl -n "$K8S_NAMESPACE" get servicemonitor backend
                     .tools/kubectl -n "$K8S_NAMESPACE" get ingress backend
                     curl -fsS \
                       "https://i15a203.p.ssafy.io/dev/api/v3/api-docs" \
