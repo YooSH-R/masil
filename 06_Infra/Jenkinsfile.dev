@@ -1,11 +1,3 @@
-def gitlabWebhookToken = System.getenv('GITLAB_WEBHOOK_TOKEN')
-
-if (!gitlabWebhookToken?.trim()) {
-    throw new IllegalStateException(
-        'GITLAB_WEBHOOK_TOKEN is not configured on the Jenkins controller.'
-    )
-}
-
 pipeline {
     agent any
 
@@ -13,17 +5,6 @@ pipeline {
         disableConcurrentBuilds(abortPrevious: true)
         timestamps()
         timeout(time: 30, unit: 'MINUTES')
-    }
-
-    triggers {
-        gitlab(
-            triggerOnPush: true,
-            triggerOnMergeRequest: false,
-            branchFilterType: 'NameBasedFilter',
-            includeBranchesSpec: 'dev',
-            excludeBranchesSpec: '',
-            secretToken: gitlabWebhookToken
-        )
     }
 
     parameters {
@@ -39,6 +20,7 @@ pipeline {
         KUBECTL_VERSION = 'v1.36.2'
         K8S_NAMESPACE = 's15a203-dev'
         MANIFEST_DIR = '06_Infra/dev'
+        MIGRATION_DIR = '06_Infra/postgres/init'
     }
 
     stages {
@@ -84,13 +66,24 @@ pipeline {
                         ).trim()
                     }
 
+                    def migrationChanged = changedFiles
+                        .readLines()
+                        .any {
+                            it.startsWith(
+                                    '06_Infra/postgres/init/'
+                            )
+                        }
+
                     def deploymentChanged = changedFiles
                         .readLines()
                         .any {
                             it.startsWith('02_Backend/') ||
                             it.startsWith("${env.MANIFEST_DIR}/") ||
+                            it == '06_Infra/postgres/scripts/apply-migrations.sh' ||
                             it == '06_Infra/Jenkinsfile.dev'
-                        }
+                        } || migrationChanged
+
+                    env.MIGRATION_CHANGED = migrationChanged.toString()
 
                     env.BACKEND_CHANGED = (
                             params.FORCE_BACKEND_BUILD || deploymentChanged
@@ -99,6 +92,7 @@ pipeline {
                     echo "Changed files:\n${changedFiles ?: '(none)'}"
                     echo "Force backend build: ${params.FORCE_BACKEND_BUILD}"
                     echo "Backend changed: ${env.BACKEND_CHANGED}"
+                    echo "Database migration changed: ${env.MIGRATION_CHANGED}"
                 }
             }
         }
@@ -166,6 +160,27 @@ pipeline {
             }
         }
 
+        stage('Migrate Dev Database') {
+            when {
+                expression { env.MIGRATION_CHANGED == 'true' }
+            }
+            steps {
+                sh '''
+                    KUBECTL_BIN=.tools/kubectl \
+                      sh 06_Infra/postgres/scripts/apply-migrations.sh \
+                      "$MIGRATION_DIR/002_robot_events.sql" \
+                      "$MIGRATION_DIR/003_robot_photos.sql" \
+                      "$MIGRATION_DIR/004_robot_mqtt_runtime.sql" \
+                      "$MIGRATION_DIR/006_robot_qr_compat.sql" \
+                      "$MIGRATION_DIR/007_pet_creation_requests_compat.sql" \
+                      "$MIGRATION_DIR/007_walk_diaries.sql" \
+                      "$MIGRATION_DIR/008_users_version_compat.sql" \
+                      "$MIGRATION_DIR/009_walk_api.sql" \
+                      "$MIGRATION_DIR/010_behavior_requests_open_unique.sql"
+                '''
+            }
+        }
+
         stage('Deploy Dev') {
             when {
                 expression { env.BACKEND_CHANGED == 'true' }
@@ -205,6 +220,9 @@ pipeline {
                     sh '''
                         set +x
 
+                        .tools/kubectl -n "$K8S_NAMESPACE" get secret \
+                          backend-mqtt-secret backend-s3-secret > /dev/null
+
                         .tools/kubectl -n "$K8S_NAMESPACE" create secret docker-registry dockerhub-registry \
                           --docker-server="https://index.docker.io/v1/" \
                           --docker-username="$DOCKERHUB_USERNAME" \
@@ -240,7 +258,8 @@ pipeline {
 
                         .tools/kubectl -n "$K8S_NAMESPACE" apply \
                           -f "$MANIFEST_DIR/service.yaml" \
-                          -f "$MANIFEST_DIR/ingress.yaml"
+                          -f "$MANIFEST_DIR/ingress.yaml" \
+                          -f "$MANIFEST_DIR/service-monitor.yaml"
 
                         .tools/kubectl -n "$K8S_NAMESPACE" rollout status \
                           deployment/backend --timeout=180s
@@ -258,6 +277,8 @@ pipeline {
                     .tools/kubectl -n "$K8S_NAMESPACE" get deployment backend
                     .tools/kubectl -n "$K8S_NAMESPACE" get pods -l app=backend -o wide
                     .tools/kubectl -n "$K8S_NAMESPACE" get service backend
+                    .tools/kubectl -n "$K8S_NAMESPACE" get service backend-metrics
+                    .tools/kubectl -n "$K8S_NAMESPACE" get servicemonitor backend
                     .tools/kubectl -n "$K8S_NAMESPACE" get ingress backend
                     curl -fsS \
                       "https://i15a203.p.ssafy.io/dev/api/v3/api-docs" \

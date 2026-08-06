@@ -1,6 +1,5 @@
 package com.ssafy.backend.robot.mqtt;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,7 +8,6 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Service
-@ConditionalOnProperty(name = "mqtt.enabled", havingValue = "true")
 public class RobotMqttApplicationService {
 
     private final RobotMqttStore store;
@@ -27,22 +25,40 @@ public class RobotMqttApplicationService {
     public AffectionChangedMessage processEvent(
             RobotEventMessage event
     ) {
-        validateEnvelope(
-                event.messageId(),
-                event.messageVersion(),
-                event.deviceId(),
-                event.occurredAt()
-        );
-        if (event.eventType() == null) {
-            throw new IllegalArgumentException("eventType은 필수입니다.");
+        validateEvent(event);
+        if (event.eventType() == RobotEventType.WALK_COMPLETED) {
+            throw new IllegalArgumentException(
+                    "산책 완료는 POST /v1/walks/{walkId}/end로 처리해야 합니다."
+            );
         }
 
         RobotMqttStore.AffectionResult result = store
                 .findEventResult(event.messageId())
                 .orElseGet(() -> createEvent(event));
-        AffectionChangedMessage response = toMessage(result);
-        eventPublisher.publishEvent(new AffectionPublishEvent(response));
-        return response;
+        return publishAffinityChanged(result);
+    }
+
+    @Transactional
+    public AffectionChangedMessage processWalkCompletedEvent(
+            RobotEventMessage event,
+            long robotId,
+            long petId
+    ) {
+        validateEvent(event);
+        if (event.eventType() != RobotEventType.WALK_COMPLETED) {
+            throw new IllegalArgumentException(
+                    "산책 완료 처리에는 WALK_COMPLETED 이벤트가 필요합니다."
+            );
+        }
+
+        RobotMqttStore.AffectionResult result = store
+                .findEventResult(event.messageId(), petId)
+                .orElseGet(() -> createWalkCompletedEvent(
+                        event,
+                        robotId,
+                        petId
+                ));
+        return publishAffinityChanged(result);
     }
 
     @Transactional
@@ -89,6 +105,33 @@ public class RobotMqttApplicationService {
         if (concurrentResult.isPresent()) {
             return concurrentResult.get();
         }
+        return applyEvent(event, affinity);
+    }
+
+    private RobotMqttStore.AffectionResult createWalkCompletedEvent(
+            RobotEventMessage event,
+            long robotId,
+            long petId
+    ) {
+        RobotMqttStore.AffinityContext affinity = store.lockAffinity(
+                robotId,
+                petId,
+                event.deviceId()
+        );
+        var concurrentResult = store.findEventResult(
+                event.messageId(),
+                petId
+        );
+        if (concurrentResult.isPresent()) {
+            return concurrentResult.get();
+        }
+        return applyEvent(event, affinity);
+    }
+
+    private RobotMqttStore.AffectionResult applyEvent(
+            RobotEventMessage event,
+            RobotMqttStore.AffinityContext affinity
+    ) {
         int previousScore = affinity.currentScore();
         int currentScore = Math.max(
                 0,
@@ -130,6 +173,14 @@ public class RobotMqttApplicationService {
                 mood,
                 event.occurredAt()
         );
+    }
+
+    private AffectionChangedMessage publishAffinityChanged(
+            RobotMqttStore.AffectionResult result
+    ) {
+        AffectionChangedMessage response = toMessage(result);
+        eventPublisher.publishEvent(new AffectionPublishEvent(response));
+        return response;
     }
 
     private AffectionChangedMessage toMessage(
@@ -175,6 +226,18 @@ public class RobotMqttApplicationService {
             throw new IllegalArgumentException(
                     "MQTT 공통 메시지 필드가 누락되었습니다."
             );
+        }
+    }
+
+    private void validateEvent(RobotEventMessage event) {
+        validateEnvelope(
+                event.messageId(),
+                event.messageVersion(),
+                event.deviceId(),
+                event.occurredAt()
+        );
+        if (event.eventType() == null) {
+            throw new IllegalArgumentException("eventType은 필수입니다.");
         }
     }
 }
