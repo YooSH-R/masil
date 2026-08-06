@@ -77,6 +77,13 @@ class OwnerSearch(Node):
             reliability=ReliabilityPolicy.BEST_EFFORT,
             history=HistoryPolicy.KEEP_LAST,
             depth=10)
+        # YOLO 추론이 카메라 프레임 속도보다 느려지면 큐에 밀린 프레임이 쌓여서
+        # 이미 다른 곳으로 이동한 사람을 쫓아가게 된다. depth=1로 항상 최신
+        # 프레임만 유지한다 (밀린 프레임은 버림).
+        image_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1)
 
         wakeword_cb_group = MutuallyExclusiveCallbackGroup()
         image_cb_group = MutuallyExclusiveCallbackGroup()
@@ -86,7 +93,7 @@ class OwnerSearch(Node):
             Bool, '/wakeword_detected', self.wakeword_callback, 10,
             callback_group=wakeword_cb_group)
         self.image_sub = self.create_subscription(
-            Image, '/image_raw', self.image_callback, 10,
+            Image, '/image_raw', self.image_callback, image_qos,
             callback_group=image_cb_group)
         self.scan_sub = self.create_subscription(
             LaserScan, '/scan', self.scan_callback, lidar_qos,

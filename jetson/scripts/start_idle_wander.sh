@@ -8,6 +8,14 @@
 # 실행: ./start_idle_wander.sh
 # 확인: tmux attach -t idle   (창 전환: Ctrl+B 누르고 숫자 0~8)
 # 중지: ./stop_idle_wander.sh
+#
+# person_locator/wakeword_node/owner_search는 ultralytics(YOLO)/openwakeword가
+# 시스템 파이썬이 아니라 yolo-env/wakeword-env venv에만 깔려있어서 일부러
+# `ros2 run` 대신 venv activate 후 `python3 <build/ 경로>`로 직접 실행한다.
+# `ros2 run`이 쓰는 install/ 쪽 콘솔스크립트는 빌드 시점에 고정된 shebang(보통
+# 시스템 python3)을 그대로 쓰기 때문에, 지금 셸에서 venv를 activate해놔도
+# 무시되고 시스템 파이썬으로 실행돼 import 에러가 난다(실제로 겪음). venv가
+# 필요 없는 idle_wander만 표준 `ros2 run` + install/ 방식을 쓴다.
 
 set -e
 
@@ -71,10 +79,10 @@ tmux send-keys -t $SESSION:ownersearch \
 
 sleep 3
 
-echo "[9/9] idle_wander 시작 (venv 불필요, 시스템 python3)..."
+echo "[9/9] idle_wander 시작 (venv 불필요한 노드라 표준 ros2 run 사용)..."
 tmux new-window -t $SESSION -n wander
 tmux send-keys -t $SESSION:wander \
-  "source /opt/ros/humble/setup.bash && source ~/ros2_ws/install/setup.bash && python3 ~/ros2_ws/build/petbot_idle_behavior/petbot_idle_behavior/idle_wander.py" C-m
+  "source /opt/ros/humble/setup.bash && source ~/ros2_ws/install/setup.bash && ros2 run petbot_idle_behavior idle_wander" C-m
 
 echo ""
 echo "=========================================="

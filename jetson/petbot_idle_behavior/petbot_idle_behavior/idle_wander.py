@@ -8,6 +8,11 @@ DOCKING(배터리 위급 시 충전)을 오가는 상태 머신.
 구독해서 얻는다 (YOLO를 또 로드하지 않음 - Jetson 리소스 절약, -140/-127
 등 앞으로 사람 위치가 필요한 기능들도 person_locator 하나만 공용으로
 쓰게 하려는 의도).
+
+/person_location은 frame_id='laser_frame'으로 오는데, tf2로 base_link
+기준으로 명시적으로 변환한다 (예전엔 "URDF상 두 프레임 x,y 원점이 같아서
+변환 없이 써도 된다"고 생략했었는데, 라이다 장착 위치가 바뀌면 에러 없이
+조용히 틀린 좌표로 이동하는 위험이 있어 코드 리뷰 반영으로 수정함).
 """
 
 import math
@@ -16,7 +21,10 @@ from enum import Enum, auto
 
 import rclpy
 from geometry_msgs.msg import PointStamped
+from rclpy.duration import Duration
 from rclpy.node import Node
+import tf2_geometry_msgs  # noqa: F401 - PointStamped용 tf2_buffer.transform() 등록
+from tf2_ros import Buffer, TransformException, TransformListener
 
 from petbot_idle_behavior.stubs import get_battery_level, get_check_owner_probability
 from petbot_idle_behavior.waypoints import PATROL_WAYPOINTS
@@ -28,6 +36,7 @@ REST_MAX = 480.0                    # sec
 CHECK_OWNER_DURATION = 5.0          # sec
 BATTERY_CRITICAL_THRESHOLD = 15.0   # %
 TICK_PERIOD_SEC = 1.0
+TF_LOOKUP_TIMEOUT_SEC = 0.2
 
 # person_locator.py는 사람이 감지될 때만 /person_location을 발행한다
 # (주기적 heartbeat 없음). 이보다 오래된 메시지는 "지금은 안 보임"으로 취급.
@@ -57,6 +66,9 @@ class IdleWanderNode(Node):
         self.latest_person_point = None
         self.latest_person_received_at = None
 
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+
         self.person_sub = self.create_subscription(
             PointStamped, '/person_location', self._person_location_callback, 10)
 
@@ -79,7 +91,14 @@ class IdleWanderNode(Node):
         age_sec = (self.get_clock().now() - self.latest_person_received_at).nanoseconds / 1e9
         if age_sec > PERSON_POSITION_FRESHNESS_SEC:
             return None
-        return self.latest_person_point
+        try:
+            return self.tf_buffer.transform(
+                self.latest_person_point, 'base_link',
+                timeout=Duration(seconds=TF_LOOKUP_TIMEOUT_SEC))
+        except TransformException as e:
+            self.get_logger().warn(f'{self.latest_person_point.header.frame_id} -> '
+                                    f'base_link 변환 실패: {e}')
+            return None
 
     def _elapsed_in_state(self):
         return (self.get_clock().now() - self.state_enter_time).nanoseconds / 1e9
@@ -150,9 +169,8 @@ class IdleWanderNode(Node):
                 self._transition_to(WanderState.REST)
                 return
 
-            # /person_location은 frame_id='laser_frame'이지만, URDF상
-            # laser_frame과 base_link는 x,y 원점이 같아서(lidar_x=lidar_y=0.0)
-            # 좌표 변환 없이 그대로 base_link 기준으로 써도 된다.
+            # target은 _get_fresh_person_point()에서 이미 tf2로 base_link
+            # 기준으로 변환된 PointStamped다.
             px, py = target.point.x, target.point.y
             distance = math.hypot(px, py)
             if distance <= CHECK_OWNER_STOP_DISTANCE:
