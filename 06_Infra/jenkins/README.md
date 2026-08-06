@@ -70,8 +70,10 @@ kubectl -n s15a203-dev auth can-i create pods/exec \
 Production cluster authorization is managed externally. The identity used by
 the production Jenkins job must have `create` permission for the core API
 `pods/exec` subresource in `s15a203-prod`, in addition to its existing Pod and
-Deployment read/update permissions. Verify that permission before enabling the
-job; do not grant cluster-wide access solely for database migration.
+Deployment read/update permissions. It must also have create/update/patch
+permission for `monitoring.coreos.com` `servicemonitors` in `s15a203-prod`.
+Verify those permissions before enabling the job; do not grant cluster-wide
+access solely for database migration or monitoring deployment.
 
 Do not configure either job to load the other environment's Jenkinsfile.
 Branch validation inside each pipeline stops an incorrectly configured job
