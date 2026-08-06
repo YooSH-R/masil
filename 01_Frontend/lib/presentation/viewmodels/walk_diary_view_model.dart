@@ -91,7 +91,7 @@ class WalkDiaryViewModel extends BaseViewModel {
     for (final item in _feed) {
       final at = item.walkedAt;
       if (at == null) continue;
-      final key = DateTime(at.year, at.month, at.day);
+      final key = DateTime.utc(at.year, at.month, at.day);
       map.putIfAbsent(key, () => []).add(item);
     }
     return map;
@@ -107,7 +107,7 @@ class WalkDiaryViewModel extends BaseViewModel {
   ///
   /// S3 일지는 session 순서로, 앱에서 저장한 기록은 시작 시각 순서로 보여준다.
   List<WalkDiaryFeedItem> itemsOn(DateTime date) {
-    final key = DateTime(date.year, date.month, date.day);
+    final key = DateTime.utc(date.year, date.month, date.day);
     final items = List<WalkDiaryFeedItem>.of(
       byDate[key] ?? const <WalkDiaryFeedItem>[],
     );
@@ -127,7 +127,7 @@ class WalkDiaryViewModel extends BaseViewModel {
 
   /// [anchor] 날 하루의 집계.
   WalkStats statsForDay(DateTime anchor) {
-    final day = DateTime(anchor.year, anchor.month, anchor.day);
+    final day = DateTime.utc(anchor.year, anchor.month, anchor.day);
     final next = day.add(const Duration(days: 1));
     return _aggregate((at) => !at.isBefore(day) && at.isBefore(next));
   }
@@ -135,7 +135,7 @@ class WalkDiaryViewModel extends BaseViewModel {
   /// [anchor] 가 속한 주의 **요일별 이동거리(m)**. 월요일부터 7칸.
   /// 막대그래프가 쓴다. 기록이 없는 요일은 0 이다.
   List<int> weekdayMeters(DateTime anchor) {
-    final monday = DateTime(anchor.year, anchor.month, anchor.day)
+    final monday = DateTime.utc(anchor.year, anchor.month, anchor.day)
         .subtract(Duration(days: anchor.weekday - 1));
     return [
       for (var i = 0; i < 7; i++)
@@ -145,7 +145,7 @@ class WalkDiaryViewModel extends BaseViewModel {
 
   /// [anchor] 가 속한 주(월요일 시작)의 집계.
   WalkStats statsForWeek(DateTime anchor) {
-    final start = DateTime(anchor.year, anchor.month, anchor.day)
+    final start = DateTime.utc(anchor.year, anchor.month, anchor.day)
         .subtract(Duration(days: anchor.weekday - 1));
     final end = start.add(const Duration(days: 7));
     return _aggregate((at) => !at.isBefore(start) && at.isBefore(end));
@@ -303,14 +303,16 @@ class WalkDiaryViewModel extends BaseViewModel {
     final serverDays = _feed
         .map((e) => e.walkedAt)
         .whereType<DateTime>()
-        .map((at) => DateTime(at.year, at.month, at.day))
+        .map((at) => DateTime.utc(at.year, at.month, at.day))
         .toSet();
 
     for (final sample in SampleWalkDiaries.items) {
       final at = sample.walkedAt;
       if (at == null) continue;
       // 서버에 그 날 기록이 있으면 실제 데이터를 우선한다.
-      if (serverDays.contains(DateTime(at.year, at.month, at.day))) continue;
+      if (serverDays.contains(DateTime.utc(at.year, at.month, at.day))) {
+        continue;
+      }
       _feed.add(sample);
     }
 

@@ -130,7 +130,7 @@ class WalkDiaryContentModel extends WalkDiaryContent {
   factory WalkDiaryContentModel.fromJson(Map<String, dynamic> json) {
     return WalkDiaryContentModel(
       deviceId: Json.asString(json['deviceId']),
-      walkDate: _parseDateOnly(json['walkDate']) ?? DateTime(1970),
+      walkDate: _parseDateOnly(json['walkDate']) ?? DateTime.utc(1970),
       session: Json.asInt(json['session']),
       imageUrl: Json.asString(json['imageUrl']),
       markdown: Json.asString(json['markdown']),
@@ -139,14 +139,14 @@ class WalkDiaryContentModel extends WalkDiaryContent {
   }
 }
 
-/// 서버의 LocalDate(`yyyy-MM-dd`)는 순간 시각이 아니므로 UTC 변환을 하지 않는다.
-/// 문자열의 연·월·일을 그대로 사용해야 어느 기기에서도 같은 날짜로 보인다.
+/// 서버의 LocalDate(`yyyy-MM-dd`)는 순간 시각이 아니다. 문자열의 연·월·일을
+/// UTC DateTime에 담아 어느 기기에서도 같은 달력 날짜로 비교되게 한다.
 DateTime? _parseDateOnly(Object? raw) {
   final value = raw?.toString();
   if (value == null) return null;
   final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(value);
   if (match == null) return null;
-  return DateTime(
+  return DateTime.utc(
     int.parse(match.group(1)!),
     int.parse(match.group(2)!),
     int.parse(match.group(3)!),

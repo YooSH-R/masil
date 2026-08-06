@@ -23,20 +23,28 @@ class _MyPageScreenState extends State<MyPageScreen> {
     super.initState();
     // GET /users/me — 로그인 응답은 {userId, nickname} 만 주므로
     // 이메일·전화번호를 보여주려면 회원정보를 따로 불러와야 한다.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       context.read<AuthViewModel>().loadMyProfile(silent: true);
-      // 펫 카드(이름·기분·사진)를 채우려면 펫도 불러와야 한다.
+      // 캐시된 현재 펫을 먼저 복원한 뒤 서버 목록을 불러온다. 목록만 조회하면
+      // 등록된 펫이 있어도 캐시가 빈 기기에서는 펫이 없는 것으로 보일 수 있고,
+      // 목록을 먼저 적용하면 사용자가 선택한 현재 펫 대신 첫 펫이 보일 수 있다.
       final petVm = context.read<PetViewModel>();
-      if (petVm.pet == null) petVm.loadCurrentPet(silent: true);
+      if (petVm.pet == null) {
+        await petVm.loadCurrentPet(silent: true);
+      }
+      if (!mounted) return;
+      await petVm.loadPets(silent: true);
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final authViewModel = context.watch<AuthViewModel>();
-    // 펫 이름·기분·사진은 GET /pets/{petId} 응답에서 온다.
-    final pet = context.watch<PetViewModel>().pet;
+    // 현재 펫 캐시가 비어 있어도 서버 목록에 펫이 있으면 등록된 것으로 본다.
+    final petViewModel = context.watch<PetViewModel>();
+    final pet = petViewModel.pet ??
+        (petViewModel.pets.isEmpty ? null : petViewModel.pets.first);
     final user = authViewModel.user;
     final profile = authViewModel.profile;
 

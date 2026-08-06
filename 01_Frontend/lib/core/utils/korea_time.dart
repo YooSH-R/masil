@@ -11,11 +11,12 @@ class KoreaTime {
 
   /// 절대 시각을 한국의 벽시계 시각으로 바꾼다.
   ///
-  /// 반환값은 날짜·달력 계산용이므로 로컬 DateTime으로 만든다. 모든 입력을 먼저
-  /// UTC로 정규화해 실행 기기의 시간대가 결과에 영향을 주지 않게 한다.
+  /// 반환값은 날짜·달력 계산용 UTC DateTime이다. 실제 UTC 순간을 뜻하는 것이
+  /// 아니라 한국의 벽시계 구성요소를 UTC 객체에 담아, 실행 기기의 시스템
+  /// 시간대가 날짜 비교와 정렬에 개입하지 않게 한다.
   static DateTime fromInstant(DateTime value) {
     final shifted = value.toUtc().add(offset);
-    return DateTime(
+    return DateTime.utc(
       shifted.year,
       shifted.month,
       shifted.day,

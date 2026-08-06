@@ -14,7 +14,7 @@ void main() {
     });
 
     expect(items, hasLength(2));
-    expect(items.first.walkedAt, DateTime(2026, 8, 3));
+    expect(items.first.walkedAt, DateTime.utc(2026, 8, 3));
     expect(items.first.deviceId, 'device-001');
     expect(items.first.session, 1);
     expect(items.first.isS3Diary, isTrue);
@@ -28,6 +28,6 @@ void main() {
       'walkedAt': '2026-08-05T15:30:00Z',
     });
 
-    expect(item.walkedAt, DateTime(2026, 8, 6, 0, 30));
+    expect(item.walkedAt, DateTime.utc(2026, 8, 6, 0, 30));
   });
 }

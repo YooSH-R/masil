@@ -14,10 +14,10 @@ void main() {
 
     await viewModel.loadFeed(refresh: true);
 
-    final items = viewModel.itemsOn(DateTime(2026, 8, 6));
+    final items = viewModel.itemsOn(DateTime.utc(2026, 8, 6));
     expect(items, hasLength(2));
     expect(items.map((item) => item.session), [1, 2]);
-    expect(viewModel.statsForDay(DateTime(2026, 8, 6)).count, 2);
+    expect(viewModel.statsForDay(DateTime.utc(2026, 8, 6)).count, 2);
 
     viewModel.dispose();
   });
@@ -32,13 +32,13 @@ class _MultipleWalksRepository implements WalkDiaryRepository {
     return CursorPage<WalkDiaryFeedItem>(items: [
       WalkDiaryFeedItem(
         walkId: -100002,
-        walkedAt: DateTime(2026, 8, 6),
+        walkedAt: DateTime.utc(2026, 8, 6),
         deviceId: 'device-001',
         session: 2,
       ),
       WalkDiaryFeedItem(
         walkId: -100001,
-        walkedAt: DateTime(2026, 8, 6),
+        walkedAt: DateTime.utc(2026, 8, 6),
         deviceId: 'device-001',
         session: 1,
       ),

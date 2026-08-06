@@ -39,6 +39,17 @@ class SessionCache {
     await _rememberPetId(petId);
   }
 
+  /// 펫 목록만 기억한다. 대표(현재) 펫은 변경하지 않는다.
+  Future<void> rememberPetIds(Iterable<int> petIds) async {
+    final prefs = await _prefs;
+    final ids = (prefs.getStringList(_kKnownPetIds) ?? <String>[]).toList();
+    for (final petId in petIds) {
+      final key = petId.toString();
+      if (!ids.contains(key)) ids.add(key);
+    }
+    await prefs.setStringList(_kKnownPetIds, ids);
+  }
+
   /// 이 앱이 아는 펫 id 전부. 만든 순서대로.
   ///
   /// **왜 목록을 직접 들고 있는가**: 서버에 `GET /pets` 가 없다. 그래서 펫을

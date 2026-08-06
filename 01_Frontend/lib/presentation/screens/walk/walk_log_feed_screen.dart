@@ -29,7 +29,7 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     final now = KoreaTime.now();
     _currentYear = now.year;
     _currentMonth = now.month;
-    _selectedDate = DateTime(now.year, now.month, now.day);
+    _selectedDate = DateTime.utc(now.year, now.month, now.day);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -75,7 +75,7 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     // 주간은 선택한 날이 속한 주, 월간은 보고 있는 달 기준으로 집계한다.
     final stats = _isWeekly
         ? diaryVm.statsForWeek(_selectedDate)
-        : diaryVm.statsForMonth(DateTime(_currentYear, _currentMonth));
+        : diaryVm.statsForMonth(DateTime.utc(_currentYear, _currentMonth));
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F3E7),
@@ -227,7 +227,7 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
       } else {
         _currentMonth--;
       }
-      _selectedDate = DateTime(_currentYear, _currentMonth, 1);
+      _selectedDate = DateTime.utc(_currentYear, _currentMonth, 1);
       _selectedWalkIndex = 0;
     });
   }
@@ -240,15 +240,15 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
       } else {
         _currentMonth++;
       }
-      _selectedDate = DateTime(_currentYear, _currentMonth, 1);
+      _selectedDate = DateTime.utc(_currentYear, _currentMonth, 1);
       _selectedWalkIndex = 0;
     });
   }
 
   /// [walkDays] 는 산책 기록이 있는 날짜(시각 제거) 집합.
   Widget _buildMonthlyCalendar(Set<DateTime> walkDays) {
-    final firstDayOfMonth = DateTime(_currentYear, _currentMonth, 1);
-    final lastDayOfMonth = DateTime(_currentYear, _currentMonth + 1, 0);
+    final firstDayOfMonth = DateTime.utc(_currentYear, _currentMonth, 1);
+    final lastDayOfMonth = DateTime.utc(_currentYear, _currentMonth + 1, 0);
     final daysInMonth = lastDayOfMonth.day;
     final startWeekday = firstDayOfMonth.weekday % 7; // 0: Sun, 1: Mon...
 
@@ -303,7 +303,7 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
               if (index < startWeekday) return const SizedBox();
 
               final day = index - startWeekday + 1;
-              final date = DateTime(_currentYear, _currentMonth, day);
+              final date = DateTime.utc(_currentYear, _currentMonth, day);
 
               bool isSelected = _selectedDate.year == date.year &&
                   _selectedDate.month == date.month &&

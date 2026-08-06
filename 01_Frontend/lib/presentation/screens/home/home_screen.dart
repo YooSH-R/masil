@@ -462,11 +462,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// UTC로 오는 walkedAt을 대한민국 시간 기준 문구로 바꾼다.
+  /// 모델에서 이미 대한민국 벽시계 시각으로 변환된 walkedAt을 표시한다.
   String _formatWalkedAt(DateTime? walkedAt) {
     if (walkedAt == null) return '날짜 미상';
 
-    final korea = KoreaTime.fromInstant(walkedAt);
+    final korea = walkedAt;
     final now = KoreaTime.now();
     final isToday = korea.year == now.year &&
         korea.month == now.month &&

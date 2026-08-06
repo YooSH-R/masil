@@ -57,9 +57,9 @@ class PetRepositoryImpl implements PetRepository {
           ? Json.asMapList(data)
           : Json.asMapList(Json.asMap(data)['items']);
       final pets = rawPets.map(PetModel.fromJson).toList(growable: false);
-      for (final pet in pets) {
-        await _cache.savePetId(pet.id);
-      }
+      // 목록 조회는 사용자가 선택한 현재 펫을 바꾸면 안 된다. 서버 목록은
+      // 미배포 서버용 fallback에만 쓰는 known 목록으로 따로 기억한다.
+      await _cache.rememberPetIds(pets.map((pet) => pet.id));
       return pets;
     } on ApiException {
       // 아직 GET /pets가 배포되지 않은 서버에서는 기존 로컬 캐시로 호환한다.
