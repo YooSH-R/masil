@@ -14,10 +14,15 @@ PC 또는 Jetson에서 실행하세요. Pi Zero W에서는 돌리지 마세요.
     구간별 1등을 뽑습니다. 같은 구간 안에서는 장면이 비슷하므로
     점수 차이가 곧 번짐 차이가 됩니다.
 
-필터 3단계
-    1. 노출  - 하이라이트 클리핑, 암부 뭉개짐 프레임 배제 (외1 대응)
+필터 4단계
+    1. 노출   - 하이라이트 클리핑, 암부 뭉개짐 프레임 배제 (외1 대응)
     2. 선명도 - 구간 내 라플라시안 분산 최댓값 선택 (외2 대응)
-    3. 중복  - 직전 선택분과 너무 비슷하면 건너뜀 (외7 대응)
+    3. 중복   - 직전 선택분과 내용이 너무 비슷하면 건너뜀 (외7 대응)
+    4. 간격   - 직전 선택분과 시간이 너무 가까우면 건너뜀 (구간 경계 몰림 대응)
+
+--max-frames로 목표 장수 상한을 주면 구간 길이를 영상 총 길이에서 역산합니다.
+--stride로 평가 간격을 늘리면 건너뛰는 프레임은 디코딩 없이(cap.grab())
+넘어가 처리 시간을 줄입니다.
 
 설치
     pip install opencv-python numpy
@@ -27,6 +32,7 @@ PC 또는 Jetson에서 실행하세요. Pi Zero W에서는 돌리지 마세요.
     python3 extract_best_frames.py walk.mp4 -o frames/ --window 5
     python3 extract_best_frames.py walk.mp4 -o frames/ --metric tenengrad
     python3 extract_best_frames.py walk.mp4 -o frames/ --no-dedup
+    python3 extract_best_frames.py walk.mp4 -o frames/ --max-frames 48 --stride 3
 """
 
 from __future__ import annotations
@@ -55,6 +61,13 @@ if sys.platform == "win32":
 
 DEFAULT_WINDOW_SEC = 10.0
 
+# --max-frames 기본값. 하류(walklog)는 4~8장만 표본화해 쓰므로
+# 30~60장이면 충분하다.
+DEFAULT_MAX_FRAMES = 48
+
+# --stride 기본값. 1이면 전 프레임 평가(기존 동작).
+DEFAULT_STRIDE = 1
+
 # 노출 판정. 이 비율을 넘으면 해당 프레임을 후보에서 제외합니다.
 # 자동 노출이 재수렴하는 동안 촬영된 프레임이 여기 걸립니다.
 CLIP_HIGH_LIMIT = 0.12      # 밝기 250 이상 픽셀 비율
@@ -62,6 +75,11 @@ CLIP_LOW_LIMIT = 0.35       # 밝기 8 이하 픽셀 비율
 
 # 중복 판정. 32x32로 줄인 뒤 평균 절대 차이가 이 값 미만이면 중복.
 DEDUP_THRESHOLD = 6.0
+
+# 직전 저장분과의 최소 시간 간격 (구간 길이 대비 비율).
+# 인접 구간의 1등이 경계 양쪽에 붙으면 같은 순간이 두 장 저장된다.
+# dedup은 내용 기준이라 카메라가 움직이면 통과하므로 시간 기준을 병행한다.
+MIN_GAP_RATIO = 0.3
 
 # 구간 전체가 쓸모없을 때 버리는 하한선.
 # 0이면 비활성. 실제 영상으로 점수 분포를 본 뒤 정하는 것을 권합니다.
@@ -164,6 +182,8 @@ def extract(
     min_sharpness: float,
     start_wall: datetime | None,
     fps_override: float | None = None,
+    max_frames: int = 0,
+    stride: int = 1,
 ) -> dict:
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
@@ -201,6 +221,22 @@ def extract(
     raw_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
     total_frames = int(raw_count) if 0 < raw_count < 100_000_000 else 0
 
+    # --max-frames 활성 시 window_sec를 총 길이에서 역산한다.
+    # window_sec(함수 인자로 받은 --window 값)는 이 모드에서 구간 하한이 된다.
+    window_floor = window_sec
+    max_frames_applied = False
+    if max_frames > 0:
+        if total_frames > 0:
+            total_duration = total_frames / fps
+            window_sec = max(total_duration / max_frames, window_floor)
+            max_frames_applied = True
+        else:
+            print(
+                f"경고: 총 프레임 수를 알 수 없어 --max-frames를 적용할 수 없습니다. "
+                f"고정 구간({window_floor:.1f}초)으로 진행합니다.",
+                file=sys.stderr,
+            )
+
     metric = METRICS[metric_name]
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -211,8 +247,13 @@ def extract(
         print(f"총 프레임 : {total_frames:,}장 ({total_frames / fps / 60:.1f}분)")
     else:
         print("총 프레임 : 미상 (진행률 표시 생략)")
-    print(f"구간 길이 : {window_sec:.0f}초")
+    if max_frames_applied:
+        print(f"구간 길이 : {window_sec:.1f}초 (--max-frames {max_frames} 기준 자동 계산)")
+    else:
+        print(f"구간 길이 : {window_sec:.1f}초")
     print(f"측정 방식 : {metric_name}")
+    if stride > 1:
+        print(f"평가 스트라이드: {stride}프레임마다 1장")
     print()
 
     selector = WindowSelector()
@@ -220,11 +261,12 @@ def extract(
     frame_index = 0
     saved: list[dict] = []
     prev_thumb: np.ndarray | None = None
+    last_saved_ts: float | None = None
     stats = {"windows": 0, "saved": 0, "skipped_dup": 0,
-             "skipped_low": 0, "rejected_exposure": 0}
+             "skipped_low": 0, "skipped_close": 0, "rejected_exposure": 0}
 
     def flush_window() -> None:
-        nonlocal prev_thumb
+        nonlocal prev_thumb, last_saved_ts
         if selector.best is None:
             return
         stats["rejected_exposure"] += selector.rejected_exposure
@@ -241,6 +283,11 @@ def extract(
                 stats["skipped_dup"] += 1
                 return
 
+        if (last_saved_ts is not None
+                and cand.timestamp_sec < last_saved_ts + window_sec * MIN_GAP_RATIO):
+            stats["skipped_close"] += 1
+            return
+
         ts = cand.timestamp_sec
         name = f"f_{cand.frame_index:07d}_t{int(ts // 60):03d}m{ts % 60:05.2f}s.jpg"
         path = output_dir / name
@@ -255,9 +302,23 @@ def extract(
             ).isoformat(timespec="seconds")
         saved.append(record)
         prev_thumb = selector.best_thumb
+        last_saved_ts = ts
         stats["saved"] += 1
 
+    def report_progress() -> None:
+        if total_frames and frame_index % 1000 == 0:
+            pct = frame_index / total_frames * 100
+            print(f"\r진행 {pct:5.1f}%  ({frame_index:,}/{total_frames:,})",
+                  end="", flush=True)
+
     while True:
+        if stride > 1 and frame_index % stride != 0:
+            if not cap.grab():
+                break
+            frame_index += 1
+            report_progress()
+            continue
+
         ok, frame = cap.read()
         if not ok:
             break
@@ -298,10 +359,7 @@ def extract(
         )
 
         frame_index += 1
-        if total_frames and frame_index % 1000 == 0:
-            pct = frame_index / total_frames * 100
-            print(f"\r진행 {pct:5.1f}%  ({frame_index:,}/{total_frames:,})",
-                  end="", flush=True)
+        report_progress()
 
     flush_window()
     stats["windows"] += 1
@@ -313,6 +371,8 @@ def extract(
         "fps": round(fps, 3),
         "frames_read": frame_index,
         "window_sec": window_sec,
+        "max_frames": max_frames,
+        "stride": stride,
         "metric": metric_name,
         "center_crop": center_crop,
         "stats": stats,
@@ -335,7 +395,9 @@ def main() -> int:
     p.add_argument("-o", "--output", type=Path, default=Path("frames"),
                    help="출력 폴더 (기본: frames/)")
     p.add_argument("--window", type=float, default=DEFAULT_WINDOW_SEC,
-                   help=f"구간 길이(초). 기본 {DEFAULT_WINDOW_SEC:.0f}")
+                   help=f"구간 길이(초). --max-frames 비활성(0) 시 고정 구간 길이로 "
+                        f"쓰인다. --max-frames 활성 시에는 구간 길이 하한이 된다. "
+                        f"기본 {DEFAULT_WINDOW_SEC:.0f}")
     p.add_argument("--fps", type=float, default=None,
                    help="프레임레이트 직접 지정. 원시 h264 입력 시 필수")
     p.add_argument("--metric", choices=list(METRICS), default="laplacian",
@@ -350,10 +412,27 @@ def main() -> int:
                    help="이 점수 미만인 구간은 버림. 0이면 비활성")
     p.add_argument("--start-time", type=str, default=None,
                    help="촬영 시작 시각 (ISO 형식). 프레임별 실제 시각 계산용")
+    p.add_argument("--max-frames", type=int, default=DEFAULT_MAX_FRAMES,
+                   help="목표 저장 장수 상한. 영상 총 길이에서 구간 길이를 역산한다 "
+                        "(--window는 구간 길이 하한이 됨). dedup/노출/최소 간격 "
+                        "필터로 실제 저장 장수는 이보다 적을 수 있다. 0이면 비활성"
+                        f"(고정 구간 동작). 기본 {DEFAULT_MAX_FRAMES}")
+    p.add_argument("--stride", type=int, default=DEFAULT_STRIDE,
+                   help="평가 스트라이드. K>1이면 K프레임마다 1장만 평가해 디코딩을 "
+                        "아낀다. 15fps 영상이면 2~3 권장 — 인접 프레임의 선명도는 "
+                        f"거의 같아 구간 1등 품질에 영향이 미미하다. 기본 {DEFAULT_STRIDE}")
     args = p.parse_args()
 
     if not args.video.exists():
         print(f"오류: 파일이 없습니다 — {args.video}", file=sys.stderr)
+        return 1
+
+    if args.max_frames < 0:
+        print("오류: --max-frames는 0 이상이어야 합니다", file=sys.stderr)
+        return 1
+
+    if args.stride < 1:
+        print("오류: --stride는 1 이상이어야 합니다", file=sys.stderr)
         return 1
 
     if not (0.1 <= args.center_crop <= 1.0):
@@ -381,6 +460,8 @@ def main() -> int:
             min_sharpness=args.min_sharpness,
             start_wall=start_wall,
             fps_override=args.fps,
+            max_frames=args.max_frames,
+            stride=args.stride,
         )
     except RuntimeError as e:
         print(f"오류: {e}", file=sys.stderr)
@@ -393,6 +474,7 @@ def main() -> int:
     print(f"저장된 프레임 : {s['saved']}장")
     print(f"  중복 제외   : {s['skipped_dup']}개 구간")
     print(f"  선명도 미달 : {s['skipped_low']}개 구간")
+    print(f"  간격 미달   : {s['skipped_close']}개 구간")
     print(f"  노출 불량   : {s['rejected_exposure']:,}프레임 후보 제외")
     if m["frames_read"]:
         ratio = s["saved"] / m["frames_read"] * 100

@@ -1,15 +1,18 @@
 """산책 흐름 삽화 생성 CLI.
 
   Stage A  관찰 기록 -> 장면 전환 감지 -> 대표 프레임 N장  (로컬, API 없음)
+  Stage A' 관찰 기록 -> 이벤트 중요도 -> 대표 프레임 N장   (로컬, API 없음. --mode journal)
   Stage B  각 장면 -> 영어 이미지 프롬프트                  (LLM)
   Stage C  각 장면 -> 삽화                                  (이미지 모델)
-  Stage D  삽화들 -> 스토리보드 한 장                        (로컬, Pillow)
+  Stage D  삽화들 -> 스토리보드 / 저널 한 장                 (로컬, Pillow)
 
 사용:
     python run_flow_image.py --dry-run                 # API 없이 장면 선정만
     python run_flow_image.py -n 5 --style watercolor
     python run_flow_image.py --mode single             # 한 장으로 요약
     python run_flow_image.py --no-ref --layout grid
+    python run_flow_image.py --mode journal --dry-run   # 저널: 이벤트 선정만
+    python run_flow_image.py --mode journal --events 5  # 저널: 이벤트 5개짜리 산책일지
 
 [분할 전에서 바뀐 점]
 1. 기록 형식을 추측하지 않는다. records.load_records 가 형식을 소유한다.
@@ -27,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Sequence
 
@@ -34,9 +38,17 @@ from .. import config
 from .. import prompts as P
 from ..console import info, step, warn
 from ..gms import GMSAuthError, GMSError
-from ..records import UNKNOWN, RecordsError, load_records, usable, walk_duration
-from ..stages import IllustrateError, build_single_image, build_storyboard
-from ..stages.illustrate import select_key_scenes
+from ..records import (
+    UNKNOWN,
+    RecordsError,
+    load_records,
+    outdoor,
+    usable,
+    walk_duration,
+    walk_time_range,
+)
+from ..stages import IllustrateError, build_journal, build_single_image, build_storyboard
+from ..stages.illustrate import _primary_subject, event_score, select_key_events, select_key_scenes
 from . import common
 
 __all__ = ["build_parser", "main"]
@@ -56,22 +68,33 @@ def build_parser() -> argparse.ArgumentParser:
 
     shape = parser.add_argument_group("생성 방식")
     shape.add_argument("-n", "--scenes", type=int, default=4, help="대표 장면 수")
-    shape.add_argument("--mode", choices=("storyboard", "single"),
+    shape.add_argument("--events", type=int, default=4,
+                       help="저널(--mode journal)에 실을 이벤트 수 (2~6 권장)")
+    shape.add_argument("--mode", choices=("storyboard", "single", "journal"),
                        default="storyboard",
-                       help="storyboard: 칸 여러 개 / single: 전체를 한 장으로")
+                       help="storyboard: 칸 여러 개 / single: 전체를 한 장으로 / "
+                            "journal: 이벤트 중요도 기준 스크랩북형 산책일지")
     shape.add_argument("--layout", choices=("row", "grid"), default="row")
     shape.add_argument("--style", default=P.DEFAULT_IMAGE_STYLE,
                        choices=list(P.IMAGE_STYLES))
     shape.add_argument("--no-ref", action="store_true",
                        help="실제 프레임을 참조하지 않고 텍스트만으로 생성")
     shape.add_argument("--no-caption-llm", action="store_true",
-                       help="캡션을 LLM 대신 location_type 으로 채운다")
+                       help="캡션을 LLM 대신 location_type 으로 채운다 "
+                            "(storyboard 전용. journal은 항상 LLM 캡션을 쓴다)")
+    shape.add_argument("--verify-style", dest="verify_style", action="store_true",
+                       default=True,
+                       help="저널 패널마다 화풍(톤)이 일치하는지 검사 후 "
+                            "필요시 재생성한다 (journal 전용, 기본값)")
+    shape.add_argument("--no-verify-style", dest="verify_style", action="store_false",
+                       help="저널 화풍 검사를 건너뛴다 (API 비용 절감)")
     shape.add_argument("--font", default=None,
                        help=f"한국어 TTF 경로 (환경변수 {config.FONT_ENV} 도 가능)")
     shape.add_argument("-o", "--out", type=Path, default=None,
-                       help=f"기본: <출력폴더>/{config.FLOW_IMAGE_NAME}")
+                       help=f"기본: <출력폴더>/{config.FLOW_IMAGE_NAME} "
+                            f"(journal 모드는 {config.JOURNAL_NAME})")
     shape.add_argument("--dry-run", action="store_true",
-                       help="API 호출 없이 장면 선정 결과만 출력")
+                       help="API 호출 없이 장면(또는 이벤트) 선정 결과만 출력")
 
     common.add_connection_args(parser)
     common.add_output_args(parser)
@@ -97,12 +120,47 @@ def _print_dry_run(records, count: int) -> int:
     return common.EXIT_OK
 
 
+def _print_dry_run_events(records, count: int) -> int:
+    """API를 부르지 않고 어떤 이벤트가 뽑히는지만 보여준다 (--mode journal)."""
+    events = select_key_events(records, count)
+    info(f"\n선정된 이벤트 {len(events)}개 (전체 기록 {len(records)}개, "
+         f"사용 가능 {len(usable(records))}개)")
+    for position, event in enumerate(events, 1):
+        observation = event.observation
+        reference = event.reference
+        info(f"  {position}. [{event.elapsed}] score={event_score(event.record):.1f} / "
+             f"피사체={_primary_subject(event.record) or '?'} / "
+             f"conf={event.confidence_mean:.2f} / "
+             f"참조={reference.name if reference else '없음'}")
+        info(f"     animals={observation.get('animals') or []} "
+             f"notable={observation.get('notable') or ''} "
+             f"objects={observation.get('objects') or []}")
+    return common.EXIT_OK
+
+
+_SUMMARY_RE = re.compile(r"\*\*한 줄 요약\*\*:\s*(.+)")
+
+
+def _diary_note(run_dir: Path) -> str:
+    """세션 폴더의 walk_log.md에서 '한 줄 요약' 줄을 읽는다.
+
+    없거나 파싱에 실패하면 빈 문자열이다. LLM을 추가로 부르지 않는다 -
+    Stage 2가 이미 만든 값을 재활용할 뿐이다.
+    """
+    diary_path = run_dir / config.DIARY_NAME
+    if not diary_path.is_file():
+        return ""
+    match = _SUMMARY_RE.search(diary_path.read_text(encoding="utf-8"))
+    return match.group(1).strip() if match else ""
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
     run_dir = common.resolve_run_dir(args, create=not args.dry_run, new_session=False)
     records_path = args.records or (run_dir / config.RECORDS_NAME)
-    out_path = args.out or (run_dir / config.FLOW_IMAGE_NAME)
+    default_name = config.JOURNAL_NAME if args.mode == "journal" else config.FLOW_IMAGE_NAME
+    out_path = args.out or (run_dir / default_name)
 
     try:
         records, walk = load_records(records_path, frame_dir=args.frames)
@@ -113,10 +171,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         return common.EXIT_ERROR
 
     step(f"관찰 기록 {len(records)}개를 읽었습니다: {records_path}")
+
+    # walk_log.py --allow-indoor로 실내 기록을 남겨 뒀을 수 있으므로, 여기서도
+    # 삽화 재료에서 한 번 더 거른다(이중 안전판). 전부 실내면 원본으로 폴백한다.
+    outdoor_records = outdoor(records)
+    if not outdoor_records:
+        warn("야외 기록이 없어(전부 실내) 실내 기록을 포함해 진행합니다.")
+    else:
+        records = outdoor_records
+
     walk_date = args.date or walk.date
 
     if args.dry_run:
         try:
+            if args.mode == "journal":
+                return _print_dry_run_events(records, args.events)
             return _print_dry_run(records, args.scenes)
         except IllustrateError as exc:
             warn(str(exc))
@@ -138,6 +207,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                 use_reference=not args.no_ref,
             )
             paths["삽화"] = path
+        elif args.mode == "journal":
+            panel_dir = run_dir / config.PANELS_DIRNAME
+            path = build_journal(
+                client, records, out_path,
+                event_count=args.events, style=args.style,
+                walk_date=walk_date, time_range=walk_time_range(walk, records),
+                duration=walk_duration(records), note=_diary_note(run_dir),
+                use_reference=not args.no_ref, verify_style=args.verify_style,
+                panel_dir=panel_dir, font_path=args.font,
+            )
+            paths["산책일지"] = path
+            paths["이벤트 삽화"] = panel_dir
         else:
             panel_dir = run_dir / config.PANELS_DIRNAME
             path, scenes = build_storyboard(

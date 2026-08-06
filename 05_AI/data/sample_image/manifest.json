@@ -1,161 +1,1331 @@
 {
-  "source": "seg_0001.mp4",
+  "source": "session_20260803_191009/walk_full.mp4",
   "fps": 15.0,
-  "frames_read": 3277,
+  "frames_read": 25133,
   "window_sec": 10.0,
   "metric": "laplacian",
   "center_crop": 1.0,
   "stats": {
-    "windows": 22,
-    "saved": 16,
-    "skipped_dup": 6,
+    "windows": 168,
+    "saved": 146,
+    "skipped_dup": 3,
     "skipped_low": 0,
-    "rejected_exposure": 0
+    "rejected_exposure": 2607
   },
   "frames": [
     {
-      "frame_index": 135,
-      "timestamp_sec": 9.0,
-      "score": 89.63,
-      "clip_high": 0.0296,
-      "clip_low": 0.0,
-      "mean_brightness": 120.2,
-      "file": "f_0000135_t000m09.00s.jpg"
+      "frame_index": 45,
+      "timestamp_sec": 3.0,
+      "score": 50.2,
+      "clip_high": 0.0971,
+      "clip_low": 0.0122,
+      "mean_brightness": 115.6,
+      "file": "f_0000045_t000m03.00s.jpg"
     },
     {
-      "frame_index": 165,
-      "timestamp_sec": 11.0,
-      "score": 102.59,
+      "frame_index": 278,
+      "timestamp_sec": 18.533,
+      "score": 179.92,
+      "clip_high": 0.0,
+      "clip_low": 0.0,
+      "mean_brightness": 146.0,
+      "file": "f_0000278_t000m18.53s.jpg"
+    },
+    {
+      "frame_index": 390,
+      "timestamp_sec": 26.0,
+      "score": 187.69,
+      "clip_high": 0.0,
+      "clip_low": 0.0,
+      "mean_brightness": 153.0,
+      "file": "f_0000390_t000m26.00s.jpg"
+    },
+    {
+      "frame_index": 555,
+      "timestamp_sec": 37.0,
+      "score": 261.27,
+      "clip_high": 0.0048,
+      "clip_low": 0.0,
+      "mean_brightness": 131.4,
+      "file": "f_0000555_t000m37.00s.jpg"
+    },
+    {
+      "frame_index": 645,
+      "timestamp_sec": 43.0,
+      "score": 281.0,
+      "clip_high": 0.0005,
+      "clip_low": 0.0,
+      "mean_brightness": 135.6,
+      "file": "f_0000645_t000m43.00s.jpg"
+    },
+    {
+      "frame_index": 762,
+      "timestamp_sec": 50.8,
+      "score": 98.36,
+      "clip_high": 0.0002,
+      "clip_low": 0.0,
+      "mean_brightness": 162.0,
+      "file": "f_0000762_t000m50.80s.jpg"
+    },
+    {
+      "frame_index": 1033,
+      "timestamp_sec": 68.867,
+      "score": 46.86,
+      "clip_high": 0.0,
+      "clip_low": 0.0,
+      "mean_brightness": 134.9,
+      "file": "f_0001033_t001m08.87s.jpg"
+    },
+    {
+      "frame_index": 1070,
+      "timestamp_sec": 71.333,
+      "score": 23.92,
+      "clip_high": 0.0543,
+      "clip_low": 0.0001,
+      "mean_brightness": 126.5,
+      "file": "f_0001070_t001m11.33s.jpg"
+    },
+    {
+      "frame_index": 1240,
+      "timestamp_sec": 82.667,
+      "score": 15.12,
+      "clip_high": 0.0003,
+      "clip_low": 0.0004,
+      "mean_brightness": 105.1,
+      "file": "f_0001240_t001m22.67s.jpg"
+    },
+    {
+      "frame_index": 1395,
+      "timestamp_sec": 93.0,
+      "score": 177.44,
+      "clip_high": 0.0043,
+      "clip_low": 0.0001,
+      "mean_brightness": 111.0,
+      "file": "f_0001395_t001m33.00s.jpg"
+    },
+    {
+      "frame_index": 1615,
+      "timestamp_sec": 107.667,
+      "score": 53.56,
+      "clip_high": 0.0466,
+      "clip_low": 0.0002,
+      "mean_brightness": 144.0,
+      "file": "f_0001615_t001m47.67s.jpg"
+    },
+    {
+      "frame_index": 1721,
+      "timestamp_sec": 114.733,
+      "score": 48.28,
+      "clip_high": 0.0023,
+      "clip_low": 0.0006,
+      "mean_brightness": 144.9,
+      "file": "f_0001721_t001m54.73s.jpg"
+    },
+    {
+      "frame_index": 1835,
+      "timestamp_sec": 122.333,
+      "score": 54.41,
       "clip_high": 0.0363,
-      "clip_low": 0.0001,
-      "mean_brightness": 120.8,
-      "file": "f_0000165_t000m11.00s.jpg"
+      "clip_low": 0.0,
+      "mean_brightness": 133.4,
+      "file": "f_0001835_t002m02.33s.jpg"
     },
     {
-      "frame_index": 330,
-      "timestamp_sec": 22.0,
-      "score": 97.83,
-      "clip_high": 0.0348,
+      "frame_index": 2070,
+      "timestamp_sec": 138.0,
+      "score": 49.06,
+      "clip_high": 0.0145,
+      "clip_low": 0.0502,
+      "mean_brightness": 109.4,
+      "file": "f_0002070_t002m18.00s.jpg"
+    },
+    {
+      "frame_index": 2146,
+      "timestamp_sec": 143.067,
+      "score": 162.45,
+      "clip_high": 0.0036,
       "clip_low": 0.0,
+      "mean_brightness": 166.8,
+      "file": "f_0002146_t002m23.07s.jpg"
+    },
+    {
+      "frame_index": 2361,
+      "timestamp_sec": 157.4,
+      "score": 134.19,
+      "clip_high": 0.0009,
+      "clip_low": 0.0001,
+      "mean_brightness": 115.7,
+      "file": "f_0002361_t002m37.40s.jpg"
+    },
+    {
+      "frame_index": 2478,
+      "timestamp_sec": 165.2,
+      "score": 221.06,
+      "clip_high": 0.0261,
+      "clip_low": 0.0,
+      "mean_brightness": 110.4,
+      "file": "f_0002478_t002m45.20s.jpg"
+    },
+    {
+      "frame_index": 2554,
+      "timestamp_sec": 170.267,
+      "score": 179.24,
+      "clip_high": 0.0687,
+      "clip_low": 0.0,
+      "mean_brightness": 104.6,
+      "file": "f_0002554_t002m50.27s.jpg"
+    },
+    {
+      "frame_index": 2813,
+      "timestamp_sec": 187.533,
+      "score": 317.75,
+      "clip_high": 0.0583,
+      "clip_low": 0.0001,
+      "mean_brightness": 108.3,
+      "file": "f_0002813_t003m07.53s.jpg"
+    },
+    {
+      "frame_index": 2926,
+      "timestamp_sec": 195.067,
+      "score": 448.19,
+      "clip_high": 0.0727,
+      "clip_low": 0.0001,
+      "mean_brightness": 97.6,
+      "file": "f_0002926_t003m15.07s.jpg"
+    },
+    {
+      "frame_index": 3090,
+      "timestamp_sec": 206.0,
+      "score": 389.72,
+      "clip_high": 0.062,
+      "clip_low": 0.0025,
+      "mean_brightness": 115.3,
+      "file": "f_0003090_t003m26.00s.jpg"
+    },
+    {
+      "frame_index": 3270,
+      "timestamp_sec": 218.0,
+      "score": 332.28,
+      "clip_high": 0.0526,
+      "clip_low": 0.0,
+      "mean_brightness": 133.2,
+      "file": "f_0003270_t003m38.00s.jpg"
+    },
+    {
+      "frame_index": 3313,
+      "timestamp_sec": 220.867,
+      "score": 203.16,
+      "clip_high": 0.09,
+      "clip_low": 0.0088,
+      "mean_brightness": 96.4,
+      "file": "f_0003313_t003m40.87s.jpg"
+    },
+    {
+      "frame_index": 3525,
+      "timestamp_sec": 235.0,
+      "score": 359.96,
+      "clip_high": 0.0486,
+      "clip_low": 0.0001,
+      "mean_brightness": 125.3,
+      "file": "f_0003525_t003m55.00s.jpg"
+    },
+    {
+      "frame_index": 3645,
+      "timestamp_sec": 243.0,
+      "score": 219.8,
+      "clip_high": 0.0031,
+      "clip_low": 0.0002,
+      "mean_brightness": 112.1,
+      "file": "f_0003645_t004m03.00s.jpg"
+    },
+    {
+      "frame_index": 3795,
+      "timestamp_sec": 253.0,
+      "score": 392.23,
+      "clip_high": 0.0009,
+      "clip_low": 0.009,
+      "mean_brightness": 84.5,
+      "file": "f_0003795_t004m13.00s.jpg"
+    },
+    {
+      "frame_index": 3981,
+      "timestamp_sec": 265.4,
+      "score": 404.13,
+      "clip_high": 0.074,
+      "clip_low": 0.0,
+      "mean_brightness": 141.2,
+      "file": "f_0003981_t004m25.40s.jpg"
+    },
+    {
+      "frame_index": 4100,
+      "timestamp_sec": 273.333,
+      "score": 388.8,
+      "clip_high": 0.0694,
+      "clip_low": 0.0003,
+      "mean_brightness": 135.2,
+      "file": "f_0004100_t004m33.33s.jpg"
+    },
+    {
+      "frame_index": 4215,
+      "timestamp_sec": 281.0,
+      "score": 385.06,
+      "clip_high": 0.0317,
+      "clip_low": 0.0,
+      "mean_brightness": 120.9,
+      "file": "f_0004215_t004m41.00s.jpg"
+    },
+    {
+      "frame_index": 4350,
+      "timestamp_sec": 290.0,
+      "score": 279.95,
+      "clip_high": 0.0757,
+      "clip_low": 0.0066,
+      "mean_brightness": 130.9,
+      "file": "f_0004350_t004m50.00s.jpg"
+    },
+    {
+      "frame_index": 4647,
+      "timestamp_sec": 309.8,
+      "score": 291.83,
+      "clip_high": 0.0649,
+      "clip_low": 0.0,
+      "mean_brightness": 118.0,
+      "file": "f_0004647_t005m09.80s.jpg"
+    },
+    {
+      "frame_index": 4782,
+      "timestamp_sec": 318.8,
+      "score": 289.28,
+      "clip_high": 0.0445,
+      "clip_low": 0.0,
+      "mean_brightness": 135.9,
+      "file": "f_0004782_t005m18.80s.jpg"
+    },
+    {
+      "frame_index": 4900,
+      "timestamp_sec": 326.667,
+      "score": 770.02,
+      "clip_high": 0.1017,
+      "clip_low": 0.0279,
+      "mean_brightness": 118.0,
+      "file": "f_0004900_t005m26.67s.jpg"
+    },
+    {
+      "frame_index": 4962,
+      "timestamp_sec": 330.8,
+      "score": 308.97,
+      "clip_high": 0.1107,
+      "clip_low": 0.0,
+      "mean_brightness": 99.7,
+      "file": "f_0004962_t005m30.80s.jpg"
+    },
+    {
+      "frame_index": 5205,
+      "timestamp_sec": 347.0,
+      "score": 375.37,
+      "clip_high": 0.0464,
+      "clip_low": 0.0,
+      "mean_brightness": 111.6,
+      "file": "f_0005205_t005m47.00s.jpg"
+    },
+    {
+      "frame_index": 5325,
+      "timestamp_sec": 355.0,
+      "score": 413.69,
+      "clip_high": 0.0828,
+      "clip_low": 0.0005,
+      "mean_brightness": 117.8,
+      "file": "f_0005325_t005m55.00s.jpg"
+    },
+    {
+      "frame_index": 5460,
+      "timestamp_sec": 364.0,
+      "score": 394.53,
+      "clip_high": 0.0568,
+      "clip_low": 0.0001,
+      "mean_brightness": 113.6,
+      "file": "f_0005460_t006m04.00s.jpg"
+    },
+    {
+      "frame_index": 5625,
+      "timestamp_sec": 375.0,
+      "score": 589.41,
+      "clip_high": 0.033,
+      "clip_low": 0.0,
+      "mean_brightness": 101.3,
+      "file": "f_0005625_t006m15.00s.jpg"
+    },
+    {
+      "frame_index": 5715,
+      "timestamp_sec": 381.0,
+      "score": 286.6,
+      "clip_high": 0.0349,
+      "clip_low": 0.0,
+      "mean_brightness": 118.2,
+      "file": "f_0005715_t006m21.00s.jpg"
+    },
+    {
+      "frame_index": 5888,
+      "timestamp_sec": 392.533,
+      "score": 177.67,
+      "clip_high": 0.0298,
+      "clip_low": 0.0001,
+      "mean_brightness": 85.9,
+      "file": "f_0005888_t006m32.53s.jpg"
+    },
+    {
+      "frame_index": 6105,
+      "timestamp_sec": 407.0,
+      "score": 142.54,
+      "clip_high": 0.0605,
+      "clip_low": 0.0151,
+      "mean_brightness": 131.5,
+      "file": "f_0006105_t006m47.00s.jpg"
+    },
+    {
+      "frame_index": 6292,
+      "timestamp_sec": 419.467,
+      "score": 185.76,
+      "clip_high": 0.0948,
+      "clip_low": 0.0003,
+      "mean_brightness": 89.0,
+      "file": "f_0006292_t006m59.47s.jpg"
+    },
+    {
+      "frame_index": 6307,
+      "timestamp_sec": 420.467,
+      "score": 121.76,
+      "clip_high": 0.0863,
+      "clip_low": 0.0003,
+      "mean_brightness": 136.1,
+      "file": "f_0006307_t007m00.47s.jpg"
+    },
+    {
+      "frame_index": 6592,
+      "timestamp_sec": 439.467,
+      "score": 189.17,
+      "clip_high": 0.1012,
+      "clip_low": 0.0,
+      "mean_brightness": 148.4,
+      "file": "f_0006592_t007m19.47s.jpg"
+    },
+    {
+      "frame_index": 6607,
+      "timestamp_sec": 440.467,
+      "score": 251.76,
+      "clip_high": 0.0887,
+      "clip_low": 0.0004,
+      "mean_brightness": 119.0,
+      "file": "f_0006607_t007m20.47s.jpg"
+    },
+    {
+      "frame_index": 6855,
+      "timestamp_sec": 457.0,
+      "score": 297.83,
+      "clip_high": 0.0391,
+      "clip_low": 0.0,
+      "mean_brightness": 124.8,
+      "file": "f_0006855_t007m37.00s.jpg"
+    },
+    {
+      "frame_index": 6930,
+      "timestamp_sec": 462.0,
+      "score": 254.21,
+      "clip_high": 0.03,
+      "clip_low": 0.0,
+      "mean_brightness": 88.9,
+      "file": "f_0006930_t007m42.00s.jpg"
+    },
+    {
+      "frame_index": 7153,
+      "timestamp_sec": 476.867,
+      "score": 479.11,
+      "clip_high": 0.0424,
+      "clip_low": 0.0001,
+      "mean_brightness": 92.9,
+      "file": "f_0007153_t007m56.87s.jpg"
+    },
+    {
+      "frame_index": 7268,
+      "timestamp_sec": 484.533,
+      "score": 705.71,
+      "clip_high": 0.0003,
+      "clip_low": 0.0,
+      "mean_brightness": 151.8,
+      "file": "f_0007268_t008m04.53s.jpg"
+    },
+    {
+      "frame_index": 7381,
+      "timestamp_sec": 492.067,
+      "score": 434.03,
+      "clip_high": 0.0201,
+      "clip_low": 0.0,
+      "mean_brightness": 112.0,
+      "file": "f_0007381_t008m12.07s.jpg"
+    },
+    {
+      "frame_index": 7545,
+      "timestamp_sec": 503.0,
+      "score": 671.59,
+      "clip_high": 0.0287,
+      "clip_low": 0.0,
+      "mean_brightness": 117.2,
+      "file": "f_0007545_t008m23.00s.jpg"
+    },
+    {
+      "frame_index": 7732,
+      "timestamp_sec": 515.467,
+      "score": 347.04,
+      "clip_high": 0.0292,
+      "clip_low": 0.0361,
+      "mean_brightness": 109.7,
+      "file": "f_0007732_t008m35.47s.jpg"
+    },
+    {
+      "frame_index": 7920,
+      "timestamp_sec": 528.0,
+      "score": 130.01,
+      "clip_high": 0.08,
+      "clip_low": 0.0003,
+      "mean_brightness": 105.8,
+      "file": "f_0007920_t008m48.00s.jpg"
+    },
+    {
+      "frame_index": 8034,
+      "timestamp_sec": 535.6,
+      "score": 83.57,
+      "clip_high": 0.0449,
+      "clip_low": 0.0134,
+      "mean_brightness": 117.7,
+      "file": "f_0008034_t008m55.60s.jpg"
+    },
+    {
+      "frame_index": 8152,
+      "timestamp_sec": 543.467,
+      "score": 83.89,
+      "clip_high": 0.1163,
+      "clip_low": 0.0311,
+      "mean_brightness": 96.1,
+      "file": "f_0008152_t009m03.47s.jpg"
+    },
+    {
+      "frame_index": 8264,
+      "timestamp_sec": 550.933,
+      "score": 86.82,
+      "clip_high": 0.1033,
+      "clip_low": 0.0458,
+      "mean_brightness": 76.7,
+      "file": "f_0008264_t009m10.93s.jpg"
+    },
+    {
+      "frame_index": 8524,
+      "timestamp_sec": 568.267,
+      "score": 147.85,
+      "clip_high": 0.0469,
+      "clip_low": 0.0053,
+      "mean_brightness": 90.9,
+      "file": "f_0008524_t009m28.27s.jpg"
+    },
+    {
+      "frame_index": 8656,
+      "timestamp_sec": 577.067,
+      "score": 136.23,
+      "clip_high": 0.0627,
+      "clip_low": 0.0149,
+      "mean_brightness": 84.4,
+      "file": "f_0008656_t009m37.07s.jpg"
+    },
+    {
+      "frame_index": 8700,
+      "timestamp_sec": 580.0,
+      "score": 149.95,
+      "clip_high": 0.0232,
+      "clip_low": 0.0,
+      "mean_brightness": 118.4,
+      "file": "f_0008700_t009m40.00s.jpg"
+    },
+    {
+      "frame_index": 8970,
+      "timestamp_sec": 598.0,
+      "score": 337.79,
+      "clip_high": 0.0508,
+      "clip_low": 0.0004,
+      "mean_brightness": 111.9,
+      "file": "f_0008970_t009m58.00s.jpg"
+    },
+    {
+      "frame_index": 9045,
+      "timestamp_sec": 603.0,
+      "score": 387.89,
+      "clip_high": 0.0583,
+      "clip_low": 0.0003,
+      "mean_brightness": 115.2,
+      "file": "f_0009045_t010m03.00s.jpg"
+    },
+    {
+      "frame_index": 9165,
+      "timestamp_sec": 611.0,
+      "score": 367.72,
+      "clip_high": 0.0606,
+      "clip_low": 0.0003,
+      "mean_brightness": 114.1,
+      "file": "f_0009165_t010m11.00s.jpg"
+    },
+    {
+      "frame_index": 9300,
+      "timestamp_sec": 620.0,
+      "score": 106.65,
+      "clip_high": 0.0578,
+      "clip_low": 0.0,
+      "mean_brightness": 115.5,
+      "file": "f_0009300_t010m20.00s.jpg"
+    },
+    {
+      "frame_index": 9580,
+      "timestamp_sec": 638.667,
+      "score": 296.1,
+      "clip_high": 0.054,
+      "clip_low": 0.0,
+      "mean_brightness": 121.8,
+      "file": "f_0009580_t010m38.67s.jpg"
+    },
+    {
+      "frame_index": 9691,
+      "timestamp_sec": 646.067,
+      "score": 71.01,
+      "clip_high": 0.0145,
+      "clip_low": 0.0019,
+      "mean_brightness": 124.6,
+      "file": "f_0009691_t010m46.07s.jpg"
+    },
+    {
+      "frame_index": 9885,
+      "timestamp_sec": 659.0,
+      "score": 93.18,
+      "clip_high": 0.0049,
+      "clip_low": 0.0006,
+      "mean_brightness": 87.2,
+      "file": "f_0009885_t010m59.00s.jpg"
+    },
+    {
+      "frame_index": 10049,
+      "timestamp_sec": 669.933,
+      "score": 99.02,
+      "clip_high": 0.004,
+      "clip_low": 0.0,
+      "mean_brightness": 95.6,
+      "file": "f_0010049_t011m09.93s.jpg"
+    },
+    {
+      "frame_index": 10286,
+      "timestamp_sec": 685.733,
+      "score": 175.69,
+      "clip_high": 0.0037,
+      "clip_low": 0.0001,
+      "mean_brightness": 95.4,
+      "file": "f_0010286_t011m25.73s.jpg"
+    },
+    {
+      "frame_index": 10494,
+      "timestamp_sec": 699.6,
+      "score": 190.83,
+      "clip_high": 0.0647,
+      "clip_low": 0.0003,
+      "mean_brightness": 106.2,
+      "file": "f_0010494_t011m39.60s.jpg"
+    },
+    {
+      "frame_index": 10545,
+      "timestamp_sec": 703.0,
+      "score": 213.59,
+      "clip_high": 0.0386,
+      "clip_low": 0.0004,
+      "mean_brightness": 97.4,
+      "file": "f_0010545_t011m43.00s.jpg"
+    },
+    {
+      "frame_index": 10778,
+      "timestamp_sec": 718.533,
+      "score": 227.7,
+      "clip_high": 0.0327,
+      "clip_low": 0.0003,
+      "mean_brightness": 99.8,
+      "file": "f_0010778_t011m58.53s.jpg"
+    },
+    {
+      "frame_index": 10905,
+      "timestamp_sec": 727.0,
+      "score": 306.18,
+      "clip_high": 0.0374,
+      "clip_low": 0.0004,
+      "mean_brightness": 103.1,
+      "file": "f_0010905_t012m07.00s.jpg"
+    },
+    {
+      "frame_index": 11012,
+      "timestamp_sec": 734.133,
+      "score": 124.48,
+      "clip_high": 0.015,
+      "clip_low": 0.0061,
+      "mean_brightness": 102.6,
+      "file": "f_0011012_t012m14.13s.jpg"
+    },
+    {
+      "frame_index": 11175,
+      "timestamp_sec": 745.0,
+      "score": 127.07,
+      "clip_high": 0.0771,
+      "clip_low": 0.0315,
+      "mean_brightness": 85.1,
+      "file": "f_0011175_t012m25.00s.jpg"
+    },
+    {
+      "frame_index": 11332,
+      "timestamp_sec": 755.467,
+      "score": 120.36,
+      "clip_high": 0.0301,
+      "clip_low": 0.0,
+      "mean_brightness": 130.3,
+      "file": "f_0011332_t012m35.47s.jpg"
+    },
+    {
+      "frame_index": 11446,
+      "timestamp_sec": 763.067,
+      "score": 94.76,
+      "clip_high": 0.0104,
+      "clip_low": 0.0052,
+      "mean_brightness": 135.1,
+      "file": "f_0011446_t012m43.07s.jpg"
+    },
+    {
+      "frame_index": 11651,
+      "timestamp_sec": 776.733,
+      "score": 256.46,
+      "clip_high": 0.0856,
+      "clip_low": 0.0106,
+      "mean_brightness": 71.4,
+      "file": "f_0011651_t012m56.73s.jpg"
+    },
+    {
+      "frame_index": 11726,
+      "timestamp_sec": 781.733,
+      "score": 271.49,
+      "clip_high": 0.117,
+      "clip_low": 0.0037,
+      "mean_brightness": 85.9,
+      "file": "f_0011726_t013m01.73s.jpg"
+    },
+    {
+      "frame_index": 11952,
+      "timestamp_sec": 796.8,
+      "score": 133.53,
+      "clip_high": 0.0979,
+      "clip_low": 0.0309,
       "mean_brightness": 121.7,
-      "file": "f_0000330_t000m22.00s.jpg"
+      "file": "f_0011952_t013m16.80s.jpg"
     },
     {
-      "frame_index": 510,
-      "timestamp_sec": 34.0,
-      "score": 97.74,
-      "clip_high": 0.0281,
+      "frame_index": 12084,
+      "timestamp_sec": 805.6,
+      "score": 661.26,
+      "clip_high": 0.0345,
+      "clip_low": 0.0002,
+      "mean_brightness": 114.8,
+      "file": "f_0012084_t013m25.60s.jpg"
+    },
+    {
+      "frame_index": 12165,
+      "timestamp_sec": 811.0,
+      "score": 427.14,
+      "clip_high": 0.0507,
+      "clip_low": 0.0,
+      "mean_brightness": 100.0,
+      "file": "f_0012165_t013m31.00s.jpg"
+    },
+    {
+      "frame_index": 12435,
+      "timestamp_sec": 829.0,
+      "score": 352.65,
+      "clip_high": 0.0263,
+      "clip_low": 0.0003,
+      "mean_brightness": 85.3,
+      "file": "f_0012435_t013m49.00s.jpg"
+    },
+    {
+      "frame_index": 12585,
+      "timestamp_sec": 839.0,
+      "score": 865.61,
+      "clip_high": 0.0289,
+      "clip_low": 0.0002,
+      "mean_brightness": 130.7,
+      "file": "f_0012585_t013m59.00s.jpg"
+    },
+    {
+      "frame_index": 12630,
+      "timestamp_sec": 842.0,
+      "score": 1432.62,
+      "clip_high": 0.0331,
+      "clip_low": 0.0013,
+      "mean_brightness": 121.8,
+      "file": "f_0012630_t014m02.00s.jpg"
+    },
+    {
+      "frame_index": 12776,
+      "timestamp_sec": 851.733,
+      "score": 128.21,
+      "clip_high": 0.1198,
+      "clip_low": 0.0007,
+      "mean_brightness": 142.5,
+      "file": "f_0012776_t014m11.73s.jpg"
+    },
+    {
+      "frame_index": 13018,
+      "timestamp_sec": 867.867,
+      "score": 82.8,
+      "clip_high": 0.0063,
+      "clip_low": 0.0415,
+      "mean_brightness": 118.5,
+      "file": "f_0013018_t014m27.87s.jpg"
+    },
+    {
+      "frame_index": 13095,
+      "timestamp_sec": 873.0,
+      "score": 139.06,
+      "clip_high": 0.0445,
+      "clip_low": 0.0497,
+      "mean_brightness": 106.4,
+      "file": "f_0013095_t014m33.00s.jpg"
+    },
+    {
+      "frame_index": 13237,
+      "timestamp_sec": 882.467,
+      "score": 153.96,
+      "clip_high": 0.0007,
+      "clip_low": 0.0298,
+      "mean_brightness": 112.0,
+      "file": "f_0013237_t014m42.47s.jpg"
+    },
+    {
+      "frame_index": 13363,
+      "timestamp_sec": 890.867,
+      "score": 113.7,
+      "clip_high": 0.0185,
+      "clip_low": 0.0,
+      "mean_brightness": 91.7,
+      "file": "f_0013363_t014m50.87s.jpg"
+    },
+    {
+      "frame_index": 13558,
+      "timestamp_sec": 903.867,
+      "score": 151.13,
+      "clip_high": 0.0942,
+      "clip_low": 0.0005,
+      "mean_brightness": 124.9,
+      "file": "f_0013558_t015m03.87s.jpg"
+    },
+    {
+      "frame_index": 13653,
+      "timestamp_sec": 910.2,
+      "score": 50.29,
+      "clip_high": 0.0004,
+      "clip_low": 0.0508,
+      "mean_brightness": 99.8,
+      "file": "f_0013653_t015m10.20s.jpg"
+    },
+    {
+      "frame_index": 13825,
+      "timestamp_sec": 921.667,
+      "score": 25.68,
+      "clip_high": 0.0325,
+      "clip_low": 0.0083,
+      "mean_brightness": 126.7,
+      "file": "f_0013825_t015m21.67s.jpg"
+    },
+    {
+      "frame_index": 14062,
+      "timestamp_sec": 937.467,
+      "score": 132.4,
+      "clip_high": 0.0287,
+      "clip_low": 0.0,
+      "mean_brightness": 106.9,
+      "file": "f_0014062_t015m37.47s.jpg"
+    },
+    {
+      "frame_index": 14209,
+      "timestamp_sec": 947.267,
+      "score": 57.44,
+      "clip_high": 0.0012,
+      "clip_low": 0.0039,
+      "mean_brightness": 107.9,
+      "file": "f_0014209_t015m47.27s.jpg"
+    },
+    {
+      "frame_index": 14398,
+      "timestamp_sec": 959.867,
+      "score": 168.05,
+      "clip_high": 0.041,
+      "clip_low": 0.0,
+      "mean_brightness": 127.1,
+      "file": "f_0014398_t015m59.87s.jpg"
+    },
+    {
+      "frame_index": 14505,
+      "timestamp_sec": 967.0,
+      "score": 838.06,
+      "clip_high": 0.0377,
+      "clip_low": 0.0009,
+      "mean_brightness": 94.5,
+      "file": "f_0014505_t016m07.00s.jpg"
+    },
+    {
+      "frame_index": 14655,
+      "timestamp_sec": 977.0,
+      "score": 441.22,
+      "clip_high": 0.0966,
+      "clip_low": 0.0,
+      "mean_brightness": 111.1,
+      "file": "f_0014655_t016m17.00s.jpg"
+    },
+    {
+      "frame_index": 14775,
+      "timestamp_sec": 985.0,
+      "score": 362.52,
+      "clip_high": 0.0549,
+      "clip_low": 0.0,
+      "mean_brightness": 143.6,
+      "file": "f_0014775_t016m25.00s.jpg"
+    },
+    {
+      "frame_index": 14880,
+      "timestamp_sec": 992.0,
+      "score": 366.04,
+      "clip_high": 0.0744,
+      "clip_low": 0.0,
+      "mean_brightness": 132.9,
+      "file": "f_0014880_t016m32.00s.jpg"
+    },
+    {
+      "frame_index": 15134,
+      "timestamp_sec": 1008.933,
+      "score": 525.2,
+      "clip_high": 0.0401,
+      "clip_low": 0.0,
+      "mean_brightness": 118.7,
+      "file": "f_0015134_t016m48.93s.jpg"
+    },
+    {
+      "frame_index": 15237,
+      "timestamp_sec": 1015.8,
+      "score": 905.57,
+      "clip_high": 0.011,
+      "clip_low": 0.0,
+      "mean_brightness": 128.0,
+      "file": "f_0015237_t016m55.80s.jpg"
+    },
+    {
+      "frame_index": 15314,
+      "timestamp_sec": 1020.933,
+      "score": 765.78,
+      "clip_high": 0.0398,
+      "clip_low": 0.0022,
+      "mean_brightness": 100.1,
+      "file": "f_0015314_t017m00.93s.jpg"
+    },
+    {
+      "frame_index": 15488,
+      "timestamp_sec": 1032.533,
+      "score": 359.06,
+      "clip_high": 0.0115,
+      "clip_low": 0.0077,
+      "mean_brightness": 94.1,
+      "file": "f_0015488_t017m12.53s.jpg"
+    },
+    {
+      "frame_index": 15600,
+      "timestamp_sec": 1040.0,
+      "score": 324.03,
+      "clip_high": 0.0788,
       "clip_low": 0.0001,
-      "mean_brightness": 120.4,
-      "file": "f_0000510_t000m34.00s.jpg"
+      "mean_brightness": 96.6,
+      "file": "f_0015600_t017m20.00s.jpg"
     },
     {
-      "frame_index": 705,
-      "timestamp_sec": 47.0,
-      "score": 103.78,
-      "clip_high": 0.0353,
+      "frame_index": 15870,
+      "timestamp_sec": 1058.0,
+      "score": 289.8,
+      "clip_high": 0.1093,
       "clip_low": 0.0,
-      "mean_brightness": 123.7,
-      "file": "f_0000705_t000m47.00s.jpg"
+      "mean_brightness": 119.4,
+      "file": "f_0015870_t017m38.00s.jpg"
     },
     {
-      "frame_index": 795,
-      "timestamp_sec": 53.0,
-      "score": 108.02,
-      "clip_high": 0.0338,
+      "frame_index": 16020,
+      "timestamp_sec": 1068.0,
+      "score": 297.57,
+      "clip_high": 0.0802,
       "clip_low": 0.0,
-      "mean_brightness": 123.5,
-      "file": "f_0000795_t000m53.00s.jpg"
+      "mean_brightness": 106.0,
+      "file": "f_0016020_t017m48.00s.jpg"
     },
     {
-      "frame_index": 1050,
-      "timestamp_sec": 70.0,
-      "score": 100.45,
-      "clip_high": 0.0315,
+      "frame_index": 16080,
+      "timestamp_sec": 1072.0,
+      "score": 315.56,
+      "clip_high": 0.0782,
+      "clip_low": 0.0002,
+      "mean_brightness": 91.8,
+      "file": "f_0016080_t017m52.00s.jpg"
+    },
+    {
+      "frame_index": 16204,
+      "timestamp_sec": 1080.267,
+      "score": 200.79,
+      "clip_high": 0.1178,
+      "clip_low": 0.0129,
+      "mean_brightness": 87.4,
+      "file": "f_0016204_t018m00.27s.jpg"
+    },
+    {
+      "frame_index": 16426,
+      "timestamp_sec": 1095.067,
+      "score": 82.8,
+      "clip_high": 0.1142,
+      "clip_low": 0.0299,
+      "mean_brightness": 108.6,
+      "file": "f_0016426_t018m15.07s.jpg"
+    },
+    {
+      "frame_index": 16642,
+      "timestamp_sec": 1109.467,
+      "score": 75.25,
+      "clip_high": 0.116,
+      "clip_low": 0.0404,
+      "mean_brightness": 86.1,
+      "file": "f_0016642_t018m29.47s.jpg"
+    },
+    {
+      "frame_index": 16792,
+      "timestamp_sec": 1119.467,
+      "score": 267.54,
+      "clip_high": 0.0565,
+      "clip_low": 0.0,
+      "mean_brightness": 142.9,
+      "file": "f_0016792_t018m39.47s.jpg"
+    },
+    {
+      "frame_index": 16875,
+      "timestamp_sec": 1125.0,
+      "score": 565.23,
+      "clip_high": 0.0775,
+      "clip_low": 0.0007,
+      "mean_brightness": 94.0,
+      "file": "f_0016875_t018m45.00s.jpg"
+    },
+    {
+      "frame_index": 17086,
+      "timestamp_sec": 1139.067,
+      "score": 519.43,
+      "clip_high": 0.0933,
+      "clip_low": 0.0005,
+      "mean_brightness": 105.6,
+      "file": "f_0017086_t018m59.07s.jpg"
+    },
+    {
+      "frame_index": 17100,
+      "timestamp_sec": 1140.0,
+      "score": 719.86,
+      "clip_high": 0.0871,
+      "clip_low": 0.0012,
+      "mean_brightness": 93.2,
+      "file": "f_0017100_t019m00.00s.jpg"
+    },
+    {
+      "frame_index": 17251,
+      "timestamp_sec": 1150.067,
+      "score": 92.68,
+      "clip_high": 0.0627,
+      "clip_low": 0.0098,
+      "mean_brightness": 118.3,
+      "file": "f_0017251_t019m10.07s.jpg"
+    },
+    {
+      "frame_index": 17546,
+      "timestamp_sec": 1169.733,
+      "score": 52.7,
+      "clip_high": 0.0069,
+      "clip_low": 0.0006,
+      "mean_brightness": 142.2,
+      "file": "f_0017546_t019m29.73s.jpg"
+    },
+    {
+      "frame_index": 17638,
+      "timestamp_sec": 1175.867,
+      "score": 72.12,
+      "clip_high": 0.004,
+      "clip_low": 0.0,
+      "mean_brightness": 140.4,
+      "file": "f_0017638_t019m35.87s.jpg"
+    },
+    {
+      "frame_index": 17727,
+      "timestamp_sec": 1181.8,
+      "score": 50.87,
+      "clip_high": 0.011,
+      "clip_low": 0.0,
+      "mean_brightness": 145.4,
+      "file": "f_0017727_t019m41.80s.jpg"
+    },
+    {
+      "frame_index": 17880,
+      "timestamp_sec": 1192.0,
+      "score": 48.14,
+      "clip_high": 0.0136,
+      "clip_low": 0.0,
+      "mean_brightness": 135.4,
+      "file": "f_0017880_t019m52.00s.jpg"
+    },
+    {
+      "frame_index": 18141,
+      "timestamp_sec": 1209.4,
+      "score": 48.61,
+      "clip_high": 0.0209,
+      "clip_low": 0.0,
+      "mean_brightness": 138.0,
+      "file": "f_0018141_t020m09.40s.jpg"
+    },
+    {
+      "frame_index": 18219,
+      "timestamp_sec": 1214.6,
+      "score": 67.98,
+      "clip_high": 0.0309,
+      "clip_low": 0.0,
+      "mean_brightness": 127.9,
+      "file": "f_0018219_t020m14.60s.jpg"
+    },
+    {
+      "frame_index": 18446,
+      "timestamp_sec": 1229.733,
+      "score": 59.57,
+      "clip_high": 0.0262,
+      "clip_low": 0.0,
+      "mean_brightness": 133.4,
+      "file": "f_0018446_t020m29.73s.jpg"
+    },
+    {
+      "frame_index": 18480,
+      "timestamp_sec": 1232.0,
+      "score": 62.68,
+      "clip_high": 0.0272,
+      "clip_low": 0.0,
+      "mean_brightness": 130.9,
+      "file": "f_0018480_t020m32.00s.jpg"
+    },
+    {
+      "frame_index": 18722,
+      "timestamp_sec": 1248.133,
+      "score": 60.23,
+      "clip_high": 0.0247,
+      "clip_low": 0.0,
+      "mean_brightness": 146.0,
+      "file": "f_0018722_t020m48.13s.jpg"
+    },
+    {
+      "frame_index": 18757,
+      "timestamp_sec": 1250.467,
+      "score": 59.87,
+      "clip_high": 0.0251,
+      "clip_low": 0.0,
+      "mean_brightness": 136.7,
+      "file": "f_0018757_t020m50.47s.jpg"
+    },
+    {
+      "frame_index": 18915,
+      "timestamp_sec": 1261.0,
+      "score": 45.08,
+      "clip_high": 0.0098,
+      "clip_low": 0.0002,
+      "mean_brightness": 138.6,
+      "file": "f_0018915_t021m01.00s.jpg"
+    },
+    {
+      "frame_index": 19110,
+      "timestamp_sec": 1274.0,
+      "score": 82.29,
+      "clip_high": 0.0333,
+      "clip_low": 0.0008,
+      "mean_brightness": 126.6,
+      "file": "f_0019110_t021m14.00s.jpg"
+    },
+    {
+      "frame_index": 19306,
+      "timestamp_sec": 1287.067,
+      "score": 44.5,
+      "clip_high": 0.0,
+      "clip_low": 0.0001,
+      "mean_brightness": 191.7,
+      "file": "f_0019306_t021m27.07s.jpg"
+    },
+    {
+      "frame_index": 19470,
+      "timestamp_sec": 1298.0,
+      "score": 43.38,
+      "clip_high": 0.0,
+      "clip_low": 0.2296,
+      "mean_brightness": 14.3,
+      "file": "f_0019470_t021m38.00s.jpg"
+    },
+    {
+      "frame_index": 19571,
+      "timestamp_sec": 1304.733,
+      "score": 47.01,
+      "clip_high": 0.0875,
+      "clip_low": 0.0,
+      "mean_brightness": 143.8,
+      "file": "f_0019571_t021m44.73s.jpg"
+    },
+    {
+      "frame_index": 19674,
+      "timestamp_sec": 1311.6,
+      "score": 38.86,
+      "clip_high": 0.0,
+      "clip_low": 0.0825,
+      "mean_brightness": 63.9,
+      "file": "f_0019674_t021m51.60s.jpg"
+    },
+    {
+      "frame_index": 19875,
+      "timestamp_sec": 1325.0,
+      "score": 12.26,
+      "clip_high": 0.0,
+      "clip_low": 0.1962,
+      "mean_brightness": 45.3,
+      "file": "f_0019875_t022m05.00s.jpg"
+    },
+    {
+      "frame_index": 20248,
+      "timestamp_sec": 1349.867,
+      "score": 17.0,
+      "clip_high": 0.1111,
+      "clip_low": 0.0,
+      "mean_brightness": 151.4,
+      "file": "f_0020248_t022m29.87s.jpg"
+    },
+    {
+      "frame_index": 20317,
+      "timestamp_sec": 1354.467,
+      "score": 27.32,
+      "clip_high": 0.0266,
+      "clip_low": 0.0001,
+      "mean_brightness": 113.6,
+      "file": "f_0020317_t022m34.47s.jpg"
+    },
+    {
+      "frame_index": 20405,
+      "timestamp_sec": 1360.333,
+      "score": 57.12,
+      "clip_high": 0.0211,
+      "clip_low": 0.0001,
+      "mean_brightness": 129.5,
+      "file": "f_0020405_t022m40.33s.jpg"
+    },
+    {
+      "frame_index": 20605,
+      "timestamp_sec": 1373.667,
+      "score": 119.08,
+      "clip_high": 0.1119,
+      "clip_low": 0.0073,
+      "mean_brightness": 99.9,
+      "file": "f_0020605_t022m53.67s.jpg"
+    },
+    {
+      "frame_index": 20700,
+      "timestamp_sec": 1380.0,
+      "score": 15.61,
+      "clip_high": 0.0401,
+      "clip_low": 0.0,
+      "mean_brightness": 97.6,
+      "file": "f_0020700_t023m00.00s.jpg"
+    },
+    {
+      "frame_index": 20988,
+      "timestamp_sec": 1399.2,
+      "score": 25.23,
+      "clip_high": 0.0589,
+      "clip_low": 0.0,
+      "mean_brightness": 128.7,
+      "file": "f_0020988_t023m19.20s.jpg"
+    },
+    {
+      "frame_index": 21071,
+      "timestamp_sec": 1404.733,
+      "score": 6.04,
+      "clip_high": 0.0447,
+      "clip_low": 0.0,
+      "mean_brightness": 104.7,
+      "file": "f_0021071_t023m24.73s.jpg"
+    },
+    {
+      "frame_index": 21511,
+      "timestamp_sec": 1434.067,
+      "score": 179.13,
+      "clip_high": 0.0013,
+      "clip_low": 0.0002,
+      "mean_brightness": 123.2,
+      "file": "f_0021511_t023m54.07s.jpg"
+    },
+    {
+      "frame_index": 21680,
+      "timestamp_sec": 1445.333,
+      "score": 138.14,
+      "clip_high": 0.0043,
+      "clip_low": 0.0005,
+      "mean_brightness": 117.2,
+      "file": "f_0021680_t024m05.33s.jpg"
+    },
+    {
+      "frame_index": 21867,
+      "timestamp_sec": 1457.8,
+      "score": 40.82,
+      "clip_high": 0.0,
       "clip_low": 0.0,
       "mean_brightness": 122.4,
-      "file": "f_0001050_t001m10.00s.jpg"
+      "file": "f_0021867_t024m17.80s.jpg"
     },
     {
-      "frame_index": 1290,
-      "timestamp_sec": 86.0,
-      "score": 100.82,
-      "clip_high": 0.034,
+      "frame_index": 21916,
+      "timestamp_sec": 1461.067,
+      "score": 84.41,
+      "clip_high": 0.0003,
       "clip_low": 0.0,
-      "mean_brightness": 122.9,
-      "file": "f_0001290_t001m26.00s.jpg"
+      "mean_brightness": 121.6,
+      "file": "f_0021916_t024m21.07s.jpg"
     },
     {
-      "frame_index": 1455,
-      "timestamp_sec": 97.0,
-      "score": 101.08,
-      "clip_high": 0.0327,
+      "frame_index": 22063,
+      "timestamp_sec": 1470.867,
+      "score": 67.32,
+      "clip_high": 0.0095,
       "clip_low": 0.0,
-      "mean_brightness": 122.8,
-      "file": "f_0001455_t001m37.00s.jpg"
+      "mean_brightness": 145.0,
+      "file": "f_0022063_t024m30.87s.jpg"
     },
     {
-      "frame_index": 1635,
-      "timestamp_sec": 109.0,
-      "score": 96.4,
-      "clip_high": 0.0305,
+      "frame_index": 22208,
+      "timestamp_sec": 1480.533,
+      "score": 19.43,
+      "clip_high": 0.0355,
       "clip_low": 0.0,
-      "mean_brightness": 122.2,
-      "file": "f_0001635_t001m49.00s.jpg"
+      "mean_brightness": 100.9,
+      "file": "f_0022208_t024m40.53s.jpg"
     },
     {
-      "frame_index": 1890,
-      "timestamp_sec": 126.0,
-      "score": 101.93,
-      "clip_high": 0.031,
+      "frame_index": 24815,
+      "timestamp_sec": 1654.333,
+      "score": 32.18,
+      "clip_high": 0.0829,
       "clip_low": 0.0,
-      "mean_brightness": 122.5,
-      "file": "f_0001890_t002m06.00s.jpg"
-    },
-    {
-      "frame_index": 2295,
-      "timestamp_sec": 153.0,
-      "score": 97.43,
-      "clip_high": 0.0351,
-      "clip_low": 0.0,
-      "mean_brightness": 122.9,
-      "file": "f_0002295_t002m33.00s.jpg"
-    },
-    {
-      "frame_index": 2400,
-      "timestamp_sec": 160.0,
-      "score": 100.29,
-      "clip_high": 0.0329,
-      "clip_low": 0.0,
-      "mean_brightness": 122.0,
-      "file": "f_0002400_t002m40.00s.jpg"
-    },
-    {
-      "frame_index": 2595,
-      "timestamp_sec": 173.0,
-      "score": 100.49,
-      "clip_high": 0.029,
-      "clip_low": 0.0,
-      "mean_brightness": 122.7,
-      "file": "f_0002595_t002m53.00s.jpg"
-    },
-    {
-      "frame_index": 2955,
-      "timestamp_sec": 197.0,
-      "score": 100.18,
-      "clip_high": 0.0292,
-      "clip_low": 0.0,
-      "mean_brightness": 123.0,
-      "file": "f_0002955_t003m17.00s.jpg"
-    },
-    {
-      "frame_index": 3180,
-      "timestamp_sec": 212.0,
-      "score": 90.84,
-      "clip_high": 0.0274,
-      "clip_low": 0.0,
-      "mean_brightness": 120.8,
-      "file": "f_0003180_t003m32.00s.jpg"
+      "mean_brightness": 186.4,
+      "file": "f_0024815_t027m34.33s.jpg"
     }
   ]
 }

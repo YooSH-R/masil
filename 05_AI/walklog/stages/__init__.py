@@ -14,27 +14,36 @@ from .compose import ComposeError, compose_walk_log
 from .illustrate import (
     IllustrateError,
     KeyScene,
+    build_journal,
     build_single_image,
     build_story_image,
     build_storyboard,
+    compose_journal,
     compose_storyboard,
+    event_score,
     scene_changed,
+    select_key_events,
     select_key_scenes,
 )
-from .observe import FrameFailure, observe_frame, observe_frames
+from .observe import FrameFailure, observe_frame, observe_frames, observe_outdoor_frames
 
 __all__ = [
     "observe_frame",
     "observe_frames",
+    "observe_outdoor_frames",
     "FrameFailure",
     "compose_walk_log",
     "ComposeError",
     "select_key_scenes",
+    "select_key_events",
+    "event_score",
     "scene_changed",
     "KeyScene",
     "build_storyboard",
     "build_single_image",
     "build_story_image",
+    "build_journal",
     "compose_storyboard",
+    "compose_journal",
     "IllustrateError",
 ]

@@ -40,9 +40,19 @@ PRIVACY_KO_ONELINE = "사람에 대한 외모 묘사, 특정 상호명, 차량 �
 
 # Stage 3(이미지 프롬프트) 영어판.
     # 번호 붙은 목록 안에 삽입되므로 둘째 줄 들여쓰기 3칸을 유지해야 한다.
+    #
+    # 인물을 "먼 실루엣으로만 그려라"는 완화 서술이었으나, 2026-08-05
+    # session3 event_02에서 "silhouette of a person's head" 서술을 이미지
+    # 모델이 식별 가능한 얼굴(눈/눈썹)로 승격시킨 사례가 확인됐다. 실루엣도
+    # "사람이 있다"는 신호를 남기면 모델이 디테일을 채워 넣을 여지가
+    # 생기므로, 완화가 아니라 전면 배제로 바꿨다. 관찰 기록(FRAME_EXTRACT)의
+    # people 필드는 기록이 사실이어야 하므로 그대로 둔다 - 배제는 이미지
+    # 프롬프트 단계에서만 적용한다.
 PRIVACY_EN = """\
 Do Not include any recognizable person, face, logo, brand name, text, or license plate.
-   If people appear in the records, render them only as distant silhouettes.
+   Do not include people, human figures, faces, or body parts in the prompt at all -
+   omit them from the scene entirely, even if they appear in the records or reference.
+   Describe the scene as if no person were present.
 """
 
 

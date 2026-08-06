@@ -12,11 +12,14 @@
     python run_walk_log.py --started-at 2026-07-28T08:12:03
     python run_walk_log.py --records outputs/2026-07-28/frame_records.json --no-observe
     python run_walk_log.py --limit 2 --dump-payload    # 2장만, 요청 덤프
-    python run_walk_log.py --quarters 6                 # 6등분, 6장만 VLM 호출
+    python run_walk_log.py                              # 표본 자동 계산 (전체의 약 10%, 4~12장)
+    python run_walk_log.py --quarters 6                 # 등분 수를 6으로 직접 지정
+    python run_walk_log.py --sample-ratio 0.15           # 자동 계산 비율만 바꿈 (등분 수는 유지)
     python run_walk_log.py --no-sample                  # 표본 추출 없이 전부 처리
     python run_walk_log.py --style story --story-image --image-style watercolor
                                                          # 이야기 문체 + 감성 이미지 한 장
     python run_walk_log.py --session 2                  # 세션 번호를 직접 지정
+    python run_walk_log.py --allow-indoor                # 실내 프레임 배제/대체를 끈다 (실내 테스트 영상용)
 
 [분할 전에서 바뀐 점]
 1. --started-at / --location 이 생겼다. 분할 전에는 shot_datetime이 항상 "불명"이라
@@ -58,13 +61,16 @@ from ..records import (
     UNKNOWN,
     RecordsError,
     WalkInfo,
+    adaptive_sample_size,
     dump_records,
     iter_frames,
     load_records,
+    outdoor,
     sample_time_quantiles,
     walk_duration,
+    walk_time_range,
 )
-from ..stages import ComposeError, compose_walk_log, observe_frames
+from ..stages import ComposeError, compose_walk_log, observe_frames, observe_outdoor_frames
 from . import common
 
 __all__ = ["build_parser", "main"]
@@ -91,14 +97,18 @@ def build_parser() -> argparse.ArgumentParser:
                         help="기존 관찰 기록을 읽는다 (--no-observe 와 함께)")
     source.add_argument("--limit", type=int, default=None,
                         help="앞에서 N장만 처리 (동작 확인용)")
-    source.add_argument("--quarters", type=int, default=4,
-                        help="표본 추출 등분 수. 산책 시간을 이 수만큼 등분해 "
-                             "각 구간 중앙 밴드에서 무작위로 1장씩만 VLM에 보낸다 "
-                             "(기본: 4)")
+    source.add_argument("--quarters", type=int, default=None,
+                        help="표본 등분 수를 직접 지정. 생략하면 전체 프레임의 약 10%% "
+                             "(최소 4, 최대 12)로 자동 계산")
+    source.add_argument("--sample-ratio", type=float, default=None,
+                        help="자동 계산 비율을 바꾼다 (기본 0.10)")
     source.add_argument("--no-sample", action="store_true",
                         help="표본 추출을 건너뛰고 추출된 프레임 전부를 처리한다")
     source.add_argument("--sample-seed", type=int, default=None,
                         help="표본 추출 난수 시드 (재현 가능한 결과가 필요할 때)")
+    source.add_argument("--allow-indoor", action="store_true",
+                        help="실내 프레임을 배제하지 않고 그대로 사용한다 "
+                             "(실내 테스트 영상용)")
 
     stages = parser.add_argument_group("단계 선택")
     stages.add_argument("--no-observe", action="store_true",
@@ -114,6 +124,9 @@ def build_parser() -> argparse.ArgumentParser:
                         choices=list(P.IMAGE_STYLES))
     stages.add_argument("--story-image", action="store_true",
                         help="일지(이야기)를 바탕으로 감성 이미지 한 장을 생성")
+    stages.add_argument("--verify-image", action="store_true",
+                        help="감성 이미지가 여정을 반영했는지 VLM으로 검증하고, "
+                             "불합격 시 최대 2회 재생성 (검증·재생성마다 API 비용 추가)")
 
     tuning = parser.add_argument_group("Stage 1 튜닝")
     tuning.add_argument("--no-thinking", action="store_true",
@@ -183,40 +196,73 @@ def main(argv: Sequence[str] | None = None) -> int:
             if walk.started_at is None and loaded_walk.started_at:
                 walk = loaded_walk
         else:
-            metas = iter_frames(args.frames, manifest=_resolve_manifest(args),
-                                walk=walk)
+            full_metas = iter_frames(args.frames, manifest=_resolve_manifest(args),
+                                     walk=walk)
+            metas = full_metas
             if not args.no_sample:
                 before = len(metas)
+                if args.quarters is not None:
+                    n = args.quarters
+                    how = f"{n}등분 (직접 지정)"
+                else:
+                    n = adaptive_sample_size(
+                        before,
+                        ratio=args.sample_ratio or config.SAMPLE_RATIO)
+                    how = (f"{n}등분 (전체 {before}장의 "
+                           f"약 {int((args.sample_ratio or config.SAMPLE_RATIO)*100)}%,"
+                           f" {config.SAMPLE_MIN}~{config.SAMPLE_MAX} 범위)")
                 rng = random.Random(args.sample_seed) \
                     if args.sample_seed is not None else None
-                metas = sample_time_quantiles(metas, args.quarters, rng=rng)
-                step(f"[표본 추출] {before}개 -> {len(metas)}개 "
-                     f"({args.quarters}등분, 구간 중앙 밴드에서 무작위 1장)")
+                metas = sample_time_quantiles(metas, n, rng=rng)
+                step(f"[표본 추출] {before}개 -> {len(metas)}개 ({how}, "
+                     f"구간 중앙 밴드)")
             if args.limit:
                 metas = metas[:args.limit]
             step(f"[Stage 1] 프레임 {len(metas)}개 -> 관찰 기록")
 
-            records, failures = observe_frames(
-                client, metas, spec=_frame_spec(args),
-                max_attempts=args.max_attempts,
-            )
+            if args.allow_indoor:
+                records, failures = observe_frames(
+                    client, metas, spec=_frame_spec(args),
+                    max_attempts=args.max_attempts,
+                )
+            else:
+                records = observe_outdoor_frames(
+                    client, metas, full_metas, spec=_frame_spec(args),
+                    max_attempts=args.max_attempts,
+                )
+                failures = []
             common.report_failures(failures)
             if not records:
                 warn("모든 프레임 처리에 실패했습니다")
                 return common.EXIT_ERROR
 
+            # frame_records.json에는 실내 판정본도 그대로 남긴다(감사 가능성).
+            # 다운스트림(일지/이미지) 재료로는 아래에서 outdoor()로만 거른다.
             dump_records(records, records_path, walk=walk,
                          prompt_version=P.PROMPT_VERSION)
             paths["관찰 기록"] = records_path
 
+        if args.allow_indoor:
+            content_records = records
+        else:
+            content_records = outdoor(records)
+            if not content_records:
+                warn("야외 기록이 없어(전부 실내) 실내 기록을 포함해 진행합니다.")
+                content_records = records
+
         # ---------------------------------------------- Stage 2
+        # 일지 본문은 content_records(실내 배제 후)를 재료로 쓴다. 소요시간은
+        # 실제 산책 전체를 반영해야 하므로 records(실내 포함) 기준을 유지한다.
         if not args.no_diary:
             diary = compose_walk_log(
-                client, records,
+                client, content_records,
                 walk_date=args.date or (walk.date if walk.date != UNKNOWN else None),
                 duration=walk_duration(records),
                 style=args.style,
             )
+            time_range = walk_time_range(walk, records)
+            if time_range:
+                diary = diary.rstrip() + f"\n- 시간: {time_range[0]} ~ {time_range[1]}\n"
             diary_path = run_dir / config.DIARY_NAME
             diary_path.write_text(diary, encoding="utf-8")
             paths["산책 일지"] = diary_path
@@ -233,9 +279,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             from ..stages.illustrate import IllustrateError, build_story_image
             try:
                 image_path = build_story_image(
-                    client, records, diary,
+                    client, content_records, diary,
                     run_dir / config.STORY_IMAGE_NAME,
                     style=args.image_style,
+                    verify=args.verify_image,
                 )
                 paths["감성 이미지"] = image_path
             except IllustrateError as exc:
@@ -246,7 +293,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.image_prompt:
             from ..stages.illustrate import select_key_scenes, write_scene_prompt
 
-            scenes = select_key_scenes(records, 1)
+            scenes = select_key_scenes(content_records, 1)
             prompt = write_scene_prompt(client, scenes[0], position=1, total=1,
                                         style=args.image_style)
             info("")
