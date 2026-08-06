@@ -11,7 +11,7 @@ pipeline {
         booleanParam(
             name: 'FORCE_BACKEND_BUILD',
             defaultValue: false,
-            description: '백엔드 변경이 없어도 운영 이미지를 빌드하고 배포한다.'
+            description: '백엔드 변경이 없어도 운영 이미지를 빌드하고 배포합니다.'
         )
     }
 
@@ -21,6 +21,8 @@ pipeline {
         K8S_NAMESPACE = 's15a203-prod'
         MANIFEST_DIR = '06_Infra/prod'
         MIGRATION_DIR = '06_Infra/postgres/init'
+        PROD_HEALTH_URL = 'https://i15a203.p.ssafy.io/api/v3/api-docs'
+        PROD_DB_BACKUP_RETENTION_DAYS = '14'
     }
 
     stages {
@@ -31,8 +33,8 @@ pipeline {
                             env.GIT_BRANCH?.replaceFirst(/^origin\//, '')
                     if (branch && branch != env.TARGET_BRANCH) {
                         error(
-                                "운영 파이프라인은 ${env.TARGET_BRANCH} " +
-                                "브랜치만 배포할 수 있습니다. 현재 브랜치: ${branch}"
+                            "운영 파이프라인은 ${env.TARGET_BRANCH} 브랜치만 " +
+                            "배포할 수 있습니다. 현재 브랜치: ${branch}"
                         )
                     }
                 }
@@ -77,9 +79,7 @@ pipeline {
                     def migrationChanged = changedFiles
                             .readLines()
                             .any {
-                                it.startsWith(
-                                        '06_Infra/postgres/init/'
-                                )
+                                it.startsWith('06_Infra/postgres/init/')
                             }
 
                     def deploymentChanged = changedFiles
@@ -87,15 +87,15 @@ pipeline {
                             .any {
                                 it.startsWith('02_Backend/') ||
                                 it.startsWith("${env.MANIFEST_DIR}/") ||
+                                it.startsWith('06_Infra/jenkins/') ||
                                 it.startsWith('06_Infra/postgres/init/') ||
                                 it == '06_Infra/postgres/scripts/apply-migrations.sh' ||
                                 it == '06_Infra/Jenkinsfile.prod'
                             } || migrationChanged
 
                     env.MIGRATION_CHANGED = migrationChanged.toString()
-
                     env.BACKEND_CHANGED = (
-                            params.FORCE_BACKEND_BUILD || deploymentChanged
+                        params.FORCE_BACKEND_BUILD || deploymentChanged
                     ).toString()
 
                     echo "Changed files:\n${changedFiles ?: '(none)'}"
@@ -126,6 +126,7 @@ pipeline {
                 }
 
                 sh '''
+                    set -eu
                     mkdir -p .tools
                     curl -fsSLo .tools/kubectl \
                       "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
@@ -143,6 +144,51 @@ pipeline {
                     sh 'chmod +x gradlew'
                     sh './gradlew test'
                 }
+            }
+        }
+
+        stage('Preflight Prod') {
+            when {
+                expression { env.BACKEND_CHANGED == 'true' }
+            }
+            steps {
+                sh '''
+                    set -eu
+
+                    require_permission() {
+                      verb="$1"
+                      resource="$2"
+                      result=$(.tools/kubectl -n "$K8S_NAMESPACE" auth can-i \
+                        "$verb" "$resource")
+                      if [ "$result" != "yes" ]; then
+                        echo "Missing Jenkins permission: $verb $resource" >&2
+                        exit 1
+                      fi
+                    }
+
+                    exec_result=$(.tools/kubectl -n "$K8S_NAMESPACE" \
+                      auth can-i create pods --subresource=exec)
+                    if [ "$exec_result" != "yes" ]; then
+                      echo "Missing Jenkins permission: create pods/exec" >&2
+                      exit 1
+                    fi
+                    require_permission patch deployments.apps
+                    require_permission create services
+                    require_permission patch services
+                    require_permission patch ingresses.networking.k8s.io
+                    require_permission create servicemonitors.monitoring.coreos.com
+                    require_permission patch servicemonitors.monitoring.coreos.com
+
+                    .tools/kubectl -n "$K8S_NAMESPACE" wait \
+                      --for=condition=Ready pod/postgres-0 --timeout=120s
+                    .tools/kubectl -n "$K8S_NAMESPACE" rollout status \
+                      statefulset/mosquitto --timeout=120s
+                    .tools/kubectl -n "$K8S_NAMESPACE" get \
+                      ingressroutetcp mosquitto-tls > /dev/null
+
+                    curl -fsS --connect-timeout 5 --max-time 10 \
+                      "$PROD_HEALTH_URL" > /dev/null
+                '''
             }
         }
 
@@ -177,19 +223,53 @@ pipeline {
             }
             steps {
                 input(
-                        message: '운영 환경에 새 백엔드 이미지를 배포할까요?',
-                        ok: '운영 배포'
+                    message: '운영 환경에 백엔드 이미지와 DB 변경을 배포할까요?',
+                    ok: '운영 배포'
                 )
                 echo "운영 배포 승인 완료: ${env.BACKEND_IMAGE}"
             }
         }
 
-        stage('Migrate Prod Database') {
+        stage('Backup and Migrate Prod Database') {
             when {
-                expression { env.MIGRATION_CHANGED == 'true' }
+                expression { env.BACKEND_CHANGED == 'true' }
             }
             steps {
                 sh '''
+                    set -eu
+                    short_commit=$(printf '%s' "$GIT_COMMIT" | cut -c1-12)
+                    backup_file="/var/lib/postgresql/data/predeploy-backups/mysil-prod-${BUILD_NUMBER}-${short_commit}.dump"
+
+                    .tools/kubectl -n "$K8S_NAMESPACE" exec postgres-0 -- \
+                      sh -c '
+                        set -eu
+                        backup_file="$1"
+                        retention_days="$2"
+                        case "$retention_days" in
+                          ""|*[!0-9]*|0)
+                            echo "Invalid backup retention days: $retention_days" >&2
+                            exit 1
+                            ;;
+                        esac
+
+                        backup_dir="$(dirname "$backup_file")"
+                        mkdir -p "$backup_dir"
+                        pg_dump -Fc \
+                          -U "$POSTGRES_USER" \
+                          -d "$POSTGRES_DB" \
+                          -f "$backup_file"
+                        pg_restore --list "$backup_file" > /dev/null
+
+                        find "$backup_dir" \
+                          -type f \
+                          -name "mysil-prod-*.dump" \
+                          -mtime "+$retention_days" \
+                          -print \
+                          -delete
+                      ' sh "$backup_file" "$PROD_DB_BACKUP_RETENTION_DAYS"
+
+                    echo "Verified pre-deploy DB backup: $backup_file"
+
                     KUBECTL_BIN=.tools/kubectl \
                       sh 06_Infra/postgres/scripts/apply-migrations.sh \
                       "$MIGRATION_DIR/002_robot_events.sql" \
@@ -205,30 +285,62 @@ pipeline {
             }
         }
 
-        stage('Deploy Prod') {
+        stage('Deploy and Smoke Test Prod') {
             when {
                 expression { env.BACKEND_CHANGED == 'true' }
             }
             steps {
                 sh '''
-                    .tools/kubectl -n "$K8S_NAMESPACE" get \
-                      deployment backend > /dev/null
+                    set -eu
+
+                    rollback_backend() {
+                      echo "Rolling back backend Deployment..." >&2
+                      .tools/kubectl -n "$K8S_NAMESPACE" rollout undo \
+                        deployment/backend
+                      .tools/kubectl -n "$K8S_NAMESPACE" rollout status \
+                        deployment/backend --timeout=180s
+                    }
+
+                    rendered_deployment=$(mktemp)
+                    trap 'rm -f "$rendered_deployment"' EXIT
 
                     sed \
                       -e "s|__BACKEND_IMAGE__|$BACKEND_IMAGE|g" \
-                      "$MANIFEST_DIR/management-port-patch.yaml" \
-                      | .tools/kubectl -n "$K8S_NAMESPACE" patch \
-                          deployment backend \
-                          --type strategic \
-                          --patch-file /dev/stdin
+                      "$MANIFEST_DIR/deployment.yaml" \
+                      > "$rendered_deployment"
 
                     .tools/kubectl -n "$K8S_NAMESPACE" apply \
                       -f "$MANIFEST_DIR/service.yaml" \
                       -f "$MANIFEST_DIR/ingress.yaml" \
                       -f "$MANIFEST_DIR/service-monitor.yaml"
 
-                    .tools/kubectl -n "$K8S_NAMESPACE" rollout status \
-                      deployment/backend --timeout=180s
+                    .tools/kubectl -n "$K8S_NAMESPACE" apply \
+                      -f "$rendered_deployment"
+
+                    if ! .tools/kubectl -n "$K8S_NAMESPACE" rollout status \
+                      deployment/backend --timeout=180s; then
+                      rollback_backend
+                      exit 1
+                    fi
+
+                    smoke_ok=false
+                    attempt=1
+                    while [ "$attempt" -le 12 ]; do
+                      if curl -fsS --connect-timeout 5 --max-time 10 \
+                        "$PROD_HEALTH_URL" > /dev/null; then
+                        smoke_ok=true
+                        break
+                      fi
+                      echo "HTTP smoke test attempt $attempt/12 failed."
+                      attempt=$((attempt + 1))
+                      sleep 5
+                    done
+
+                    if [ "$smoke_ok" != "true" ]; then
+                      echo "HTTP smoke test failed; restoring previous image." >&2
+                      rollback_backend
+                      exit 1
+                    fi
                 '''
             }
         }
@@ -239,6 +351,7 @@ pipeline {
             }
             steps {
                 sh '''
+                    set -eu
                     .tools/kubectl -n "$K8S_NAMESPACE" get deployment backend
                     .tools/kubectl -n "$K8S_NAMESPACE" get \
                       pods -l app=backend -o wide
@@ -246,9 +359,8 @@ pipeline {
                     .tools/kubectl -n "$K8S_NAMESPACE" get service backend-metrics
                     .tools/kubectl -n "$K8S_NAMESPACE" get servicemonitor backend
                     .tools/kubectl -n "$K8S_NAMESPACE" get ingress backend
-                    curl -fsS \
-                      "https://i15a203.p.ssafy.io/api/v3/api-docs" \
-                      > /dev/null
+                    curl -fsS --connect-timeout 5 --max-time 10 \
+                      "$PROD_HEALTH_URL" > /dev/null
                 '''
             }
         }
@@ -260,7 +372,7 @@ pipeline {
                 if (env.BACKEND_CHANGED == 'true') {
                     echo "운영 환경 배포 성공: ${env.BACKEND_IMAGE}"
                 } else {
-                    echo '02_Backend 변경이 없어 운영 배포를 건너뜁니다.'
+                    echo '백엔드 또는 운영 인프라 변경이 없어 배포를 건너뜁니다.'
                 }
             }
         }

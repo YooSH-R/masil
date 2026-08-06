@@ -48,32 +48,72 @@ The development job deploys automatically when `02_Backend/`, its deployment
 manifests, or `06_Infra/postgres/init/` changes on `dev`. Its public API prefix
 is `/dev/api/v1`.
 
-The production job builds from `master`, waits for a Jenkins user to approve
-the `Approve Production` stage, and then updates the production Deployment.
+The production job builds from `master`, performs a read-only production
+preflight, waits for a Jenkins user to approve the `Approve Production` stage,
+backs up and migrates the database, and then applies the production manifests.
 Its public API prefix remains `/api/v1`.
 
-When a file under `06_Infra/postgres/init/` changes, each job applies migrations
-`002`, `003`, `004`, `006`, `007`, `008`, `009`, and `010` in that order against the
-existing `postgres-0` PVC before rolling out the application. Every `psql`
-invocation uses `ON_ERROR_STOP=1`; a failed migration stops the pipeline before
-the backend Deployment changes. The production migration runs only after the
-production approval stage.
+When a file under `06_Infra/postgres/init/` changes, the development job applies
+migrations `002`, `003`, `004`, `006`, `007`, `008`, `009`, and `010` in that
+order against the existing `postgres-0` PVC before rolling out the application.
+Every `psql` invocation uses `ON_ERROR_STOP=1`; a failed migration stops the
+pipeline before the backend Deployment changes.
+
+For production, every approved backend deployment first creates a custom-format
+`pg_dump` under
+`/var/lib/postgresql/data/predeploy-backups/` on the PostgreSQL PVC and verifies
+the dump with `pg_restore --list`. It then reapplies the idempotent migration set
+so a previously missed migration is recovered. A migration failure leaves the
+current backend Deployment unchanged. Database restoration is an explicit
+administrator action; the pipeline does not automatically overwrite production
+data. After a new dump passes verification, dumps older than the configured
+`PROD_DB_BACKUP_RETENTION_DAYS` value (14 days by default) are deleted from the
+PVC. Long-term disaster recovery backups should be copied to external object
+storage instead of relying only on this PVC.
 
 Apply the development deployer Role before using this migration stage:
 
 ```bash
 kubectl apply -f 06_Infra/jenkins/dev-backend-deployer-rbac.yaml
-kubectl -n s15a203-dev auth can-i create pods/exec \
+kubectl -n s15a203-dev auth can-i create pods --subresource=exec \
   --as=system:serviceaccount:jenkins:jenkins
 ```
 
-Production cluster authorization is managed externally. The identity used by
-the production Jenkins job must have `create` permission for the core API
-`pods/exec` subresource in `s15a203-prod`, in addition to its existing Pod and
-Deployment read/update permissions. It must also have create/update/patch
-permission for `monitoring.coreos.com` `servicemonitors` in `s15a203-prod`.
-Verify those permissions before enabling the job; do not grant cluster-wide
-access solely for database migration or monitoring deployment.
+Apply the namespace-scoped production Role once as a cluster administrator:
+
+```bash
+kubectl apply -f 06_Infra/jenkins/prod-backend-deployer-rbac.yaml
+```
+
+The Role does not grant Secret reads, resource deletion, or cluster-wide
+access. It grants only the operations required to execute migrations, update
+the existing backend Deployment and Ingress, create or update the metrics
+Service and ServiceMonitor, and inspect the existing PostgreSQL, Mosquitto, and
+Traefik resources. Confirm the effective permissions before enabling the job:
+
+```bash
+JENKINS_IDENTITY=system:serviceaccount:jenkins:jenkins
+
+kubectl -n s15a203-prod auth can-i create pods --subresource=exec \
+  --as="$JENKINS_IDENTITY"
+kubectl -n s15a203-prod auth can-i patch deployments.apps \
+  --as="$JENKINS_IDENTITY"
+kubectl -n s15a203-prod auth can-i create services \
+  --as="$JENKINS_IDENTITY"
+kubectl -n s15a203-prod auth can-i patch ingresses.networking.k8s.io \
+  --as="$JENKINS_IDENTITY"
+kubectl -n s15a203-prod auth can-i create \
+  servicemonitors.monitoring.coreos.com \
+  --as="$JENKINS_IDENTITY"
+```
+
+After applying the rendered Deployment, the production pipeline waits for the
+rollout and retries the public API documentation endpoint for up to one minute.
+If the rollout or HTTP smoke test fails, it runs `kubectl rollout undo` and
+waits for the previous backend ReplicaSet to become ready. Static Service,
+Ingress, and ServiceMonitor declarations remain applied because they are not
+image-versioned. Database schema rollback remains manual using the verified
+pre-deployment dump.
 
 Do not configure either job to load the other environment's Jenkinsfile.
 Branch validation inside each pipeline stops an incorrectly configured job
