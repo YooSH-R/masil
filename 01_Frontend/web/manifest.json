@@ -1,6 +1,6 @@
 {
-    "name": "Mysil",
-    "short_name": "Mysil",
+    "name": "mysil_project_new",
+    "short_name": "mysil_project_new",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
