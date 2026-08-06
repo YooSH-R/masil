@@ -196,7 +196,6 @@ class _IndoorHomeScreenState extends State<IndoorHomeScreen> {
               ],
             ),
           ),
-          Switch(value: true, onChanged: (v) => context.push('/indoor/roaming'), activeThumbColor: const Color(0xFFE8F6F3), activeTrackColor: const Color(0xFFE8F5E9)),
           const Icon(Icons.chevron_right, color: Colors.grey),
         ],
       ),
