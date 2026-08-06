@@ -1,0 +1,303 @@
+pipeline {
+    agent any
+
+    options {
+        disableConcurrentBuilds(abortPrevious: true)
+        timestamps()
+        timeout(time: 30, unit: 'MINUTES')
+    }
+
+    parameters {
+        booleanParam(
+            name: 'FORCE_BACKEND_BUILD',
+            defaultValue: false,
+            description: '백엔드 변경이 없어도 이미지 빌드와 배포를 실행한다.'
+        )
+    }
+
+    environment {
+        TARGET_BRANCH = 'dev'
+        KUBECTL_VERSION = 'v1.36.2'
+        K8S_NAMESPACE = 's15a203-dev'
+        MANIFEST_DIR = '06_Infra/dev'
+        MIGRATION_DIR = '06_Infra/postgres/init'
+    }
+
+    stages {
+        stage('Validate Branch') {
+            steps {
+                script {
+                    def branch = env.gitlabBranch ?:
+                            env.GIT_BRANCH?.replaceFirst(/^origin\//, '')
+                    if (branch && branch != env.TARGET_BRANCH) {
+                        error(
+                                "개발 파이프라인은 ${env.TARGET_BRANCH} " +
+                                "브랜치만 배포할 수 있습니다. 현재 브랜치: ${branch}"
+                        )
+                    }
+                }
+            }
+        }
+
+        stage('Detect Backend Changes') {
+            steps {
+                script {
+                    env.GIT_COMMIT = sh(
+                        script: 'git rev-parse HEAD',
+                        returnStdout: true
+                    ).trim()
+
+                    def beforeCommit = env.gitlabBefore ?: env.GIT_PREVIOUS_COMMIT
+                    def validBeforeCommit = beforeCommit ==~ /[0-9a-fA-F]{40}/
+                    def changedFiles
+
+                    if (validBeforeCommit &&
+                        beforeCommit != '0000000000000000000000000000000000000000' &&
+                        beforeCommit != env.GIT_COMMIT &&
+                        sh(script: "git cat-file -e ${beforeCommit}^{commit}", returnStatus: true) == 0) {
+                        changedFiles = sh(
+                            script: "git diff --name-only ${beforeCommit} ${env.GIT_COMMIT}",
+                            returnStdout: true
+                        ).trim()
+                    } else {
+                        changedFiles = sh(
+                            script: 'git show --pretty= --name-only HEAD',
+                            returnStdout: true
+                        ).trim()
+                    }
+
+                    def migrationChanged = changedFiles
+                        .readLines()
+                        .any {
+                            it.startsWith(
+                                    '06_Infra/postgres/init/'
+                            )
+                        }
+
+                    def deploymentChanged = changedFiles
+                        .readLines()
+                        .any {
+                            it.startsWith('02_Backend/') ||
+                            it.startsWith("${env.MANIFEST_DIR}/") ||
+                            it == '06_Infra/postgres/scripts/apply-migrations.sh' ||
+                            it == '06_Infra/Jenkinsfile.dev'
+                        } || migrationChanged
+
+                    env.MIGRATION_CHANGED = migrationChanged.toString()
+
+                    env.BACKEND_CHANGED = (
+                            params.FORCE_BACKEND_BUILD || deploymentChanged
+                    ).toString()
+
+                    echo "Changed files:\n${changedFiles ?: '(none)'}"
+                    echo "Force backend build: ${params.FORCE_BACKEND_BUILD}"
+                    echo "Backend changed: ${env.BACKEND_CHANGED}"
+                    echo "Database migration changed: ${env.MIGRATION_CHANGED}"
+                }
+            }
+        }
+
+        stage('Prepare') {
+            when {
+                expression { env.BACKEND_CHANGED == 'true' }
+            }
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub',
+                        usernameVariable: 'DOCKERHUB_USERNAME',
+                        passwordVariable: 'DOCKERHUB_TOKEN'
+                    )
+                ]) {
+                    script {
+                        env.BACKEND_IMAGE = "${env.DOCKERHUB_USERNAME}/s15a203-backend:${env.GIT_COMMIT.take(8)}"
+                    }
+                }
+
+                sh '''
+                    mkdir -p .tools
+                    curl -fsSLo .tools/kubectl \
+                      "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+                    chmod +x .tools/kubectl
+                '''
+            }
+        }
+
+        stage('Backend Test') {
+            when {
+                expression { env.BACKEND_CHANGED == 'true' }
+            }
+            steps {
+                dir('02_Backend') {
+                    sh 'chmod +x gradlew'
+                    sh './gradlew test'
+                }
+            }
+        }
+
+        stage('Build and Push Image') {
+            when {
+                expression { env.BACKEND_CHANGED == 'true' }
+            }
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub',
+                        usernameVariable: 'DOCKERHUB_USERNAME',
+                        passwordVariable: 'DOCKERHUB_TOKEN'
+                    )
+                ]) {
+                    dir('02_Backend') {
+                        sh '''
+                            set +x
+                            ./gradlew jib \
+                              --image="$BACKEND_IMAGE" \
+                              -Djib.to.auth.username="$DOCKERHUB_USERNAME" \
+                              -Djib.to.auth.password="$DOCKERHUB_TOKEN"
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Migrate Dev Database') {
+            when {
+                expression { env.MIGRATION_CHANGED == 'true' }
+            }
+            steps {
+                sh '''
+                    KUBECTL_BIN=.tools/kubectl \
+                      sh 06_Infra/postgres/scripts/apply-migrations.sh \
+                      "$MIGRATION_DIR/002_robot_events.sql" \
+                      "$MIGRATION_DIR/003_robot_photos.sql" \
+                      "$MIGRATION_DIR/004_robot_mqtt_runtime.sql" \
+                      "$MIGRATION_DIR/006_robot_qr_compat.sql" \
+                      "$MIGRATION_DIR/007_pet_creation_requests_compat.sql" \
+                      "$MIGRATION_DIR/007_walk_diaries.sql" \
+                      "$MIGRATION_DIR/008_users_version_compat.sql" \
+                      "$MIGRATION_DIR/009_walk_api.sql" \
+                      "$MIGRATION_DIR/010_behavior_requests_open_unique.sql"
+                '''
+            }
+        }
+
+        stage('Deploy Dev') {
+            when {
+                expression { env.BACKEND_CHANGED == 'true' }
+            }
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub',
+                        usernameVariable: 'DOCKERHUB_USERNAME',
+                        passwordVariable: 'DOCKERHUB_TOKEN'
+                    ),
+                    string(
+                        credentialsId: 'google-client-id',
+                        variable: 'GOOGLE_CLIENT_ID'
+                    ),
+                    string(
+                        credentialsId: 'kakao-native-app-key',
+                        variable: 'KAKAO_NATIVE_APP_KEY'
+                    ),
+                    string(
+                        credentialsId: 'jwt-secret',
+                        variable: 'JWT_SECRET'
+                    ),
+                    string(
+                        credentialsId: 'dev-db-url',
+                        variable: 'DB_URL'
+                    ),
+                    string(
+                        credentialsId: 'dev-db-username',
+                        variable: 'DB_USERNAME'
+                    ),
+                    string(
+                        credentialsId: 'dev-db-password',
+                        variable: 'DB_PASSWORD'
+                    )
+                ]) {
+                    sh '''
+                        set +x
+
+                        .tools/kubectl -n "$K8S_NAMESPACE" get secret \
+                          backend-mqtt-secret backend-s3-secret > /dev/null
+
+                        .tools/kubectl -n "$K8S_NAMESPACE" create secret docker-registry dockerhub-registry \
+                          --docker-server="https://index.docker.io/v1/" \
+                          --docker-username="$DOCKERHUB_USERNAME" \
+                          --docker-password="$DOCKERHUB_TOKEN" \
+                          --dry-run=client -o yaml \
+                          | .tools/kubectl apply -f -
+
+                        .tools/kubectl -n "$K8S_NAMESPACE" create secret generic backend-auth-secret \
+                          --from-literal=GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
+                          --from-literal=KAKAO_NATIVE_APP_KEY="$KAKAO_NATIVE_APP_KEY" \
+                          --from-literal=JWT_SECRET="$JWT_SECRET" \
+                          --dry-run=client -o yaml \
+                          | .tools/kubectl apply -f -
+
+                        .tools/kubectl -n "$K8S_NAMESPACE" create secret generic backend-db-secret \
+                          --from-literal=DB_URL="$DB_URL" \
+                          --from-literal=DB_USERNAME="$DB_USERNAME" \
+                          --from-literal=DB_PASSWORD="$DB_PASSWORD" \
+                          --dry-run=client -o yaml \
+                          | .tools/kubectl apply -f -
+
+                        BACKEND_SECRET_CHECKSUM="$(
+                          printf '%s' "$GOOGLE_CLIENT_ID:$KAKAO_NATIVE_APP_KEY:$JWT_SECRET:$DB_URL:$DB_USERNAME:$DB_PASSWORD" \
+                            | sha256sum \
+                            | cut -d ' ' -f 1
+                        )"
+
+                        sed \
+                          -e "s|__BACKEND_IMAGE__|$BACKEND_IMAGE|g" \
+                          -e "s|__BACKEND_SECRET_CHECKSUM__|$BACKEND_SECRET_CHECKSUM|g" \
+                          "$MANIFEST_DIR/deployment.yaml" \
+                          | .tools/kubectl -n "$K8S_NAMESPACE" apply -f -
+
+                        .tools/kubectl -n "$K8S_NAMESPACE" apply \
+                          -f "$MANIFEST_DIR/service.yaml" \
+                          -f "$MANIFEST_DIR/ingress.yaml"
+
+                        .tools/kubectl -n "$K8S_NAMESPACE" rollout status \
+                          deployment/backend --timeout=180s
+                    '''
+                }
+            }
+        }
+
+        stage('Verify Dev') {
+            when {
+                expression { env.BACKEND_CHANGED == 'true' }
+            }
+            steps {
+                sh '''
+                    .tools/kubectl -n "$K8S_NAMESPACE" get deployment backend
+                    .tools/kubectl -n "$K8S_NAMESPACE" get pods -l app=backend -o wide
+                    .tools/kubectl -n "$K8S_NAMESPACE" get service backend
+                    .tools/kubectl -n "$K8S_NAMESPACE" get ingress backend
+                    curl -fsS \
+                      "https://i15a203.p.ssafy.io/dev/api/v3/api-docs" \
+                      | grep -Eq \
+                        '"url"[[:space:]]*:[[:space:]]*"https://i15a203.p.ssafy.io/dev/api"'
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            script {
+                if (env.BACKEND_CHANGED == 'true') {
+                    echo "개발 환경 배포 성공: ${env.BACKEND_IMAGE}"
+                } else {
+                    echo '02_Backend 변경이 없어 개발 배포를 건너뜁니다.'
+                }
+            }
+        }
+        failure {
+            echo '개발 백엔드 빌드 또는 배포에 실패했습니다.'
+        }
+    }
+}

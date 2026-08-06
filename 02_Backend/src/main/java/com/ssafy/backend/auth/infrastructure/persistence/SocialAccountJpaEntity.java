@@ -67,4 +67,8 @@ public class SocialAccountJpaEntity {
     public Long getUserId() {
         return userId;
     }
+
+    public SocialProvider getProvider() {
+        return provider;
+    }
 }
