@@ -128,56 +128,6 @@ class _MyPageScreenState extends State<MyPageScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Device Registration Card
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF5D4037), Color(0xFF3E2723)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(25),
-              ),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('기기 등록',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold)),
-                        SizedBox(height: 8),
-                        Text('펫 프로필 생성부터 QR 연결까지\n한 번에 등록해 보세요.',
-                            style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 13,
-                                height: 1.4)),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.grid_view_rounded,
-                          color: Color(0xFF5D4037), size: 30),
-                      onPressed: () => context.push('/user/robot-mgmt'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
             // 펫이 없을 때는 별도 등록 안내를 중복 노출하지 않는다. 위의 기기
             // 등록 흐름이 이름 입력부터 QR 연결까지 함께 처리한다.
             if (pet != null) ...[
@@ -260,6 +210,59 @@ class _MyPageScreenState extends State<MyPageScreen> {
               ),
               const SizedBox(height: 24),
             ],
+
+            // 펫 프로필이 있으면 새 기기를 더 연결하는 흐름임을 명확히 한다.
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF5D4037), Color(0xFF3E2723)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(25),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(pet == null ? '기기 등록' : '기기 추가 등록',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        Text(
+                            pet == null
+                                ? '펫 프로필 생성부터 QR 연결까지\n한 번에 등록해 보세요.'
+                                : '${pet.name}과 연결할 새 기기를\n등록해 보세요.',
+                            style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 13,
+                                height: 1.4)),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.grid_view_rounded,
+                          color: Color(0xFF5D4037), size: 30),
+                      onPressed: () => context.push('/user/robot-mgmt'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
 
             // Other Menus
             Container(

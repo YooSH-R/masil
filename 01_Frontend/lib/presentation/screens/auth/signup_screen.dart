@@ -237,7 +237,7 @@ class _SignupScreenState extends State<SignupScreen> {
     final nickname = _nicknameController.text.trim();
 
     if (!AuthValidation.nickname.hasMatch(nickname)) {
-      _showSnackBar('닉네임은 한글·영문·숫자 2~20자로 입력해 주세요.', isError: true);
+      _showSnackBar('이름은 한글·영문·숫자 2~20자로 입력해 주세요.', isError: true);
       return;
     }
 
@@ -420,7 +420,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
               // Nickname Card
               _buildSectionCard([
-                _buildLabel('닉네임'),
+                _buildLabel('이름'),
                 Row(
                   children: [
                     Expanded(
@@ -431,7 +431,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           context.read<AuthViewModel>().resetNicknameCheck();
                           setState(() {});
                         },
-                        decoration: _inputDecoration('멋진 댕댕이'),
+                        decoration: _inputDecoration('이름을 입력해 주세요'),
                         // DO NOT add inputFormatters to allow Hangul
                       ),
                     ),
@@ -454,8 +454,8 @@ class _SignupScreenState extends State<SignupScreen> {
                     padding: const EdgeInsets.only(top: 8.0, left: 4),
                     child: Text(
                       authViewModel.isNicknameAvailable
-                          ? '✓ 사용 가능한 닉네임이에요'
-                          : '! 이미 사용 중인 닉네임이에요',
+                          ? '✓ 사용 가능한 이름이에요'
+                          : '! 이미 사용 중인 이름이에요',
                       style: TextStyle(
                         color: authViewModel.isNicknameAvailable
                             ? Colors.green

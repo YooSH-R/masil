@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../data/models/auth_model.dart';
 import '../../viewmodels/auth_view_model.dart';
 
-/// 구글로 처음 들어온 회원이 닉네임만 정해 가입을 마치는 화면.
+/// 소셜 로그인으로 처음 들어온 회원이 사용자 이름을 확인하고 가입을 마치는 화면.
 /// POST /auth/oauth/signup {signupToken, nickname, deviceId}
 class SocialSignupScreen extends StatefulWidget {
   const SocialSignupScreen({super.key});
@@ -20,7 +20,7 @@ class _SocialSignupScreenState extends State<SocialSignupScreen> {
   @override
   void initState() {
     super.initState();
-    // 서버가 제안한 닉네임을 기본값으로 채운다.
+    // 구글·카카오 프로필에서 받은 이름을 기본값으로 채우고 사용자가 수정할 수 있게 한다.
     final suggested = context.read<AuthViewModel>().suggestedNickname;
     if (suggested != null) _nicknameController.text = suggested;
   }
@@ -40,14 +40,14 @@ class _SocialSignupScreenState extends State<SocialSignupScreen> {
     final nickname = _nicknameController.text.trim();
 
     if (!_isFormatValid) {
-      _showMessage('닉네임은 한글·영문·숫자 2~20자로 입력해 주세요.', isError: true);
+      _showMessage('이름은 한글·영문·숫자 2~20자로 입력해 주세요.', isError: true);
       return;
     }
 
     final available = await authViewModel.checkNickname(nickname);
     if (!mounted) return;
     _showMessage(
-      available ? '사용 가능한 닉네임이에요.' : '이미 사용 중인 닉네임이에요.',
+      available ? '사용 가능한 이름이에요.' : '이미 사용 중인 이름이에요.',
       isError: !available,
     );
   }
@@ -129,7 +129,7 @@ class _SocialSignupScreenState extends State<SocialSignupScreen> {
                   children: [
                     const Padding(
                       padding: EdgeInsets.only(left: 4, bottom: 8),
-                      child: Text('닉네임',
+                      child: Text('이름',
                           style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
@@ -145,7 +145,7 @@ class _SocialSignupScreenState extends State<SocialSignupScreen> {
                               setState(() {});
                             },
                             decoration: InputDecoration(
-                              hintText: '멋진 댕댕이',
+                              hintText: '이름을 입력해 주세요',
                               hintStyle: TextStyle(
                                   color: Colors.grey.shade400, fontSize: 14),
                               filled: true,
@@ -196,8 +196,8 @@ class _SocialSignupScreenState extends State<SocialSignupScreen> {
                         padding: const EdgeInsets.only(top: 8.0, left: 4),
                         child: Text(
                           authViewModel.isNicknameAvailable
-                              ? '✓ 사용 가능한 닉네임이에요'
-                              : '! 이미 사용 중인 닉네임이에요',
+                              ? '✓ 사용 가능한 이름이에요'
+                              : '! 이미 사용 중인 이름이에요',
                           style: TextStyle(
                             color: authViewModel.isNicknameAvailable
                                 ? Colors.green
