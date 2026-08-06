@@ -72,7 +72,7 @@ Apply the development deployer Role before using this migration stage:
 
 ```bash
 kubectl apply -f 06_Infra/jenkins/dev-backend-deployer-rbac.yaml
-kubectl -n s15a203-dev auth can-i create pods/exec \
+kubectl -n s15a203-dev auth can-i create pods --subresource=exec \
   --as=system:serviceaccount:jenkins:jenkins
 ```
 
@@ -91,7 +91,7 @@ Traefik resources. Confirm the effective permissions before enabling the job:
 ```bash
 JENKINS_IDENTITY=system:serviceaccount:jenkins:jenkins
 
-kubectl -n s15a203-prod auth can-i create pods/exec \
+kubectl -n s15a203-prod auth can-i create pods --subresource=exec \
   --as="$JENKINS_IDENTITY"
 kubectl -n s15a203-prod auth can-i patch deployments.apps \
   --as="$JENKINS_IDENTITY"

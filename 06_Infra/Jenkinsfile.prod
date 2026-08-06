@@ -165,7 +165,12 @@ pipeline {
                       fi
                     }
 
-                    require_permission create pods/exec
+                    exec_result=$(.tools/kubectl -n "$K8S_NAMESPACE" \
+                      auth can-i create pods --subresource=exec)
+                    if [ "$exec_result" != "yes" ]; then
+                      echo "Missing Jenkins permission: create pods/exec" >&2
+                      exit 1
+                    fi
                     require_permission patch deployments.apps
                     require_permission create services
                     require_permission patch services
