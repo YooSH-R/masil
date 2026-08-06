@@ -55,6 +55,13 @@ dev_dependencies:
   flutter_lints: ^2.0.0
   build_runner: ^2.4.6
   json_serializable: ^6.7.1
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/images/app_icon_mysil.png
+  remove_alpha_ios: true
 
 flutter:
   uses-material-design: true
