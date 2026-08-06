@@ -121,6 +121,22 @@ class PetApiIntegrationTest {
     }
 
     @Test
+    void listsOnlyAuthenticatedUsersPets() throws Exception {
+        UserJpaEntity owner = saveUser("owner@example.com", "주인");
+        UserJpaEntity other = saveUser("other@example.com", "다른주인");
+        petService.create(owner.getId(), "owner-pet-1", "몽이");
+        petService.create(owner.getId(), "owner-pet-2", "콩이");
+        petService.create(other.getId(), "other-pet", "타인펫");
+
+        mockMvc.perform(get("/v1/pets")
+                        .header("Authorization", bearer(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].name").value("몽이"))
+                .andExpect(jsonPath("$.data[1].name").value("콩이"));
+    }
+
+    @Test
     void returnsSamePetForConcurrentRequestsWithSameIdempotencyKey()
             throws Exception {
         UserJpaEntity user = saveUser("owner@example.com", "주인");

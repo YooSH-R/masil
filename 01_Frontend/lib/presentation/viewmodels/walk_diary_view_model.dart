@@ -99,9 +99,30 @@ class WalkDiaryViewModel extends BaseViewModel {
 
   /// 특정 날짜의 첫 산책. 없으면 null.
   WalkDiaryFeedItem? itemOn(DateTime date) {
+    final items = itemsOn(date);
+    return items.isEmpty ? null : items.first;
+  }
+
+  /// 특정 날짜의 모든 산책. 하루에 여러 번 걸어도 세션을 잃지 않는다.
+  ///
+  /// S3 일지는 session 순서로, 앱에서 저장한 기록은 시작 시각 순서로 보여준다.
+  List<WalkDiaryFeedItem> itemsOn(DateTime date) {
     final key = DateTime(date.year, date.month, date.day);
-    final items = byDate[key];
-    return (items == null || items.isEmpty) ? null : items.first;
+    final items = List<WalkDiaryFeedItem>.of(
+      byDate[key] ?? const <WalkDiaryFeedItem>[],
+    );
+    items.sort((a, b) {
+      final aSession = a.session;
+      final bSession = b.session;
+      if (aSession != null && bSession != null) {
+        return aSession.compareTo(bSession);
+      }
+      final aAt = a.walkedAt;
+      final bAt = b.walkedAt;
+      if (aAt == null || bAt == null) return 0;
+      return aAt.compareTo(bAt);
+    });
+    return List.unmodifiable(items);
   }
 
   /// [anchor] 날 하루의 집계.

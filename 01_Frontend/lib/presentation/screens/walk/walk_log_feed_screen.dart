@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/services/sample_walk_diaries.dart';
+import '../../../core/utils/korea_time.dart';
 import '../../../domain/entities/walk_diary.dart';
 import '../../viewmodels/walk_diary_view_model.dart';
 
@@ -20,11 +21,12 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
   late int _currentYear;
   late DateTime _selectedDate;
   bool _isWeekly = true;
+  int _selectedWalkIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
+    final now = KoreaTime.now();
     _currentYear = now.year;
     _currentMonth = now.month;
     _selectedDate = DateTime(now.year, now.month, now.day);
@@ -37,11 +39,19 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
 
   /// 날짜를 누르면 그 날 산책의 상세(경로)와 장소명을 불러온다.
   void _selectDate(DateTime date) {
-    setState(() => _selectedDate = date);
+    setState(() {
+      _selectedDate = date;
+      _selectedWalkIndex = 0;
+    });
 
     final diaryVm = context.read<WalkDiaryViewModel>();
-    final item = diaryVm.itemOn(date);
-    if (item != null) diaryVm.selectFeedItem(item);
+    final items = diaryVm.itemsOn(date);
+    if (items.isNotEmpty) diaryVm.selectFeedItem(items.first);
+  }
+
+  void _selectWalk(WalkDiaryFeedItem item, int index) {
+    setState(() => _selectedWalkIndex = index);
+    context.read<WalkDiaryViewModel>().selectFeedItem(item);
   }
 
   @override
@@ -49,13 +59,18 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     final diaryVm = context.watch<WalkDiaryViewModel>();
 
     final walkDays = diaryVm.byDate.keys.toSet();
-    final selectedItem = diaryVm.itemOn(_selectedDate);
+    final selectedItems = diaryVm.itemsOn(_selectedDate);
+    final selectedIndex =
+        _selectedWalkIndex < selectedItems.length ? _selectedWalkIndex : 0;
+    final selectedItem =
+        selectedItems.isEmpty ? null : selectedItems[selectedIndex];
     final placeName =
         selectedItem == null ? null : diaryVm.placeNameOf(selectedItem.walkId);
 
-    final monthLogCount = walkDays
-        .where((d) => d.year == _currentYear && d.month == _currentMonth)
-        .length;
+    final monthLogCount = diaryVm.byDate.entries
+        .where((entry) =>
+            entry.key.year == _currentYear && entry.key.month == _currentMonth)
+        .fold<int>(0, (count, entry) => count + entry.value.length);
 
     // 주간은 선택한 날이 속한 주, 월간은 보고 있는 달 기준으로 집계한다.
     final stats = _isWeekly
@@ -121,6 +136,11 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
             ),
             const SizedBox(height: 24),
 
+            if (selectedItems.length > 1) ...[
+              _buildWalkSelector(selectedItems, selectedIndex),
+              const SizedBox(height: 16),
+            ],
+
             // 선택한 날의 장소·거리·시간
             if (selectedItem != null)
               _buildDailySummaryCard(selectedItem, placeName)
@@ -148,6 +168,57 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     );
   }
 
+  /// 같은 날 여러 번 산책한 경우 각 세션을 골라 상세를 볼 수 있게 한다.
+  Widget _buildWalkSelector(
+    List<WalkDiaryFeedItem> items,
+    int selectedIndex,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '이날은 ${items.length}번 산책했어요',
+            style: const TextStyle(
+              color: Color(0xFF5D4037),
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (var index = 0; index < items.length; index++)
+                ChoiceChip(
+                  label: Text('${items[index].session ?? index + 1}번째 산책'),
+                  selected: index == selectedIndex,
+                  onSelected: (_) => _selectWalk(items[index], index),
+                  selectedColor: const Color(0xFFC67C4E),
+                  backgroundColor: const Color(0xFFF9F3E7),
+                  labelStyle: TextStyle(
+                    color: index == selectedIndex
+                        ? Colors.white
+                        : const Color(0xFF8D6E63),
+                    fontWeight: FontWeight.bold,
+                  ),
+                  side: BorderSide.none,
+                  showCheckmark: false,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   void _prevMonth() {
     setState(() {
       if (_currentMonth == 1) {
@@ -157,6 +228,7 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
         _currentMonth--;
       }
       _selectedDate = DateTime(_currentYear, _currentMonth, 1);
+      _selectedWalkIndex = 0;
     });
   }
 
@@ -169,6 +241,7 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
         _currentMonth++;
       }
       _selectedDate = DateTime(_currentYear, _currentMonth, 1);
+      _selectedWalkIndex = 0;
     });
   }
 
@@ -236,9 +309,10 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
                   _selectedDate.month == date.month &&
                   _selectedDate.day == date.day;
               bool hasLog = walkDays.contains(date);
-              bool isToday = DateTime.now().year == date.year &&
-                  DateTime.now().month == date.month &&
-                  DateTime.now().day == date.day;
+              final today = KoreaTime.now();
+              bool isToday = today.year == date.year &&
+                  today.month == date.month &&
+                  today.day == date.day;
 
               return GestureDetector(
                 onTap: () => _selectDate(date),

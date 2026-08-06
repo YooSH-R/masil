@@ -51,6 +51,20 @@ class PetRepositoryImpl implements PetRepository {
 
   @override
   Future<List<Pet>> getPets() async {
+    try {
+      final data = await _client.get(ApiEndpoints.pets);
+      final rawPets = data is List
+          ? Json.asMapList(data)
+          : Json.asMapList(Json.asMap(data)['items']);
+      final pets = rawPets.map(PetModel.fromJson).toList(growable: false);
+      for (final pet in pets) {
+        await _cache.savePetId(pet.id);
+      }
+      return pets;
+    } on ApiException {
+      // 아직 GET /pets가 배포되지 않은 서버에서는 기존 로컬 캐시로 호환한다.
+    }
+
     final ids = await _cache.readKnownPetIds();
     if (ids.isEmpty) return const [];
 
@@ -125,7 +139,13 @@ class PetRepositoryImpl implements PetRepository {
     // 로컬 테스트 로그인은 펫 생성 과정을 거치지 않아 캐시에 id가 없을 수 있다.
     // 운영/개발 서버에는 절대 적용하지 않고 loopback 백엔드에서만 시드 펫을 쓴다.
     petId ??= ApiConfig.isLoopback ? ApiConfig.localTestPetId : null;
-    if (petId == null) return null;
+    if (petId == null) {
+      final pets = await getPets();
+      if (pets.isEmpty) return null;
+      final pet = pets.first;
+      await _cache.savePetId(pet.id);
+      return pet;
+    }
     try {
       final pet = await getPet(petId);
       // 백엔드의 로컬 fallback이 다른 시드 id를 돌려준 경우에도 다음 조회부터는

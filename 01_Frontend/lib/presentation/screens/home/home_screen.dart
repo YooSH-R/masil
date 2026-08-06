@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/utils/korea_time.dart';
 import '../../../domain/entities/pet.dart';
 import '../../../domain/entities/walk_diary.dart';
 import '../../viewmodels/notification_view_model.dart';
@@ -461,22 +462,22 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// UTC로 오는 walkedAt을 로컬 시간 기준 문구로 바꾼다.
+  /// UTC로 오는 walkedAt을 대한민국 시간 기준 문구로 바꾼다.
   String _formatWalkedAt(DateTime? walkedAt) {
     if (walkedAt == null) return '날짜 미상';
 
-    final local = walkedAt.toLocal();
-    final now = DateTime.now();
-    final isToday = local.year == now.year &&
-        local.month == now.month &&
-        local.day == now.day;
+    final korea = KoreaTime.fromInstant(walkedAt);
+    final now = KoreaTime.now();
+    final isToday = korea.year == now.year &&
+        korea.month == now.month &&
+        korea.day == now.day;
 
-    final hour = local.hour;
+    final hour = korea.hour;
     final period = hour < 12 ? '오전' : '오후';
     final hour12 = hour % 12 == 0 ? 12 : hour % 12;
     final time = '$period $hour12시';
 
     if (isToday) return '오늘 $time';
-    return '${local.month}월 ${local.day}일 $time';
+    return '${korea.month}월 ${korea.day}일 $time';
   }
 }
