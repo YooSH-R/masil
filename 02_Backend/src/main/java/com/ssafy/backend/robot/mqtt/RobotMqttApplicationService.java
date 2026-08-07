@@ -1,5 +1,6 @@
 package com.ssafy.backend.robot.mqtt;
 
+import com.ssafy.backend.pet.application.PetAffinityChangedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -165,6 +166,7 @@ public class RobotMqttApplicationService {
         );
         return new RobotMqttStore.AffectionResult(
                 event.deviceId(),
+                affinity.petId(),
                 event.messageId(),
                 previousScore,
                 appliedChange,
@@ -180,6 +182,16 @@ public class RobotMqttApplicationService {
     ) {
         AffectionChangedMessage response = toMessage(result);
         eventPublisher.publishEvent(new AffectionPublishEvent(response));
+        eventPublisher.publishEvent(new PetAffinityChangedEvent(
+                result.petId(),
+                result.eventMessageId(),
+                result.previousScore(),
+                result.scoreChange(),
+                result.currentScore(),
+                result.affinityLevel(),
+                result.mood(),
+                response.occurredAt()
+        ));
         return response;
     }
 
