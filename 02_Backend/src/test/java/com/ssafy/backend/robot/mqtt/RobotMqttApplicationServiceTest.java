@@ -1,5 +1,6 @@
 package com.ssafy.backend.robot.mqtt;
 
+import com.ssafy.backend.pet.application.PetAffinityChangedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
@@ -73,6 +74,48 @@ class RobotMqttApplicationServiceTest {
         verify(eventPublisher).publishEvent(
                 new AffectionPublishEvent(response)
         );
+        verify(eventPublisher).publishEvent(new PetAffinityChangedEvent(
+                2L,
+                messageId,
+                95,
+                3,
+                98,
+                5,
+                "HAPPY",
+                response.occurredAt()
+        ));
+    }
+
+    @Test
+    void callAndResponsePublishesAffinityChangeForApp() {
+        UUID messageId = UUID.randomUUID();
+        RobotEventMessage event = new RobotEventMessage(
+                messageId,
+                "1.0",
+                "device-001",
+                Instant.parse("2026-08-07T01:00:00Z"),
+                RobotEventType.CALL_AND_RESPONSE,
+                null
+        );
+        when(store.findEventResult(messageId)).thenReturn(Optional.empty());
+        when(store.lockAffinity("device-001")).thenReturn(
+                new RobotMqttStore.AffinityContext(1L, 10L, 2L, 6)
+        );
+
+        AffectionChangedMessage response = service.processEvent(event);
+
+        assertEquals(8, response.currentScore());
+        assertEquals(2, response.scoreChange());
+        verify(eventPublisher).publishEvent(new PetAffinityChangedEvent(
+                2L,
+                messageId,
+                6,
+                2,
+                8,
+                1,
+                "WARY",
+                response.occurredAt()
+        ));
     }
 
     @Test

@@ -74,4 +74,8 @@ public class PetAffinityStateJpaEntity {
     public String getMood() {
         return mood;
     }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
 }

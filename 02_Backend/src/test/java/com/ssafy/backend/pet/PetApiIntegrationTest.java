@@ -2,7 +2,9 @@ package com.ssafy.backend.pet;
 
 import com.ssafy.backend.auth.service.TokenService;
 import com.ssafy.backend.pet.application.PetCreatedResult;
+import com.ssafy.backend.pet.application.PetAffinityChangedEvent;
 import com.ssafy.backend.pet.application.PetService;
+import com.ssafy.backend.pet.presentation.PetAffinitySseRegistry;
 import com.ssafy.backend.user.infrastructure.persistence.SpringDataUserRepository;
 import com.ssafy.backend.user.infrastructure.persistence.UserJpaEntity;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,7 +15,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.Instant;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -22,17 +27,22 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @AutoConfigureMockMvc
 @SpringBootTest(properties = {
         "solapi.api-key=test-api-key",
         "solapi.secret-key=test-secret-key",
-        "solapi.sender=01000000000"
+        "solapi.sender=01000000000",
+        "pet.affinity.sse.timeout-ms=5000",
+        "pet.affinity.sse.heartbeat-ms=60000"
 })
 class PetApiIntegrationTest {
 
@@ -50,6 +60,9 @@ class PetApiIntegrationTest {
 
     @Autowired
     private PetService petService;
+
+    @Autowired
+    private PetAffinitySseRegistry affinitySseRegistry;
 
     @BeforeEach
     void resetData() {
@@ -236,6 +249,103 @@ class PetApiIntegrationTest {
                 .andExpect(jsonPath("$.data.robot.robotId").value(301))
                 .andExpect(jsonPath("$.data.robot.online").value(true))
                 .andExpect(jsonPath("$.data.robot.batteryLevel").value(82));
+    }
+
+    @Test
+    void getsAffinitySnapshotForOwnedPet() throws Exception {
+        UserJpaEntity user = saveUser("affinity-owner@example.com", "owner");
+        PetCreatedResult pet = petService.create(
+                user.getId(),
+                "affinity-pet",
+                "masil"
+        );
+
+        mockMvc.perform(get("/v1/pets/{petId}/affinity", pet.petId())
+                        .header("Authorization", bearer(user)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.petId").value(pet.petId()))
+                .andExpect(jsonPath("$.data.score").value(0))
+                .andExpect(jsonPath("$.data.level").value(1))
+                .andExpect(jsonPath("$.data.mood").value("NEUTRAL"))
+                .andExpect(jsonPath("$.data.updatedAt").isNotEmpty());
+    }
+
+    @Test
+    void streamsInitialAffinitySnapshotAndCleansUpConnection()
+            throws Exception {
+        UserJpaEntity user = saveUser("sse-owner@example.com", "owner");
+        PetCreatedResult pet = petService.create(
+                user.getId(),
+                "sse-pet",
+                "masil"
+        );
+
+        MvcResult result = mockMvc.perform(
+                        get("/v1/pets/{petId}/affinity/stream", pet.petId())
+                                .header("Authorization", bearer(user))
+                                .accept(MediaType.TEXT_EVENT_STREAM)
+                )
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(
+                        MediaType.TEXT_EVENT_STREAM
+                ))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        try {
+            assertTrue(result.getResponse().getContentAsString()
+                    .contains("event:affinity-snapshot"));
+            assertTrue(result.getResponse().getContentAsString()
+                    .contains("\"score\":0"));
+            assertEquals(
+                    1,
+                    affinitySseRegistry.activeConnectionCount(pet.petId())
+            );
+            UUID eventMessageId = UUID.randomUUID();
+            affinitySseRegistry.broadcast(new PetAffinityChangedEvent(
+                    pet.petId(),
+                    eventMessageId,
+                    0,
+                    2,
+                    2,
+                    1,
+                    "WARY",
+                    Instant.parse("2026-08-07T01:00:00Z")
+            ));
+            String stream = result.getResponse().getContentAsString();
+            assertTrue(stream.contains("event:affinity-changed"));
+            assertTrue(stream.contains("\"score\":2"));
+            assertTrue(stream.contains("\"change\":2"));
+            assertTrue(stream.contains(eventMessageId.toString()));
+        } finally {
+            affinitySseRegistry.disconnect(pet.petId());
+            mockMvc.perform(asyncDispatch(result))
+                    .andExpect(status().isOk());
+        }
+        assertEquals(0, affinitySseRegistry.activeConnectionCount(pet.petId()));
+    }
+
+    @Test
+    void rejectsAffinityAccessForAnotherUser() throws Exception {
+        UserJpaEntity owner = saveUser("affinity-owner2@example.com", "owner");
+        UserJpaEntity other = saveUser("affinity-other@example.com", "other");
+        PetCreatedResult pet = petService.create(
+                owner.getId(),
+                "private-affinity-pet",
+                "masil"
+        );
+
+        mockMvc.perform(get("/v1/pets/{petId}/affinity", pet.petId())
+                        .header("Authorization", bearer(other)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("PET_NOT_FOUND"));
+
+        mockMvc.perform(get(
+                        "/v1/pets/{petId}/affinity/stream",
+                        pet.petId()
+                ).header("Authorization", bearer(other)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("PET_NOT_FOUND"));
     }
 
     @Test

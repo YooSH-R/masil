@@ -20,7 +20,7 @@ public class RobotMqttStore {
 
     Optional<AffectionResult> findEventResult(UUID messageId) {
         return jdbcTemplate.query("""
-                SELECT r.serial_number, e.message_id, e.previous_score,
+                SELECT r.serial_number, rp.pet_id, e.message_id, e.previous_score,
                        e.score_change, e.current_score, a.affinity_level,
                        a.mood, e.occurred_at
                 FROM device_events e
@@ -32,6 +32,7 @@ public class RobotMqttStore {
                 """,
                 (rs, rowNum) -> new AffectionResult(
                         rs.getString("serial_number"),
+                        rs.getLong("pet_id"),
                         rs.getObject("message_id", UUID.class),
                         rs.getInt("previous_score"),
                         rs.getInt("score_change"),
@@ -56,6 +57,7 @@ public class RobotMqttStore {
                 """,
                 (rs, rowNum) -> new AffectionResult(
                         rs.getString("serial_number"),
+                        petId,
                         rs.getObject("message_id", UUID.class),
                         rs.getInt("previous_score"),
                         rs.getInt("score_change"),
@@ -477,6 +479,7 @@ public class RobotMqttStore {
 
     record AffectionResult(
             String deviceId,
+            long petId,
             UUID eventMessageId,
             int previousScore,
             int scoreChange,

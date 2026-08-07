@@ -102,6 +102,24 @@ public class PetService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public PetAffinitySnapshot getAffinity(Long userId, Long petId) {
+        PetJpaEntity pet = findOwnedPet(petId, userId);
+        PetAffinityStateJpaEntity state = pet.getAffinityState();
+        if (state == null) {
+            throw new BusinessException(
+                    ErrorCode.PET_AFFINITY_STATE_NOT_FOUND
+            );
+        }
+        return new PetAffinitySnapshot(
+                pet.getId(),
+                state.getAffinityScore(),
+                state.getAffinityLevel(),
+                state.getMood(),
+                state.getUpdatedAt()
+        );
+    }
+
     private PetJpaEntity findLocalTestPet() {
         if (localTestPetId == null) {
             throw new BusinessException(ErrorCode.PET_NOT_FOUND);
