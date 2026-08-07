@@ -16,6 +16,11 @@ java {
 
 tasks.withType(JavaCompile).configureEach {
 	options.encoding = 'UTF-8'
+	// sourceCompatibility 만으로는 API 표면이 제한되지 않는다. JDK 21 로
+	// 컴파일하면 -source 17 이어도 List.getFirst() 같은 21 전용 메서드가
+	// 해석돼서, 로컬은 통과하고 CI(JDK 17 이미지)에서만 깨진다.
+	// release 를 주면 17 에 없는 API 를 컴파일 시점에 바로 잡아낸다.
+	options.release = 17
 }
 
 repositories {

@@ -3,6 +3,7 @@ import 'dart:async';
 import '../../core/services/place_name_resolver.dart';
 import '../../core/services/sample_walk_diaries.dart';
 import '../../core/services/walk_record_store.dart';
+import '../../core/utils/walk_log_markdown.dart';
 import '../../domain/entities/walk_diary.dart';
 import '../../domain/entities/walk_progress.dart';
 import '../../domain/repositories/walk_diary_repository.dart';
@@ -268,8 +269,12 @@ class WalkDiaryViewModel extends BaseViewModel {
     final index = _feed.indexWhere((entry) => entry.walkId == item.walkId);
     if (index == -1) return;
     _feed[index] = _feed[index].copyWith(
-      thumbnailUrl: content.imageUrl,
-      summary: content.markdown,
+      thumbnailUrl: content.coverImageUrl,
+      imageUrls: content.imageUrls,
+      // 목록에는 기호를 걷어낸 한 줄만 넣는다. 원문을 그대로 넣으면 `##` 이나
+      // `**` 가 화면에 그대로 보인다. 서식이 필요한 본문은 markdown 을 쓴다.
+      summary: WalkLogMarkdown.summaryLine(content.markdown),
+      markdown: content.markdown,
     );
     _placeNames[item.walkId] = null;
     safeNotify();

@@ -82,6 +82,120 @@ class WalkDiaryServiceTest {
         );
     }
 
+    /** presign URL 을 키에서 만들어, 어느 객체가 어떤 순서로 서명됐는지 본다. */
+    private void stubPresignerEchoingKey() {
+        when(presigner.presignGetObject(any(GetObjectPresignRequest.class)))
+                .thenAnswer(invocation -> {
+                    GetObjectPresignRequest request = invocation.getArgument(0);
+                    PresignedGetObjectRequest signed =
+                            mock(PresignedGetObjectRequest.class);
+                    when(signed.url()).thenReturn(new URL(
+                            "https://example.com/"
+                                    + request.getObjectRequest().key()
+                    ));
+                    return signed;
+                });
+    }
+
+    @Test
+    void returnsEveryEventImageInFileNameOrder() {
+        when(store.findActiveOwnedDevice(10L, "device-001"))
+                .thenReturn(java.util.Optional.of(ownedDevice(PAIRED_AT)));
+        stubPresignerEchoingKey();
+        // S3 목록 순서를 믿지 않는다는 것을 보이려고 일부러 뒤섞어 넣는다.
+        stubObjects(
+                key("2026-08-07", 1, "event_03.png"),
+                key("2026-08-07", 1, "event_01.png"),
+                key("2026-08-07", 1, "walk_log.md"),
+                key("2026-08-07", 1, "event_04.png"),
+                key("2026-08-07", 1, "event_02.png")
+        );
+
+        WalkDiaryService.DiaryDetail result = service.getDiary(
+                10L,
+                "device-001",
+                LocalDate.parse("2026-08-07"),
+                1
+        );
+
+        assertEquals(
+                List.of(
+                        "https://example.com/" + key("2026-08-07", 1, "event_01.png"),
+                        "https://example.com/" + key("2026-08-07", 1, "event_02.png"),
+                        "https://example.com/" + key("2026-08-07", 1, "event_03.png"),
+                        "https://example.com/" + key("2026-08-07", 1, "event_04.png")
+                ),
+                result.imageUrls()
+        );
+        // imageUrl 은 배포된 앱 호환용으로 첫 장을 가리킨다.
+        assertEquals(result.imageUrls().get(0), result.imageUrl());
+    }
+
+    @Test
+    void stillReadsLegacySessionWithSingleStoryImage() {
+        when(store.findActiveOwnedDevice(10L, "device-001"))
+                .thenReturn(java.util.Optional.of(ownedDevice(PAIRED_AT)));
+        stubPresignerEchoingKey();
+        stubObjects(
+                key("2026-08-03", 1, "story_image.png"),
+                key("2026-08-03", 1, "walk_log.md")
+        );
+
+        WalkDiaryService.DiaryDetail result = service.getDiary(
+                10L,
+                "device-001",
+                LocalDate.parse("2026-08-03"),
+                1
+        );
+
+        assertEquals(1, result.imageUrls().size());
+        assertTrue(result.imageUrl().endsWith("story_image.png"));
+    }
+
+    @Test
+    void feedIncludesSessionWithOnlyEventImages() {
+        when(store.findActiveOwnedDevices(10L))
+                .thenReturn(List.of(ownedDevice(PAIRED_AT)));
+        stubObjectsAt(
+                UPLOADED_AT,
+                key("2026-08-07", 1, "event_01.png"),
+                key("2026-08-07", 1, "walk_log.md")
+        );
+
+        WalkDiaryService.DiaryFeed feed = service.getFeed(10L, null, 30);
+
+        assertEquals(1, feed.items().size());
+        assertEquals(
+                LocalDate.parse("2026-08-07"),
+                feed.items().get(0).walkDate()
+        );
+    }
+
+    @Test
+    void ignoresImagesInsideSubdirectories() {
+        // flow_panels/ 는 진단용 부산물이라 일지 이미지로 세지 않는다.
+        // 이걸 이미지로 인정하면 세션 폴더 최상위에 아무 이미지가 없어도
+        // 완성된 일지처럼 보인다.
+        when(store.findActiveOwnedDevice(10L, "device-001"))
+                .thenReturn(java.util.Optional.of(ownedDevice(PAIRED_AT)));
+        stubObjects(
+                key("2026-08-07", 1, "flow_panels/event_01.png"),
+                key("2026-08-07", 1, "walk_log.md")
+        );
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.getDiary(
+                        10L,
+                        "device-001",
+                        LocalDate.parse("2026-08-07"),
+                        1
+                )
+        );
+
+        assertEquals(ErrorCode.WALK_DIARY_NOT_FOUND, exception.errorCode());
+    }
+
     @Test
     void returnsOwnedDiaryDirectlyFromFixedS3Path() {
         when(store.findActiveOwnedDevice(10L, "device-001"))

@@ -92,12 +92,13 @@ CREATE TABLE pets (
     name VARCHAR(100) NOT NULL,
     profile_image_key VARCHAR(500),
     -- 하루 산책 횟수. 산책 제안 간격을 정한다(활동 시간대를 이 횟수로 나눔).
+    -- 상한 6 은 산책일지 S3 경로의 session1~6 과 맞춘 값이다.
     daily_walk_count INTEGER NOT NULL DEFAULT 2,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMPTZ,
     CONSTRAINT pets_daily_walk_count_check
-        CHECK (daily_walk_count BETWEEN 1 AND 24)
+        CHECK (daily_walk_count BETWEEN 1 AND 6)
 );
 
 CREATE INDEX idx_pets_user_active

@@ -6,6 +6,7 @@ import '../../../core/services/sample_walk_diaries.dart';
 import '../../../core/utils/korea_time.dart';
 import '../../../domain/entities/walk_diary.dart';
 import '../../viewmodels/walk_diary_view_model.dart';
+import '../../widgets/markdown_view.dart';
 
 /// 산책 일지. GET /walk-diaries 로 받은 기록을 달력에 표시하고,
 /// 날짜를 누르면 그 날의 장소·거리·시간을 보여준다.
@@ -379,33 +380,24 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
   /// 산책 사진. 서버 사진을 우선하고, 없으면 예시 asset, 둘 다 없으면 안내 아이콘.
   ///
   /// asset 파일이 빠져 있어도 화면이 깨지지 않게 errorBuilder 로 받아준다.
-  static Widget _buildWalkImage({
-    required String? thumbnailUrl,
-    required String? imageAsset,
-  }) {
-    const placeholder = Center(
-      child: Icon(Icons.image_outlined, size: 48, color: Color(0xFFD7CCC8)),
-    );
 
-    if (thumbnailUrl != null) {
-      return Image.network(
-        thumbnailUrl,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => imageAsset == null
-            ? placeholder
-            : Image.asset(imageAsset,
-                fit: BoxFit.cover, errorBuilder: (_, __, ___) => placeholder),
-      );
-    }
-    if (imageAsset != null) {
-      return Image.asset(
-        imageAsset,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => placeholder,
-      );
-    }
-    return placeholder;
+  /// 사진을 전체 화면으로 넘겨 본다. 카드 안 캐러셀은 250px 높이라 그림의
+  /// 세부를 볼 수 없다.
+  void _openImageViewer(
+    BuildContext context,
+    List<String> imageUrls,
+    int initialIndex,
+  ) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (_) => _ImageViewerDialog(
+        imageUrls: imageUrls,
+        initialIndex: initialIndex,
+      ),
+    );
   }
+
 
   /// 선택한 날의 요약. 장소는 역지오코딩 결과이고, 아직 못 구했으면 `-`.
   Widget _buildDailySummaryCard(WalkDiaryFeedItem item, String? placeName) {
@@ -621,6 +613,8 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
       showPathButton: !item.isS3Diary,
       // 7월 예시 기록은 서버 사진이 없어 asset 그림을 쓴다.
       imageAsset: SampleWalkDiaries.imageAssetOf(item.walkId),
+      markdown: item.markdown,
+      imageUrls: item.imageUrls,
     );
   }
 
@@ -634,6 +628,8 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     required String? thumbnailUrl,
     required bool showPathButton,
     String? imageAsset,
+    String? markdown,
+    List<String> imageUrls = const [],
   }) {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -652,14 +648,28 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
             ),
             child: Stack(
               children: [
-                // 서버 사진(thumbnailUrl)이 있으면 그걸, 없으면 예시 그림을 쓴다.
                 Positioned.fill(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
-                    child: _buildWalkImage(
-                      thumbnailUrl: thumbnailUrl,
-                      imageAsset: imageAsset,
-                    ),
+                    // 한 세션에 event_01~04 로 여러 장이 오면 넘겨 볼 수 있게
+                    // 캐러셀로 띄운다. 한 장뿐이면 그냥 그린다.
+                    child: imageUrls.length > 1
+                        ? _WalkImageCarousel(
+                            imageUrls: imageUrls,
+                            onImageTap: (index) =>
+                                _openImageViewer(context, imageUrls, index),
+                          )
+                        : GestureDetector(
+                            onTap: imageUrls.isEmpty
+                                ? null
+                                : () =>
+                                    _openImageViewer(context, imageUrls, 0),
+                            // 서버 사진이 있으면 그걸, 없으면 예시 그림을 쓴다.
+                            child: _buildWalkImage(
+                              thumbnailUrl: thumbnailUrl,
+                              imageAsset: imageAsset,
+                            ),
+                          ),
                   ),
                 ),
                 if (showPathButton)
@@ -699,10 +709,19 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
                 color: Color(0xFF5D4037)),
           ),
           const SizedBox(height: 12),
-          Text(
-            summary ?? '이 산책에 남긴 기록이 아직 없어요.',
-            style: TextStyle(color: Colors.grey.shade700, height: 1.5),
-          ),
+          // 원문이 있으면 서식을 살려 그린다. 마크다운을 Text 로 그대로 뿌리면
+          // `##` 이나 `**` 가 사용자에게 보인다.
+          if (markdown != null && markdown.trim().isNotEmpty)
+            MarkdownView(
+              markdown,
+              baseStyle: TextStyle(
+                  fontSize: 14, height: 1.6, color: Colors.grey.shade700),
+            )
+          else
+            Text(
+              summary ?? '이 산책에 남긴 기록이 아직 없어요.',
+              style: TextStyle(color: Colors.grey.shade700, height: 1.5),
+            ),
           const SizedBox(height: 24),
 
           Row(
@@ -762,4 +781,260 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
       ),
     );
   }
+}
+
+/// 산책일지 사진을 전체 화면으로 넘겨 보는 뷰어.
+///
+/// **왜 StatefulWidget 인가**: 확대 상태를 알아야 하고, [PageController] 를
+/// 한 번만 만들어 폐기해야 한다. `showDialog` 의 builder 안에서 컨트롤러를
+/// 만들면 다이얼로그가 다시 빌드될 때마다 새로 생기고 폐기되지 않는다.
+class _ImageViewerDialog extends StatefulWidget {
+  const _ImageViewerDialog({
+    required this.imageUrls,
+    required this.initialIndex,
+  });
+
+  final List<String> imageUrls;
+  final int initialIndex;
+
+  @override
+  State<_ImageViewerDialog> createState() => _ImageViewerDialogState();
+}
+
+class _ImageViewerDialogState extends State<_ImageViewerDialog> {
+  late final PageController _pageController;
+
+  /// 페이지마다 확대 상태를 따로 가진다. 한 컨트롤러를 공유하면 옆 사진으로
+  /// 넘어갔을 때 앞 사진의 확대·이동이 그대로 따라온다.
+  late final List<TransformationController> _transformControllers;
+
+  late int _currentPage;
+  bool _isZoomed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentPage = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+    _transformControllers = List.generate(
+      widget.imageUrls.length,
+      (_) => TransformationController(),
+    );
+    for (final controller in _transformControllers) {
+      controller.addListener(_syncZoomState);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    for (final controller in _transformControllers) {
+      controller.removeListener(_syncZoomState);
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  /// 확대 중인지 갱신한다.
+  ///
+  /// 확대한 상태에서 가로로 끌면 PageView 가 그 제스처를 가로채 다음 장으로
+  /// 넘겨버린다. 그러면 확대한 부분을 좌우로 훑어볼 수 없다. 확대 중에는
+  /// PageView 의 스크롤을 막아 드래그를 InteractiveViewer 에게 넘긴다.
+  void _syncZoomState() {
+    final scale = _transformControllers[_currentPage]
+        .value
+        .getMaxScaleOnAxis();
+    // 부동소수 오차로 1.0 이 1.0000001 로 나오는 경우가 있어 여유를 둔다.
+    final zoomed = scale > 1.01;
+    if (zoomed != _isZoomed) {
+      setState(() => _isZoomed = zoomed);
+    }
+  }
+
+  void _onPageChanged(int index) {
+    // 넘어간 뒤에도 앞 장이 확대된 채로 남으면, 되돌아왔을 때 갑자기 확대된
+    // 화면이 뜬다. 떠난 장은 원래 배율로 되돌린다.
+    _transformControllers[_currentPage].value = Matrix4.identity();
+    setState(() {
+      _currentPage = index;
+      _isZoomed = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: PageView.builder(
+              controller: _pageController,
+              physics: _isZoomed
+                  ? const NeverScrollableScrollPhysics()
+                  : const PageScrollPhysics(),
+              onPageChanged: _onPageChanged,
+              itemCount: widget.imageUrls.length,
+              itemBuilder: (_, index) => InteractiveViewer(
+                transformationController: _transformControllers[index],
+                minScale: 1,
+                maxScale: 4,
+                child: Image.network(
+                  widget.imageUrls[index],
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Center(
+                    child: Icon(Icons.broken_image_outlined,
+                        size: 48, color: Colors.white54),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (widget.imageUrls.length > 1)
+                Text(
+                  '${_currentPage + 1} / ${widget.imageUrls.length}',
+                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+                ),
+              if (widget.imageUrls.length > 1) const SizedBox(width: 16),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('닫기',
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 일지 카드 안에서 사진을 넘겨 보는 캐러셀.
+///
+/// 한 세션에 `event_01 ~ event_04` 로 여러 장이 오는데, 대표 한 장만 띄우면
+/// 나머지는 있는 줄도 모른다. 좌우로 넘길 수 있게 하고 아래에 점으로 몇 장
+/// 중 몇 번째인지 알린다.
+class _WalkImageCarousel extends StatefulWidget {
+  const _WalkImageCarousel({
+    required this.imageUrls,
+    required this.onImageTap,
+  });
+
+  final List<String> imageUrls;
+
+  /// 누른 장의 순번을 넘긴다. 전체 화면 뷰어를 그 장에서 열기 위한 값이다.
+  final ValueChanged<int> onImageTap;
+
+  @override
+  State<_WalkImageCarousel> createState() => _WalkImageCarouselState();
+}
+
+class _WalkImageCarouselState extends State<_WalkImageCarousel> {
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: PageView.builder(
+            controller: _pageController,
+            itemCount: widget.imageUrls.length,
+            onPageChanged: (index) => setState(() => _currentPage = index),
+            itemBuilder: (_, index) => GestureDetector(
+              onTap: () => widget.onImageTap(index),
+              child: _buildWalkImage(
+                thumbnailUrl: widget.imageUrls[index],
+                imageAsset: null,
+              ),
+            ),
+          ),
+        ),
+        // 점 표시. 사진 위에 얹히므로 어두운 배경을 깔아 밝은 사진에서도
+        // 보이게 한다.
+        Positioned(
+          bottom: 12,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var index = 0;
+                      index < widget.imageUrls.length;
+                      index++) ...[
+                    if (index > 0) const SizedBox(width: 6),
+                    Container(
+                      width: index == _currentPage ? 18 : 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: index == _currentPage
+                            ? Colors.white
+                            : Colors.white54,
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 산책 사진 한 장. 서버 사진을 우선하고, 없으면 예시 asset, 둘 다 없으면
+/// 안내 아이콘을 그린다. asset 파일이 빠져 있어도 화면이 깨지지 않게
+/// errorBuilder 로 받아준다.
+///
+/// 일지 카드와 캐러셀이 함께 쓰므로 최상위 함수로 둔다.
+Widget _buildWalkImage({
+  required String? thumbnailUrl,
+  required String? imageAsset,
+}) {
+  const placeholder = Center(
+    child: Icon(Icons.image_outlined, size: 48, color: Color(0xFFD7CCC8)),
+  );
+
+  if (thumbnailUrl != null) {
+    return Image.network(
+      thumbnailUrl,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => imageAsset == null
+          ? placeholder
+          : Image.asset(imageAsset,
+              fit: BoxFit.cover, errorBuilder: (_, __, ___) => placeholder),
+    );
+  }
+  if (imageAsset != null) {
+    return Image.asset(
+      imageAsset,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => placeholder,
+    );
+  }
+  return placeholder;
 }

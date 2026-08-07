@@ -122,7 +122,7 @@ class WalkDiaryContentModel extends WalkDiaryContent {
     required super.deviceId,
     required super.walkDate,
     required super.session,
-    required super.imageUrl,
+    required super.imageUrls,
     required super.markdown,
     super.imageUrlExpiresAt,
   });
@@ -132,10 +132,25 @@ class WalkDiaryContentModel extends WalkDiaryContent {
       deviceId: Json.asString(json['deviceId']),
       walkDate: _parseDateOnly(json['walkDate']) ?? DateTime.utc(1970),
       session: Json.asInt(json['session']),
-      imageUrl: Json.asString(json['imageUrl']),
+      imageUrls: _parseImageUrls(json),
       markdown: Json.asString(json['markdown']),
       imageUrlExpiresAt: Json.asDateTime(json['imageUrlExpiresAt']),
     );
+  }
+
+  /// `imageUrls` 를 쓰고, 없으면 옛 응답의 `imageUrl` 한 장으로 받아준다.
+  /// 서버가 아직 배포되지 않은 동안에도 화면이 비지 않게 한다.
+  static List<String> _parseImageUrls(Map<String, dynamic> json) {
+    final raw = json['imageUrls'];
+    if (raw is List) {
+      final urls = raw
+          .map((entry) => entry?.toString() ?? '')
+          .where((url) => url.isNotEmpty)
+          .toList(growable: false);
+      if (urls.isNotEmpty) return urls;
+    }
+    final single = Json.asStringOrNull(json['imageUrl']);
+    return single == null || single.isEmpty ? const [] : [single];
   }
 }
 
