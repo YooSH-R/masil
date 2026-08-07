@@ -41,6 +41,11 @@ class ApiEndpoints {
   static String robotInteractions(int robotId) =>
       '/robots/$robotId/interactions';
   static String petAffinity(int petId) => '/pets/$petId/affinity';
+
+  /// 친밀도 실시간 구독(SSE). 연결되면 `affinity-snapshot` 이 한 번 오고,
+  /// 이후 변경은 `affinity-changed` 로 온다.
+  static String petAffinityStream(int petId) =>
+      '/pets/$petId/affinity/stream';
   static String petAffinityHistory(int petId) =>
       '/pets/$petId/affinity/history';
 

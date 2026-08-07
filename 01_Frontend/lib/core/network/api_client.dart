@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 
 import 'api_exception.dart';
+import 'sse_client.dart';
 
 /// 공통 응답 봉투를 벗겨내는 얇은 래퍼.
 ///
@@ -92,6 +93,37 @@ class ApiClient {
         options: Options(responseType: ResponseType.bytes),
       );
       return res.data ?? const [];
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// `text/event-stream` 응답을 프레임 단위로 돌려준다.
+  ///
+  /// 일반 요청과 두 가지가 다르다.
+  /// 1. 응답 전체를 기다릴 수 없다. 연결이 열려 있는 동안 계속 흘러온다.
+  /// 2. **receiveTimeout 을 없애야 한다.** 전역 기본값(15초)을 그대로 쓰면
+  ///    서버가 20초마다 보내는 heartbeat 사이에서 정상 연결이 끊긴다.
+  ///    Dio 는 `Duration.zero` 를 "타임아웃 없음" 으로 본다.
+  ///
+  /// 구독을 취소하면 소켓도 닫아야 하므로 [cancelToken] 을 받는다.
+  Future<Stream<SseEvent>> eventStream(
+    String path, {
+    CancelToken? cancelToken,
+  }) async {
+    try {
+      final res = await _dio.get<ResponseBody>(
+        path,
+        options: Options(
+          responseType: ResponseType.stream,
+          headers: {'Accept': 'text/event-stream'},
+          receiveTimeout: Duration.zero,
+        ),
+        cancelToken: cancelToken,
+      );
+      final body = res.data;
+      if (body == null) return const Stream<SseEvent>.empty();
+      return decodeSseEvents(body.stream);
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
     }

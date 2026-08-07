@@ -34,6 +34,13 @@ abstract class PetRepository {
   /// GET /pets/{petId}/affinity — 친밀도·기분 조회
   Future<Affinity> getAffinity(int petId);
 
+  /// GET /pets/{petId}/affinity/stream — 친밀도 실시간 구독(SSE).
+  ///
+  /// 연결 직후 현재값이 한 번 오고, 이후 변경이 이어서 온다. **구독을 취소하면
+  /// 연결도 닫힌다.** 서버가 30분마다 정상 종료하므로 스트림이 끝나는 것은
+  /// 오류가 아니며, 다시 붙는 것은 호출하는 쪽 책임이다.
+  Stream<Affinity> streamAffinity(int petId);
+
   /// GET /pets/{petId}/affinity/history — 친밀도 변화 이력
   Future<List<AffinityHistoryEntry>> getAffinityHistory(int petId,
       {int? limit});

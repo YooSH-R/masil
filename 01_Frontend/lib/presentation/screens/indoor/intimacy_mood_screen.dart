@@ -10,13 +10,13 @@ import '../../viewmodels/walk_diary_view_model.dart';
 
 /// 친밀도 상세 화면.
 ///
-/// **어디서 값이 오는가**: `GET /v1/pets/{petId}` 응답의 `affinity`
-/// (`score`·`level`·`mood`)다. 명세서에 있는 `GET /pets/{petId}/affinity` 는
-/// 아직 배포되지 않았지만(2026-08-03 확인), 펫 프로필 응답에 친밀도가 함께
-/// 들어있어서 **지금 배포된 API 만으로도 실제 값을 보여줄 수 있다.**
+/// **어디서 값이 오는가**: `GET /v1/pets/{petId}/affinity` 다. 펫 프로필 응답의
+/// `affinity` 는 첫 화면을 채우는 대체값으로만 쓴다
+/// ([PetViewModel.affinity] 가 `_affinity ?? _pet?.affinity` 순으로 돌려준다).
 ///
-/// [PetViewModel.affinity] 가 `_affinity ?? _pet?.affinity` 순으로 돌려주므로,
-/// 전용 엔드포인트가 배포되면 이 화면은 손대지 않아도 그 값을 쓰게 된다.
+/// 연결된 동안의 변경은 `GET /pets/{petId}/affinity/stream`(SSE)으로 들어온다.
+/// 그 연결은 화면이 아니라 세션 단위로 관리하므로(`AffinityStreamBinder`) 이
+/// 화면은 `context.watch<PetViewModel>()` 만 하면 자동으로 갱신된다.
 ///
 class IntimacyMoodScreen extends StatefulWidget {
   const IntimacyMoodScreen({super.key});

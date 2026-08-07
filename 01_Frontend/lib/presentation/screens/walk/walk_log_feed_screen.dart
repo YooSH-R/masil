@@ -32,9 +32,16 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     _currentMonth = now.month;
     _selectedDate = DateTime.utc(now.year, now.month, now.day);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      context.read<WalkDiaryViewModel>().loadFeed(refresh: true);
+      final diaryVm = context.read<WalkDiaryViewModel>();
+      await diaryVm.loadFeed(refresh: true);
+      if (!mounted) return;
+
+      // 피드만 불러오면 달력에 점은 찍히지만 본문·사진은 비어 있다. 그건
+      // selectFeedItem 이 채운다. 여기서 한 번 불러주지 않으면 사용자가
+      // 달력을 한 번 눌러야 비로소 오늘 일지가 뜬다.
+      _loadDetailFor(diaryVm, _selectedDate);
     });
   }
 
@@ -44,8 +51,11 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
       _selectedDate = date;
       _selectedWalkIndex = 0;
     });
+    _loadDetailFor(context.read<WalkDiaryViewModel>(), date);
+  }
 
-    final diaryVm = context.read<WalkDiaryViewModel>();
+  /// 그 날 첫 산책의 상세를 불러온다. 기록이 없으면 아무것도 하지 않는다.
+  void _loadDetailFor(WalkDiaryViewModel diaryVm, DateTime date) {
     final items = diaryVm.itemsOn(date);
     if (items.isNotEmpty) diaryVm.selectFeedItem(items.first);
   }
