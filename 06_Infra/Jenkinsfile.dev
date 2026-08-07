@@ -13,6 +13,11 @@ pipeline {
             defaultValue: false,
             description: '백엔드 변경이 없어도 이미지 빌드와 배포를 실행한다.'
         )
+        booleanParam(
+            name: 'FORCE_MIGRATION',
+            defaultValue: false,
+            description: '마이그레이션 파일 변경이 없어도 dev DB 마이그레이션을 실행한다.'
+        )
     }
 
     environment {
@@ -61,18 +66,28 @@ pipeline {
                             returnStdout: true
                         ).trim()
                     } else {
+                        // 머지 커밋에서 `git show --name-only` 는 파일을 하나도
+                        // 내놓지 않는다. dev 는 MR 머지로만 진행되므로 이 경로를
+                        // 타면 마이그레이션 스테이지가 조용히 스킵됐다.
+                        // 첫 부모와 비교하면 일반 커밋도 머지 커밋도 실제 반영된
+                        // 파일 목록을 얻는다.
                         changedFiles = sh(
-                            script: 'git show --pretty= --name-only HEAD',
+                            script: '''
+                                if git rev-parse --verify --quiet HEAD^1 >/dev/null; then
+                                  git diff --name-only HEAD^1 HEAD
+                                else
+                                  git show --pretty= --name-only HEAD
+                                fi
+                            ''',
                             returnStdout: true
                         ).trim()
                     }
 
-                    def migrationChanged = changedFiles
-                        .readLines()
-                        .any {
-                            it.startsWith('06_Infra/postgres/init/') ||
-                            it.startsWith('06_Infra/postgres/dev/')
-                        }
+                    def migrationChanged = params.FORCE_MIGRATION ||
+                            changedFiles.readLines().any {
+                                it.startsWith('06_Infra/postgres/init/') ||
+                                it.startsWith('06_Infra/postgres/dev/')
+                            }
 
                     def deploymentChanged = changedFiles
                         .readLines()
@@ -91,6 +106,7 @@ pipeline {
 
                     echo "Changed files:\n${changedFiles ?: '(none)'}"
                     echo "Force backend build: ${params.FORCE_BACKEND_BUILD}"
+                    echo "Force migration: ${params.FORCE_MIGRATION}"
                     echo "Backend changed: ${env.BACKEND_CHANGED}"
                     echo "Database migration changed: ${env.MIGRATION_CHANGED}"
                 }
