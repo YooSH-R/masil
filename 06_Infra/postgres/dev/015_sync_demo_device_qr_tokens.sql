@@ -15,21 +15,18 @@ CREATE TABLE IF NOT EXISTS dev_maintenance_runs (
     executed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 이 파일의 첫 버전은 파일 단위 키 하나를 남겼다. 아래에서 기기 단위 키로
+-- 바꿨으므로 남아 있으면 오해를 부르는 옛 키를 정리한다.
+DELETE FROM dev_maintenance_runs
+WHERE maintenance_key = '015_sync_demo_device_qr_tokens';
+
 DO $$
 DECLARE
     demo_device RECORD;
+    device_maintenance_key TEXT;
     target_robot_id BIGINT;
     conflicting_robot_id BIGINT;
-    skipped_devices INTEGER := 0;
 BEGIN
-    IF EXISTS (
-        SELECT 1
-        FROM dev_maintenance_runs
-        WHERE maintenance_key = '015_sync_demo_device_qr_tokens'
-    ) THEN
-        RETURN;
-    END IF;
-
     FOR demo_device IN
         SELECT *
         FROM (VALUES
@@ -45,6 +42,21 @@ BEGIN
             )
         ) AS demo(serial_number, model_name, qr_token_hash)
     LOOP
+        -- 이력은 기기 단위로 남긴다. 파일 단위 키 하나만 쓰면 한 기기가
+        -- 스킵될 때 이미 성공한 기기까지 다음 배포에서 다시 처리하게 되고,
+        -- 루프 안의 모든 쓰기가 완전히 멱등해야만 안전한 구조가 된다.
+        -- 기기 단위로 쪼개면 스킵된 기기만 재시도한다.
+        device_maintenance_key :=
+            '015_sync_demo_device_qr_tokens:' || demo_device.serial_number;
+
+        IF EXISTS (
+            SELECT 1
+            FROM dev_maintenance_runs maintenance
+            WHERE maintenance.maintenance_key = device_maintenance_key
+        ) THEN
+            CONTINUE;
+        END IF;
+
         SELECT robot.id
         INTO target_robot_id
         FROM robots robot
@@ -74,7 +86,7 @@ BEGIN
 
         -- uq_robot_credentials_qr_token_hash 위반은 파이프라인 전체(set -eu)를
         -- 세운다. 다른 로봇이 같은 해시를 들고 있으면 배포를 막지 않고
-        -- 알림만 남기고 다음 배포에서 다시 시도한다.
+        -- 알림만 남기고, 이력을 남기지 않아 다음 배포에서 다시 시도한다.
         SELECT credential.robot_id
         INTO conflicting_robot_id
         FROM robot_credentials credential
@@ -83,9 +95,8 @@ BEGIN
 
         IF conflicting_robot_id IS NOT NULL THEN
             RAISE NOTICE
-                '% QR hash is already held by robot id %; skipping',
+                '% QR hash is already held by robot id %; retrying on the next deployment',
                 demo_device.serial_number, conflicting_robot_id;
-            skipped_devices := skipped_devices + 1;
             CONTINUE;
         END IF;
 
@@ -109,19 +120,10 @@ BEGIN
             qr_token_expires_at = NULL,
             qr_token_last_used_at = NULL,
             updated_at = CURRENT_TIMESTAMP;
+
+        INSERT INTO dev_maintenance_runs (maintenance_key)
+        VALUES (device_maintenance_key);
     END LOOP;
-
-    -- 하나라도 건너뛰었으면 키를 남기지 않는다. 무조건 기록하면 아무 일도
-    -- 하지 않은 실행이 "완료"로 박혀 영구히 재시도되지 않는다(011 사례).
-    IF skipped_devices > 0 THEN
-        RAISE NOTICE
-            '% demo device(s) were skipped; retrying on the next deployment',
-            skipped_devices;
-        RETURN;
-    END IF;
-
-    INSERT INTO dev_maintenance_runs (maintenance_key)
-    VALUES ('015_sync_demo_device_qr_tokens');
 END
 $$;
 

@@ -66,19 +66,16 @@ pipeline {
                             returnStdout: true
                         ).trim()
                     } else {
-                        // 머지 커밋에서 `git show --name-only` 는 파일을 하나도
-                        // 내놓지 않는다. dev 는 MR 머지로만 진행되므로 이 경로를
-                        // 타면 마이그레이션 스테이지가 조용히 스킵됐다.
-                        // 첫 부모와 비교하면 일반 커밋도 머지 커밋도 실제 반영된
-                        // 파일 목록을 얻는다.
+                        // `-m` 없는 `git show --name-only` 는 머지 커밋에서 파일을
+                        // 하나도 내놓지 않는다. dev 는 MR 머지로만 진행되므로 이
+                        // 경로를 타면 마이그레이션 스테이지가 조용히 스킵됐다.
+                        //
+                        // `-m` 은 부모별 diff 를 출력해 머지 커밋도 잡아낸다.
+                        // 얕은 복제(depth 1)면 부모가 잘려 나가 전체 트리가
+                        // 나오는데, 마이그레이션은 모두 멱등이므로 한 번 더 도는
+                        // 편이 조용히 건너뛰는 것보다 안전하다.
                         changedFiles = sh(
-                            script: '''
-                                if git rev-parse --verify --quiet HEAD^1 >/dev/null; then
-                                  git diff --name-only HEAD^1 HEAD
-                                else
-                                  git show --pretty= --name-only HEAD
-                                fi
-                            ''',
+                            script: 'git show -m --pretty= --name-only HEAD',
                             returnStdout: true
                         ).trim()
                     }
