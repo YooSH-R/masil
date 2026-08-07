@@ -312,7 +312,10 @@ class PetApiIntegrationTest {
                     "WARY",
                     Instant.parse("2026-08-07T01:00:00Z")
             ));
-            String stream = result.getResponse().getContentAsString();
+            String stream = waitForStreamEvent(
+                    result,
+                    "event:affinity-changed"
+            );
             assertTrue(stream.contains("event:affinity-changed"));
             assertTrue(stream.contains("\"score\":2"));
             assertTrue(stream.contains("\"change\":2"));
@@ -323,6 +326,20 @@ class PetApiIntegrationTest {
                     .andExpect(status().isOk());
         }
         assertEquals(0, affinitySseRegistry.activeConnectionCount(pet.petId()));
+    }
+
+    private String waitForStreamEvent(MvcResult result, String expected)
+            throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+        String stream;
+        do {
+            stream = result.getResponse().getContentAsString();
+            if (stream.contains(expected)) {
+                return stream;
+            }
+            Thread.sleep(10);
+        } while (System.nanoTime() < deadline);
+        return stream;
     }
 
     @Test
