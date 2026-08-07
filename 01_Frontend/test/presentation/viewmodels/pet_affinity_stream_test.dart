@@ -175,6 +175,46 @@ void main() {
       await vm.stopAffinityStream();
     });
 
+    // 연결 도중 refreshAffinity 를 await 하는 사이에는 구독이 아직 null 이다.
+    // 그 GET 이 끝나며 부르는 safeNotify 가 AffinityStreamBinder 를 재빌드해
+    // startAffinityStream 을 다시 부르는데, 구독 유무만 보고 막으면 그 틈으로
+    // 두 번째 연결이 들어온다. 그러면 먼저 만든 구독이 덮어써져 소켓이
+    // 새어 나간다.
+    test('연결 도중 다시 start 를 불러도 연결은 하나만 만든다', () async {
+      final slowGet = Completer<Affinity>();
+      final repo = _FakePetRepository(affinityOnGet: () => slowGet.future);
+      final vm = await _viewModelWithPet(repo);
+
+      // 첫 시도가 GET 응답을 기다리는 중이다(구독은 아직 null).
+      final first = vm.startAffinityStream();
+      expect(vm.isAffinityStreaming, isFalse);
+
+      // 그 틈에 바인더가 다시 부른다.
+      final second = vm.startAffinityStream();
+
+      slowGet.complete(_affinity(10, updatedAt: older));
+      await Future.wait([first, second]);
+
+      expect(repo.streamCallCount, 1, reason: '중복 연결이 만들어졌다');
+      expect(vm.isAffinityStreaming, isTrue);
+      await vm.stopAffinityStream();
+    });
+
+    test('연결 도중 stop 하면 구독을 만들지 않는다', () async {
+      final slowGet = Completer<Affinity>();
+      final repo = _FakePetRepository(affinityOnGet: () => slowGet.future);
+      final vm = await _viewModelWithPet(repo);
+
+      final connecting = vm.startAffinityStream();
+      await vm.stopAffinityStream();
+
+      slowGet.complete(_affinity(10, updatedAt: older));
+      await connecting;
+
+      expect(repo.streamCallCount, 0, reason: '중단했는데도 연결을 만들었다');
+      expect(vm.isAffinityStreaming, isFalse);
+    });
+
     test('stop 하면 구독이 끊기고 이후 이벤트는 무시된다', () async {
       final repo = _FakePetRepository(
         affinityOnGet: () async => _affinity(10, updatedAt: older),

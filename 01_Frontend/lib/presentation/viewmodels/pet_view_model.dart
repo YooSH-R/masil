@@ -94,6 +94,20 @@ class PetViewModel extends BaseViewModel {
   /// 구독 중인 펫. 펫이 바뀌면 이 값과 달라져 다시 연결한다.
   int? _affinityStreamPetId;
 
+  /// 연결을 세우는 중인지.
+  ///
+  /// [_connectAffinityStream] 은 중간에 `refreshAffinity()` 를 await 하는데,
+  /// 그 사이 [_affinitySubscription] 은 아직 null 이다. 그리고 그 GET 이
+  /// 끝나면서 부르는 `safeNotify()` 가 `AffinityStreamBinder` 를 재빌드해
+  /// [startAffinityStream] 을 다시 부른다. 구독 유무만 보고 막으면 그 틈으로
+  /// 두 번째 연결이 들어와, 먼저 만든 구독이 덮어써지고 소켓이 새어 나간다.
+  bool _affinityConnecting = false;
+
+  /// 연결 시도마다 발급하는 번호. await 뒤에 자기 시도가 아직 최신인지 본다.
+  /// 펫이 바뀌어 새 시도가 시작됐을 때, 늦게 끝난 낡은 시도가 구독을 덮어써
+  /// 새 연결을 잃어버리는 것을 막는다.
+  int _affinityEpoch = 0;
+
   static const Duration _affinityRetryBase = Duration(seconds: 5);
   static const Duration _affinityRetryMax = Duration(seconds: 60);
 
@@ -103,13 +117,16 @@ class PetViewModel extends BaseViewModel {
 
   bool get isAffinityStreaming => _affinitySubscription != null;
 
-  /// 친밀도 구독을 시작한다. 이미 같은 펫을 구독 중이면 아무것도 하지 않는다.
+  /// 친밀도 구독을 시작한다.
+  ///
+  /// 이미 같은 펫으로 붙어 있거나 **붙는 중이면** 아무것도 하지 않는다. 붙는
+  /// 중까지 봐야 하는 이유는 [_affinityConnecting] 주석에 적어 두었다.
   Future<void> startAffinityStream() async {
     final id = _pet?.id;
     if (id == null) return;
     if (_affinityStreamWanted &&
         _affinityStreamPetId == id &&
-        _affinitySubscription != null) {
+        (_affinitySubscription != null || _affinityConnecting)) {
       return;
     }
 
@@ -123,6 +140,10 @@ class PetViewModel extends BaseViewModel {
     _affinityStreamWanted = false;
     _affinityStreamPetId = null;
     _affinityRetry = 0;
+    // 진행 중인 연결 시도를 무효로 만든다. 그 시도가 뒤늦게 끝나도 구독을
+    // 만들지 않는다.
+    _affinityEpoch++;
+    _affinityConnecting = false;
     _affinityReconnectTimer?.cancel();
     _affinityReconnectTimer = null;
 
@@ -132,31 +153,50 @@ class PetViewModel extends BaseViewModel {
   }
 
   Future<void> _connectAffinityStream(int petId) async {
-    final previous = _affinitySubscription;
-    _affinitySubscription = null;
-    await previous?.cancel();
+    final epoch = ++_affinityEpoch;
+    _affinityConnecting = true;
+    try {
+      final previous = _affinitySubscription;
+      _affinitySubscription = null;
+      await previous?.cancel();
+      if (!_isAffinityAttemptValid(epoch, petId)) return;
 
-    if (!_affinityStreamWanted || _pet?.id != petId) return;
+      // 붙기 전에 일반 GET 으로 값을 맞춘다. 끊겨 있던 동안의 변경은 SSE 로
+      // 오지 않기 때문이다.
+      await refreshAffinity();
+      if (!_isAffinityAttemptValid(epoch, petId)) return;
 
-    // 붙기 전에 일반 GET 으로 값을 맞춘다. 끊겨 있던 동안의 변경은 SSE 로
-    // 오지 않기 때문이다.
-    await refreshAffinity();
-    if (!_affinityStreamWanted || _pet?.id != petId) return;
-
-    _affinitySubscription = _petRepository.streamAffinity(petId).listen(
-      (affinity) {
-        // 한 번이라도 받았으면 연결이 건강하다는 뜻이라 백오프를 되돌린다.
-        _affinityRetry = 0;
-        _applyAffinity(affinity);
-      },
-      onError: (_) => _scheduleAffinityReconnect(petId, failed: true),
-      onDone: () => _scheduleAffinityReconnect(petId, failed: false),
-      cancelOnError: true,
-    );
+      _affinitySubscription = _petRepository.streamAffinity(petId).listen(
+        (affinity) {
+          // 한 번이라도 받았으면 연결이 건강하다는 뜻이라 백오프를 되돌린다.
+          _affinityRetry = 0;
+          _applyAffinity(affinity);
+        },
+        onError: (_) => _scheduleAffinityReconnect(petId, failed: true),
+        onDone: () => _scheduleAffinityReconnect(petId, failed: false),
+        cancelOnError: true,
+      );
+    } catch (_) {
+      // 연결을 세우는 중(구독 취소·GET)에 던져진 예외까지 재연결 경로로 보낸다.
+      // 여기서 새어 나가면 처리되지 않은 비동기 오류가 되고, 재연결이 예약되지
+      // 않아 실시간 갱신이 조용히 멈춘다.
+      if (_isAffinityAttemptValid(epoch, petId)) {
+        _scheduleAffinityReconnect(petId, failed: true);
+      }
+    } finally {
+      // 내 시도가 아직 최신일 때만 플래그를 내린다. 새 시도가 이미 시작됐다면
+      // 그 시도가 자기 몫으로 관리한다.
+      if (epoch == _affinityEpoch) _affinityConnecting = false;
+    }
   }
+
+  /// 이 연결 시도가 아직 유효한지. await 를 건너온 뒤마다 확인한다.
+  bool _isAffinityAttemptValid(int epoch, int petId) =>
+      epoch == _affinityEpoch && _affinityStreamWanted && _pet?.id == petId;
 
   void _scheduleAffinityReconnect(int petId, {required bool failed}) {
     _affinitySubscription = null;
+    _affinityConnecting = false;
     if (!_affinityStreamWanted || _pet?.id != petId) return;
 
     final delay = failed ? _affinityBackoff(_affinityRetry++) : _affinityRenewDelay;
