@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/services/profile_image_store.dart';
+import '../../../domain/entities/pet.dart';
 import '../../viewmodels/pet_view_model.dart';
 import '../../widgets/profile_avatar_picker.dart';
 
@@ -17,19 +18,31 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
   /// 서버에서 이름이 오기 전까지 보여줄 값. 도착하면 [_syncName] 이 덮어쓴다.
   final _nameController = TextEditingController(text: '마실이');
 
-  /// 산책 주기·회당 시간·알림 동의는 서버 `UpdatePetRequest` 에 항목이 없다.
-  /// 지금은 화면에만 남는 값이다([_save] 주석 참고).
-  final _cycleController = TextEditingController(text: '2');
-  final _timeController = TextEditingController(text: '30');
+  /// 하루 산책 횟수. 서버 `pets.daily_walk_count` 와 이어져 있고, 산책 제안
+  /// 간격을 실제로 정한다. 서버 값이 오면 [_syncPet] 이 덮어쓴다.
+  final _cycleController =
+      TextEditingController(text: '${Pet.defaultDailyWalkCount}');
+
+  /// 알림 동의는 아직 서버 `UpdatePetRequest` 에 항목이 없다([_save] 주석 참고).
   bool _isNotificationEnabled = true;
 
-  /// 사용자가 이름을 직접 고쳤는지. 고친 뒤에 서버 값으로 되돌리지 않기 위한 표시.
+  /// 산책 알림이 오는 활동 시간대. [_cycleGuide] 문구를 만들 때만 쓴다.
+  static const int _activeStartHour = 8;
+  static const int _activeEndHour = 22;
+
+  /// 사용자가 직접 고쳤는지. 고친 뒤에 서버 값으로 되돌리지 않기 위한 표시.
   bool _nameTouched = false;
+  bool _cycleTouched = false;
 
   @override
   void initState() {
     super.initState();
     _nameController.addListener(() => _nameTouched = true);
+    // 횟수를 고칠 때마다 알림 간격 안내 문구를 다시 계산한다.
+    _cycleController.addListener(() {
+      _cycleTouched = true;
+      setState(() {});
+    });
     // 사진을 어느 펫 자리에 저장할지 알려면 petId 가 필요하다.
     // 펫 API 가 아직 없으면 조용히 실패하고 공용 자리를 쓴다.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -37,7 +50,7 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
       final petVm = context.read<PetViewModel>();
       if (petVm.pet == null) await petVm.loadCurrentPet(silent: true);
       if (!mounted) return;
-      _syncName(petVm.pet?.name);
+      _syncPet(petVm.pet);
     });
   }
 
@@ -45,30 +58,49 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
   void dispose() {
     _nameController.dispose();
     _cycleController.dispose();
-    _timeController.dispose();
     super.dispose();
   }
 
-  /// 서버에서 온 이름을 입력칸에 채운다.
+  /// 서버에서 온 펫 정보를 입력칸에 채운다.
   ///
   /// 사용자가 이미 고쳐 둔 값을 서버 값으로 되돌리면 입력을 잃어버리므로,
   /// 아직 손대지 않았을 때만(=처음 채울 때) 넣는다.
-  void _syncName(String? name) {
-    if (name == null || name.isEmpty || _nameTouched) return;
-    _nameController.text = name;
+  void _syncPet(Pet? pet) {
+    if (pet == null) return;
+    if (pet.name.isNotEmpty && !_nameTouched) {
+      _nameController.text = pet.name;
+    }
+    if (!_cycleTouched) {
+      _cycleController.text = '${pet.dailyWalkCount}';
+      // 위 대입이 리스너를 깨워 _cycleTouched 를 세우므로 되돌려 놓는다.
+      // 그러지 않으면 서버 값을 채운 것만으로 "사용자가 고쳤다" 가 된다.
+      _cycleTouched = false;
+    }
   }
 
   /// PATCH /pets/{petId} — 펫 정보 저장.
   ///
-  /// 서버 `UpdatePetRequest` 는 `name` 과 `profileImage` 만 받는다. 아래 화면에
-  /// 있는 **산책 주기·회당 시간·알림 동의는 서버에 보낼 항목이 없다** — 저장돼도
-  /// 이 기기에만 남는다. 서버에 항목이 생기면 여기에 함께 실어 보내면 된다.
+  /// 이름과 하루 산책 횟수를 함께 보낸다. 횟수는 서버에서 산책 제안 간격이
+  /// 되므로 저장하는 순간 마실이가 조르는 주기가 바뀐다.
+  ///
+  /// **알림 수신 동의는 아직 서버에 보낼 항목이 없다** — 저장돼도 이 기기에만
+  /// 남는다. 서버에 항목이 생기면 여기에 함께 실어 보내면 된다.
   Future<void> _save() async {
     final petVm = context.read<PetViewModel>();
     final name = _nameController.text.trim();
+    final cycle = int.tryParse(_cycleController.text.trim());
 
     if (name.isEmpty) {
       _toast('펫 이름을 입력해 주세요', isError: true);
+      return;
+    }
+    if (cycle == null ||
+        cycle < Pet.minDailyWalkCount ||
+        cycle > Pet.maxDailyWalkCount) {
+      _toast(
+        '하루 산책 횟수는 ${Pet.minDailyWalkCount}~${Pet.maxDailyWalkCount}회로 입력해 주세요',
+        isError: true,
+      );
       return;
     }
     if (petVm.pet == null) {
@@ -76,7 +108,7 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
       return;
     }
 
-    final ok = await petVm.updatePet(name: name);
+    final ok = await petVm.updatePet(name: name, dailyWalkCount: cycle);
     if (!mounted) return;
 
     if (!ok) {
@@ -85,6 +117,36 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
     }
     _toast('저장했어요');
     context.pop();
+  }
+
+  /// 하루 산책 횟수에 따른 알림 간격 안내 문구.
+  ///
+  /// 활동 시간대(08:00~22:00, 14시간)를 입력한 횟수로 나눈 값이다.
+  String get _cycleGuide {
+    const window = '$_activeStartHour:00 ~ $_activeEndHour:00';
+    final count = int.tryParse(_cycleController.text.trim());
+
+    if (count == null ||
+        count < Pet.minDailyWalkCount ||
+        count > Pet.maxDailyWalkCount) {
+      return '하루 산책 횟수를 '
+          '${Pet.minDailyWalkCount}~${Pet.maxDailyWalkCount}회 사이 숫자로 입력해 주세요.';
+    }
+    if (count == 1) {
+      return '$window 사이에 한 번 마실이가 산책 가자고 조릅니다.';
+    }
+
+    const totalMinutes = (_activeEndHour - _activeStartHour) * 60;
+    return '$window 사이에 약 ${_formatInterval(totalMinutes ~/ count)} 간격으로 '
+        '마실이가 산책 가자고 조릅니다.';
+  }
+
+  /// 분을 `7시간`, `4시간 40분`, `42분` 처럼 읽기 쉬운 형태로 바꾼다.
+  String _formatInterval(int minutes) {
+    if (minutes < 60) return '$minutes분';
+    final hours = minutes ~/ 60;
+    final rest = minutes % 60;
+    return rest == 0 ? '$hours시간' : '$hours시간 $rest분';
   }
 
   void _toast(String message, {bool isError = false}) {
@@ -179,20 +241,12 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
                       style: TextStyle(fontWeight: FontWeight.bold)),
                 ],
               ),
-              const SizedBox(height: 20),
-              const Text('회당 산책 시간',
-                  style: TextStyle(color: Colors.grey, fontSize: 12)),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                      child: _buildTextField(
-                          controller: _timeController,
-                          textAlign: TextAlign.center)),
-                  const SizedBox(width: 12),
-                  const Text('분',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                ],
+              const SizedBox(height: 10),
+              // 숫자만 보면 알림이 얼마나 자주 오는지 알 수 없어서 함께 보여준다.
+              Text(
+                _cycleGuide,
+                style: const TextStyle(
+                    color: Color(0xFF8D6E63), fontSize: 12, height: 1.5),
               ),
             ]),
             const SizedBox(height: 16),

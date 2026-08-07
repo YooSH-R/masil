@@ -4,6 +4,7 @@ import '../../core/services/place_name_resolver.dart';
 import '../../core/services/sample_walk_diaries.dart';
 import '../../core/services/walk_record_store.dart';
 import '../../domain/entities/walk_diary.dart';
+import '../../domain/entities/walk_progress.dart';
 import '../../domain/repositories/walk_diary_repository.dart';
 import 'base_view_model.dart';
 
@@ -57,6 +58,9 @@ class WalkDiaryViewModel extends BaseViewModel {
   /// walkId → 장소명. 역지오코딩 결과를 담아둔다.
   final Map<int, String?> _placeNames = {};
 
+  /// 마지막으로 계산한 산책 진행 상황. [safeNotify] 에서 비운다.
+  WalkProgress? _progress;
+
   // --- 일지 생성 대기 ---
 
   Timer? _diaryPollTimer;
@@ -71,6 +75,27 @@ class WalkDiaryViewModel extends BaseViewModel {
   static const Duration _generationTimeout = Duration(minutes: 3);
 
   List<WalkDiaryFeedItem> get feed => List.unmodifiable(_feed);
+
+  /// 오늘 산책 횟수·누적 횟수·받은 리본. 홈과 친밀도 화면이 함께 쓴다.
+  ///
+  /// **화면의 build 안에서 계산하지 않는다.** 산책 중에는
+  /// [WalkViewModel] 의 경과 시간 타이머가 1초마다 알림을 보내고, `loadMore`
+  /// 는 피드를 계속 누적하므로 화면마다 매번 다시 정렬·집계하게 된다. 여기서
+  /// 한 번 계산해 두면 알림 1회당 최대 한 번만 돌고, 두 화면이 같은 값을
+  /// 본다는 것도 구조로 보장된다.
+  WalkProgress get progress => _progress ??= WalkProgress.from(
+        _feed.map((item) => item.walkedAt).whereType<DateTime>(),
+      );
+
+  /// 피드를 고치는 지점이 여러 곳(`loadFeed`·`loadMore`·`_mergeLocalRecords`·
+  /// `_mergeSamples`·항목 갱신)인데 전부 이 알림을 거친다. 그래서 무효화를
+  /// 여기 한 곳에만 두면 나중에 변경 지점이 늘어도 빠뜨릴 수 없다. 각 메서드
+  /// 끝에서 다시 계산하는 방식은 한 곳을 잊으면 낡은 값을 조용히 보여준다.
+  @override
+  void safeNotify() {
+    _progress = null;
+    super.safeNotify();
+  }
   bool get hasNext => _hasNext;
   bool get isLoadingMore => _isLoadingMore;
   bool get isEmpty => _feed.isEmpty && !isLoading;

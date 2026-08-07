@@ -3,7 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/utils/korea_time.dart';
+import '../../../core/utils/korean.dart';
 import '../../../domain/entities/pet.dart';
+import '../../../domain/entities/walk_progress.dart';
 import '../../../domain/entities/walk_diary.dart';
 import '../../viewmodels/notification_view_model.dart';
 import '../../viewmodels/pet_view_model.dart';
@@ -54,8 +56,16 @@ class _HomeScreenState extends State<HomeScreen> {
     final nickname = petVm.petName;
     final affinity = petVm.affinity;
     final requiresPairing = petVm.requiresDevicePairing;
+
+    // 아래 '최근 산책 일지' 섹션에 보여줄 가장 최근 한 건.
     final latestWalk =
         requiresPairing || diaryVm.feed.isEmpty ? null : diaryVm.feed.first;
+
+    // 계산은 뷰모델이 피드가 바뀔 때 한 번만 한다([WalkDiaryViewModel.progress]).
+    // 친밀도 화면의 "받은 보상" 도 같은 값을 읽는다.
+    final progress = requiresPairing ? WalkProgress.none : diaryVm.progress;
+    final dailyWalkGoal = petVm.pet?.dailyWalkCount ?? Pet.defaultDailyWalkCount;
+    final goalReached = !requiresPairing && progress.todayCount >= dailyWalkGoal;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F3E7),
@@ -218,58 +228,85 @@ class _HomeScreenState extends State<HomeScreen> {
               // Stats Row
               Row(
                 children: [
+                  // 마실이가 산책을 조르는 중이면 카드를 눌러 바로 산책을
+                  // 시작할 수 있게 한다(아래 '산책 시작' 메뉴와 같은 경로).
                   Expanded(
-                    child: _buildWhiteCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(Icons.timer_outlined,
-                              color: Colors.grey, size: 24),
-                          const SizedBox(height: 8),
-                          const Text('산책 제안',
-                              style:
-                                  TextStyle(color: Colors.grey, fontSize: 13)),
-                          // GET /walk-proposals/current 결과에 따라 문구를 바꾼다.
-                          Text(
-                            requiresPairing
-                                ? '연결 필요'
-                                : walkVm.hasProposal
-                                    ? '지금 가능!'
-                                    : '대기 중',
-                            style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF5D4037)),
-                          ),
-                        ],
+                    child: GestureDetector(
+                      onTap: walkVm.hasProposal
+                          ? () => _openFeature(
+                              context, requiresPairing, '/walk/suggestion')
+                          : null,
+                      child: _buildWhiteCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              walkVm.hasProposal
+                                  ? Icons.pets
+                                  : Icons.timer_outlined,
+                              color: walkVm.hasProposal
+                                  ? const Color(0xFFC67C4E)
+                                  : Colors.grey,
+                              size: 24,
+                            ),
+                            const SizedBox(height: 8),
+                            const Text('산책 제안',
+                                style: TextStyle(
+                                    color: Colors.grey, fontSize: 13)),
+                            // GET /walk-proposals/current 결과에 따라 문구를 바꾼다.
+                            Text(
+                              requiresPairing
+                                  ? '연결 필요'
+                                  : walkVm.hasProposal
+                                      ? '가고 싶어요!'
+                                      : '쉬고 있어요',
+                              style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF5D4037)),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 16),
+                  // 눌러서 산책 리포트로. 목표는 펫 설정(하루 산책 횟수)이라
+                  // 설정을 바꾸면 이 칸의 분모도 함께 바뀐다.
                   Expanded(
-                    child: _buildWhiteCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(Icons.directions_walk,
-                              color: Colors.grey, size: 24),
-                          const SizedBox(height: 8),
-                          const Text('최근 산책',
-                              style:
-                                  TextStyle(color: Colors.grey, fontSize: 13)),
-                          // 걸음 수 API가 없어 최근 산책 거리로 대체한다.
-                          Text(
-                            requiresPairing
-                                ? '연결 필요'
-                                : latestWalk == null
-                                    ? '-'
-                                    : '${((latestWalk.distanceMeters ?? 0) / 1000).toStringAsFixed(1)}km',
-                            style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF5D4037)),
-                          ),
-                        ],
+                    child: GestureDetector(
+                      onTap: () => _openFeature(
+                          context, requiresPairing, '/walk/dashboard'),
+                      child: _buildWhiteCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              goalReached
+                                  ? Icons.check_circle_outline
+                                  : Icons.directions_walk,
+                              color: goalReached
+                                  ? const Color(0xFF558B2F)
+                                  : Colors.grey,
+                              size: 24,
+                            ),
+                            const SizedBox(height: 8),
+                            const Text('오늘의 산책',
+                                style: TextStyle(
+                                    color: Colors.grey, fontSize: 13)),
+                            Text(
+                              requiresPairing
+                                  ? '연결 필요'
+                                  : '${progress.todayCount} / $dailyWalkGoal회',
+                              style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: goalReached
+                                      ? const Color(0xFF558B2F)
+                                      : const Color(0xFF5D4037)),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -297,10 +334,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       '산책일지',
                       Colors.blue.shade50,
                       () => _openFeature(context, requiresPairing, '/walk')),
+                  // orange.shade50(#FFF3E0)은 홈 배경(#F9F3E7)과 거의 같은 색이라
+                  // 타일이 묻혔다. 옆칸이 파란 계열이라 보라 계열로 띄운다.
                   _buildMenuItem(
                       Icons.auto_awesome,
                       'AI 사진',
-                      Colors.orange.shade50,
+                      Colors.deepPurple.shade50,
                       () => _openFeature(
                           context, requiresPairing, '/walk/ai-photo')),
                 ],
@@ -327,18 +366,20 @@ class _HomeScreenState extends State<HomeScreen> {
                             requiresPairing
                                 ? '기기 연결이 필요해요'
                                 : walkVm.hasProposal
-                                    ? '지금 산책하기 좋아요!'
-                                    : '산책 제안을 기다리고 있어요',
+                                    ? '$nickname${Korean.subject(nickname)} '
+                                        '산책 가고 싶어 해요!'
+                                    : '$nickname${Korean.subject(nickname)} '
+                                        '지금은 쉬고 있어요',
                             style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF2E7D32)),
                           ),
-                          // 제안 이유(SCHEDULE_AND_WEATHER 등)를 보조 문구로 노출.
+                          // 마실이가 조르는 말은 서버 제안 문구를 그대로 쓴다.
                           Text(
                             requiresPairing
                                 ? '마이페이지에서 마실이 기기를 등록해 주세요'
-                                : walkVm.proposal?.reason ??
-                                    '언제든 산책을 시작할 수 있어요',
+                                : walkVm.proposal?.message ??
+                                    '다음 산책 시간이 되면 알려드릴게요',
                             style: const TextStyle(
                                 fontSize: 12, color: Color(0xFF2E7D32)),
                           ),
@@ -383,7 +424,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               SizedBox(width: 8),
                               Flexible(
                                 child: Text(
-                                  '연속 산책 미션',
+                                  '산책 미션',
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16),
@@ -395,34 +436,30 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          requiresPairing ? '- / 7일' : '3 / 7일',
+                          _missionCounter(requiresPairing, progress),
                           style: const TextStyle(
                               fontWeight: FontWeight.bold, color: Colors.grey),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
-                    Row(
-                      children: List.generate(7, (index) {
-                        return Expanded(
-                          child: Container(
-                            height: 8,
-                            margin: EdgeInsets.only(right: index == 6 ? 0 : 6),
-                            decoration: BoxDecoration(
-                              color: !requiresPairing && index < 3
-                                  ? const Color(0xFFC67C4E)
-                                  : const Color(0xFFF9F3E7),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          ),
-                        );
-                      }),
+                    // 리본 조건이 1·5·10·30·100회라 칸 수를 고정할 수 없다.
+                    // 7칸짜리 눈금 대신 연속 진행 바를 쓴다.
+                    ClipRRect(
+                      borderRadius: const BorderRadius.all(Radius.circular(4)),
+                      child: LinearProgressIndicator(
+                        value: requiresPairing
+                            ? 0
+                            : progress.progressToNextRibbon,
+                        minHeight: 8,
+                        backgroundColor: const Color(0xFFF9F3E7),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                            Color(0xFFC67C4E)),
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      requiresPairing
-                          ? '기기를 연결하면 연속 산책 미션을 시작할 수 있어요'
-                          : '7일 달성하면 마실이가 새 리본을 선물해요 🎀',
+                      _missionMessage(requiresPairing, progress, nickname),
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.grey, fontSize: 12),
                     ),
@@ -461,6 +498,33 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  /// 산책 미션 카드 오른쪽의 `누적 / 다음 리본 조건` 표시.
+  String _missionCounter(bool requiresPairing, WalkProgress progress) {
+    if (requiresPairing) return '- / ${WalkProgress.catalog.first.requiredWalks}회';
+    final next = progress.nextRibbon;
+    if (next == null) return '${progress.totalCount}회';
+    return '${progress.totalCount} / ${next.requiredWalks}회';
+  }
+
+  /// 산책 미션 카드 아래 안내 문구.
+  ///
+  /// 리본을 받을 조건과 지금 상태를 같은 문장에서 알려준다. 받은 리본은
+  /// 친밀도 화면의 "받은 보상" 에서 모아 볼 수 있다.
+  String _missionMessage(
+    bool requiresPairing,
+    WalkProgress progress,
+    String nickname,
+  ) {
+    if (requiresPairing) {
+      return '기기를 연결하면 산책 미션을 시작할 수 있어요';
+    }
+    final next = progress.nextRibbon;
+    if (next == null) {
+      return '리본을 모두 모았어요! $nickname${Korean.subject(nickname)} 아주 행복해요 🎀';
+    }
+    return '${progress.walksToNextRibbon}회 더 걸으면 ${next.name}을 받아요 ${next.emoji}';
   }
 
   Widget _buildWhiteCard({required Widget child}) {

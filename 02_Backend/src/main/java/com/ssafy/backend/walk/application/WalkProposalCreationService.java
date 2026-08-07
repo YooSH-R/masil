@@ -1,5 +1,6 @@
 package com.ssafy.backend.walk.application;
 
+import com.ssafy.backend.pet.infrastructure.persistence.SpringDataPetRepository;
 import com.ssafy.backend.robot.infrastructure.persistence.RobotPairingJpaEntity;
 import com.ssafy.backend.robot.infrastructure.persistence.SpringDataRobotCurrentStateRepository;
 import com.ssafy.backend.robot.infrastructure.persistence.SpringDataRobotPairingRepository;
@@ -11,6 +12,7 @@ import com.ssafy.backend.walk.infrastructure.persistence.WalkProposalJpaEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Set;
@@ -19,7 +21,7 @@ import java.util.Set;
 public class WalkProposalCreationService {
 
     private static final String WALK_PROPOSAL_MESSAGE =
-            "오랫동안 산책하지 않았어요. 함께 산책해요.";
+            "산책 가고 싶어요! 같이 나가요.";
     private static final Set<WalkStatus> OPEN_WALK_STATUSES = Set.of(
             WalkStatus.READY,
             WalkStatus.ACTIVE,
@@ -30,6 +32,7 @@ public class WalkProposalCreationService {
     private final SpringDataRobotCurrentStateRepository currentStateRepository;
     private final SpringDataWalkProposalRepository proposalRepository;
     private final SpringDataWalkRepository walkRepository;
+    private final SpringDataPetRepository petRepository;
     private final WalkProposalProducerProperties properties;
 
     public WalkProposalCreationService(
@@ -37,12 +40,14 @@ public class WalkProposalCreationService {
             SpringDataRobotCurrentStateRepository currentStateRepository,
             SpringDataWalkProposalRepository proposalRepository,
             SpringDataWalkRepository walkRepository,
+            SpringDataPetRepository petRepository,
             WalkProposalProducerProperties properties
     ) {
         this.pairingRepository = pairingRepository;
         this.currentStateRepository = currentStateRepository;
         this.proposalRepository = proposalRepository;
         this.walkRepository = walkRepository;
+        this.petRepository = petRepository;
         this.properties = properties;
     }
 
@@ -89,6 +94,11 @@ public class WalkProposalCreationService {
         if (properties.isSleeping(mode)) {
             return WalkProposalCreationOutcome.ROBOT_SLEEPING;
         }
+        // 새벽에 조르지 않는다. 앱의 산책 주기 안내 문구가 이 시간대를 그대로
+        // 설명하므로, 여기서 막지 않으면 화면 설명과 실제 알림이 어긋난다.
+        if (!properties.isWithinActiveHours(now)) {
+            return WalkProposalCreationOutcome.OUTSIDE_ACTIVE_HOURS;
+        }
 
         Long pairingId = pairing.getId();
         var pendingProposalAfterLock = proposalRepository
@@ -111,7 +121,14 @@ public class WalkProposalCreationService {
             return WalkProposalCreationOutcome.WALK_IN_PROGRESS;
         }
 
-        Instant recentWalkCutoff = now.minus(properties.getDueAfter());
+        // 제안 간격은 펫의 "하루 산책 횟수" 설정에서 나온다. 펫을 못 찾으면
+        // 기본값(due-after)으로 떨어져, 설정 조회 실패가 제안을 막지 않게 한다.
+        Duration proposalInterval = petRepository
+                .findById(pairing.getPetId())
+                .map(pet -> properties.intervalFor(pet.getDailyWalkCount()))
+                .orElseGet(properties::getDueAfter);
+
+        Instant recentWalkCutoff = now.minus(proposalInterval);
         if (walkRepository
                 .existsByRobotPairingIdAndStatusAndEndedAtGreaterThan(
                         pairingId,

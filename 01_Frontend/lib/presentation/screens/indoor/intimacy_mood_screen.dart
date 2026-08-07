@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/utils/korean.dart';
 import '../../../domain/entities/pet.dart';
+import '../../../domain/entities/walk_progress.dart';
 import '../../viewmodels/pet_view_model.dart';
+import '../../viewmodels/walk_diary_view_model.dart';
 
 /// 친밀도 상세 화면.
 ///
@@ -36,6 +39,13 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
       }
       // 전용 친밀도 API가 배포되면 최신 값으로 덮어쓴다.
       petVm.refreshAffinity();
+
+      // 받은 보상은 산책 기록에서 계산한다. 홈을 거치지 않고 이 화면으로
+      // 바로 들어오는 경우가 있어 여기서도 한 번 불러온다.
+      final diaryVm = context.read<WalkDiaryViewModel>();
+      if (diaryVm.feed.isEmpty) {
+        diaryVm.loadFeed(refresh: true);
+      }
     });
   }
 
@@ -68,6 +78,8 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
                   _buildMoodBanner(affinity.mood),
                   const SizedBox(height: 24),
                   _buildEvolutionCard(affinity.level),
+                  const SizedBox(height: 24),
+                  _buildRewardCard(petVm.petName),
                   const SizedBox(height: 40),
                 ],
               ),
@@ -247,6 +259,109 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
       ),
     );
   }
+
+  /// 산책 보상으로 받은 리본.
+  ///
+  /// 서버에 보상 API 가 없어서 산책 기록에서 계산한다([WalkProgress]). 홈의
+  /// "산책 미션" 과 같은 계산을 쓰므로 두 화면의 숫자가 어긋나지 않는다.
+  /// 아직 못 받은 리본도 흐리게 함께 보여줘서 무엇을 더 모을 수 있는지 알린다.
+  Widget _buildRewardCard(String nickname) {
+    // 계산은 뷰모델이 피드가 바뀔 때 한 번만 한다. 홈과 같은 값을 읽는다.
+    final progress = context.watch<WalkDiaryViewModel>().progress;
+    final earnedCount = progress.earnedRibbons.length;
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+          color: Colors.white, borderRadius: BorderRadius.circular(25)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('받은 보상',
+                  style:
+                      TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text('$earnedCount / ${progress.ribbons.length}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, color: Color(0xFFC67C4E))),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            earnedCount == 0
+                ? '산책을 다녀오면 $nickname${Korean.subject(nickname)} 리본을 선물해요'
+                : '지금까지 ${progress.totalCount}번 산책했어요 · '
+                    '최장 연속 ${progress.longestStreakDays}일',
+            style: const TextStyle(color: Colors.grey, fontSize: 12),
+          ),
+          const SizedBox(height: 20),
+          for (final ribbon in progress.ribbons) ...[
+            _buildRibbonRow(ribbon),
+            if (ribbon != progress.ribbons.last) const SizedBox(height: 12),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRibbonRow(WalkRibbon ribbon) {
+    final earned = ribbon.isEarned;
+    return Opacity(
+      // 못 받은 리본은 흐리게. 목록에서 빼면 목표가 안 보인다.
+      opacity: earned ? 1 : 0.4,
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: earned
+                  ? const Color(0xFFFDF7F0)
+                  : const Color(0xFFF5F5F5),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: earned ? const Color(0xFFC67C4E) : Colors.grey.shade300,
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Text(ribbon.emoji, style: const TextStyle(fontSize: 20)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(ribbon.name,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Color(0xFF5D4037))),
+                const SizedBox(height: 2),
+                Text(
+                  earned
+                      ? '${_formatDay(ribbon.earnedOn!)} 획득'
+                      : '산책 ${ribbon.requiredWalks}회 달성',
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            earned ? Icons.check_circle : Icons.lock_outline,
+            size: 20,
+            color: earned ? const Color(0xFF558B2F) : Colors.grey,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// [WalkProgress] 가 돌려주는 한국 날짜는 UTC 객체에 담긴 벽시계 값이라
+  /// 그대로 연·월·일만 읽는다.
+  String _formatDay(DateTime day) =>
+      '${day.year}년 ${day.month}월 ${day.day}일';
 
   Widget _buildEvolutionStep({
     required String label,

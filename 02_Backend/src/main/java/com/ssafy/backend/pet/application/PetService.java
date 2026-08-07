@@ -134,7 +134,8 @@ public class PetService {
     public PetProfileResult update(
             Long userId,
             Long petId,
-            String name
+            String name,
+            Integer dailyWalkCount
     ) {
         PetJpaEntity pet = petRepository
                 .findOwnedWithAffinity(petId, userId)
@@ -142,6 +143,10 @@ public class PetService {
                         ErrorCode.PET_NOT_FOUND
                 ));
         pet.changeName(normalizeName(name));
+        // 보내지 않은 항목은 기존 값을 유지한다(부분 수정).
+        if (dailyWalkCount != null) {
+            pet.changeDailyWalkCount(dailyWalkCount);
+        }
         return toProfileResult(pet);
     }
 
@@ -194,6 +199,7 @@ public class PetService {
                 pet.getId(),
                 pet.getName(),
                 null,
+                pet.getDailyWalkCount(),
                 toAffinityResult(pet.getAffinityState()),
                 robot
         );

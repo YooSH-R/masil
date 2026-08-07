@@ -118,7 +118,11 @@ class PetViewModel extends BaseViewModel {
   ///
   /// [name] 을 넘기지 않으면 지금 이름을 그대로 보낸다. 서버가 name 을 필수로
   /// 받기 때문에, 사진만 바꾸는 화면에서도 이름이 빠지면 400 이 난다.
-  Future<bool> updatePet({String? name, String? profileImage}) async {
+  Future<bool> updatePet({
+    String? name,
+    String? profileImage,
+    int? dailyWalkCount,
+  }) async {
     final current = _pet;
     final id = current?.id;
     if (current == null || id == null) return false;
@@ -127,6 +131,7 @@ class PetViewModel extends BaseViewModel {
           petId: id,
           name: name ?? current.name,
           profileImage: profileImage,
+          dailyWalkCount: dailyWalkCount,
         ));
     if (pet == null) return false;
 

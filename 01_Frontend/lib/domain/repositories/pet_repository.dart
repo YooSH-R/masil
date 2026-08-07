@@ -25,6 +25,7 @@ abstract class PetRepository {
     required int petId,
     required String name,
     String? profileImage,
+    int? dailyWalkCount,
   });
 
   /// DELETE /pets/{petId} — 페어링을 해제하고 펫 프로필을 삭제한다.
