@@ -58,14 +58,6 @@ public class AuthService {
             );
         }
 
-        if (userRepository.existsByNickname(request.nickname())) {
-            throw new ApiException(
-                    HttpStatus.CONFLICT,
-                    "NICKNAME_ALREADY_IN_USE",
-                    "이미 사용 중인 닉네임입니다."
-            );
-        }
-
         if (userRepository.existsByPhoneNumber(request.phoneNumber())) {
             throw new ApiException(
                     HttpStatus.CONFLICT,

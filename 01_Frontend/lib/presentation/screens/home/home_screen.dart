@@ -33,10 +33,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final notificationVm = context.read<NotificationViewModel>();
 
     await Future.wait([
-      petVm.loadCurrentPet(silent: true),          // GET /pets/{petId}
-      walkVm.loadCurrentProposal(silent: true),    // GET /walk-proposals/current
-      diaryVm.loadFeed(refresh: true),             // GET /walk-diaries
+      petVm.loadCurrentPet(silent: true), // GET /pets/{petId}
       notificationVm.loadNotifications(refresh: true), // GET /notifications
+    ]);
+    if (!mounted || petVm.requiresDevicePairing) return;
+
+    await Future.wait([
+      walkVm.loadCurrentProposal(silent: true), // GET /walk-proposals/current
+      diaryVm.loadFeed(refresh: true), // GET /walk-diaries
     ]);
   }
 
@@ -49,7 +53,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final nickname = petVm.petName;
     final affinity = petVm.affinity;
-    final latestWalk = diaryVm.feed.isEmpty ? null : diaryVm.feed.first;
+    final requiresPairing = petVm.requiresDevicePairing;
+    final latestWalk =
+        requiresPairing || diaryVm.feed.isEmpty ? null : diaryVm.feed.first;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F3E7),
@@ -67,7 +73,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: () => context.push('/indoor/notifications'),
                     child: Stack(
                       children: [
-                        const Icon(Icons.notifications_none, color: Color(0xFF5D4037), size: 28),
+                        const Icon(Icons.notifications_none,
+                            color: Color(0xFF5D4037), size: 28),
                         // 읽지 않은 알림이 있을 때만 배지를 띄운다 (GET /notifications).
                         if (unreadCount > 0)
                           Positioned(
@@ -86,24 +93,31 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
               const SizedBox(height: 20),
-              
+
               // Character & State
               Center(
                 child: Column(
                   children: [
-                    Image.asset('assets/images/mysil_character.png', height: 220),
+                    Image.asset('assets/images/mysil_character.png',
+                        height: 220),
                     const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(nickname, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF5D4037))),
+                        Text(nickname,
+                            style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF5D4037))),
                         const SizedBox(width: 8),
-                        const Icon(Icons.mood, color: Color(0xFF8D6E63), size: 24),
+                        const Icon(Icons.mood,
+                            color: Color(0xFF8D6E63), size: 24),
                       ],
                     ),
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 6),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.8),
                         borderRadius: BorderRadius.circular(20),
@@ -112,15 +126,24 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.circle, color: Colors.green, size: 10),
+                          Icon(
+                            requiresPairing ? Icons.link_off : Icons.circle,
+                            color: requiresPairing ? Colors.grey : Colors.green,
+                            size: requiresPairing ? 16 : 10,
+                          ),
                           const SizedBox(width: 8),
                           // 기분은 친밀도 응답의 mood(HAPPY/NEUTRAL/...)에서 가져온다.
                           Flexible(
                             child: Text(
-                              affinity?.mood.homeMessage ?? '마실이 상태를 불러오는 중...',
+                              requiresPairing
+                                  ? '연결이 필요합니다'
+                                  : affinity?.mood.homeMessage ??
+                                      '마실이 상태를 불러오는 중...',
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  color: Colors.green,
+                              style: TextStyle(
+                                  color: requiresPairing
+                                      ? Colors.grey
+                                      : Colors.green,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13),
                             ),
@@ -132,10 +155,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 32),
-              
+
               // Intimacy Card — GET /pets/{petId}/affinity
               GestureDetector(
-                onTap: () => context.push('/indoor/intimacy'),
+                onTap: () => context.push(
+                  requiresPairing ? '/user/robot-mgmt' : '/indoor/intimacy',
+                ),
                 child: _buildWhiteCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -145,23 +170,27 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           const Row(
                             children: [
-                              Icon(Icons.favorite, color: Colors.redAccent, size: 18),
+                              Icon(Icons.favorite,
+                                  color: Colors.redAccent, size: 18),
                               SizedBox(width: 8),
                               Text('친밀도',
                                   style: TextStyle(
-                                      fontWeight: FontWeight.bold, fontSize: 16)),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16)),
                             ],
                           ),
                           Text(
                             affinity == null ? '-' : '${affinity.score}%',
                             style: const TextStyle(
-                                fontWeight: FontWeight.bold, color: Color(0xFFC67C4E)),
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFC67C4E)),
                           ),
                         ],
                       ),
                       const SizedBox(height: 12),
                       ClipRRect(
-                        borderRadius: const BorderRadius.all(Radius.circular(10)),
+                        borderRadius:
+                            const BorderRadius.all(Radius.circular(10)),
                         child: LinearProgressIndicator(
                           value: affinity?.progress ?? 0,
                           minHeight: 12,
@@ -172,17 +201,20 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        affinity == null
-                            ? '친밀도를 불러오는 중이에요'
-                            : 'Lv.${affinity.level} · ${affinity.mood.label}',
-                        style: const TextStyle(color: Colors.grey, fontSize: 12),
+                        requiresPairing
+                            ? '연결이 필요합니다'
+                            : affinity == null
+                                ? '친밀도를 불러오는 중이에요'
+                                : 'Lv.${affinity.level} · ${affinity.mood.label}',
+                        style:
+                            const TextStyle(color: Colors.grey, fontSize: 12),
                       ),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 16),
-              
+
               // Stats Row
               Row(
                 children: [
@@ -191,13 +223,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.timer_outlined, color: Colors.grey, size: 24),
+                          const Icon(Icons.timer_outlined,
+                              color: Colors.grey, size: 24),
                           const SizedBox(height: 8),
                           const Text('산책 제안',
-                              style: TextStyle(color: Colors.grey, fontSize: 13)),
+                              style:
+                                  TextStyle(color: Colors.grey, fontSize: 13)),
                           // GET /walk-proposals/current 결과에 따라 문구를 바꾼다.
                           Text(
-                            walkVm.hasProposal ? '지금 가능!' : '대기 중',
+                            requiresPairing
+                                ? '연결 필요'
+                                : walkVm.hasProposal
+                                    ? '지금 가능!'
+                                    : '대기 중',
                             style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -213,15 +251,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.directions_walk, color: Colors.grey, size: 24),
+                          const Icon(Icons.directions_walk,
+                              color: Colors.grey, size: 24),
                           const SizedBox(height: 8),
                           const Text('최근 산책',
-                              style: TextStyle(color: Colors.grey, fontSize: 13)),
+                              style:
+                                  TextStyle(color: Colors.grey, fontSize: 13)),
                           // 걸음 수 API가 없어 최근 산책 거리로 대체한다.
                           Text(
-                            latestWalk == null
-                                ? '-'
-                                : '${((latestWalk.distanceMeters ?? 0) / 1000).toStringAsFixed(1)}km',
+                            requiresPairing
+                                ? '연결 필요'
+                                : latestWalk == null
+                                    ? '-'
+                                    : '${((latestWalk.distanceMeters ?? 0) / 1000).toStringAsFixed(1)}km',
                             style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -234,18 +276,37 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
               const SizedBox(height: 32),
-              
+
               // Grid Menu
               Row(
                 children: [
-                  _buildMenuItem(Icons.directions_walk, '산책 시작', Colors.red.shade50, () => context.push('/walk/suggestion')),
-                  _buildMenuItem(Icons.event_seat, '실내놀이', Colors.green.shade50, () => context.push('/indoor/play-request')),
-                  _buildMenuItem(Icons.book_outlined, '산책일지', Colors.blue.shade50, () => context.go('/walk')),
-                  _buildMenuItem(Icons.auto_awesome, 'AI 사진', Colors.orange.shade50, () => context.push('/walk/ai-photo')),
+                  _buildMenuItem(
+                      Icons.directions_walk,
+                      '산책 시작',
+                      Colors.red.shade50,
+                      () => _openFeature(
+                          context, requiresPairing, '/walk/suggestion')),
+                  _buildMenuItem(
+                      Icons.event_seat,
+                      '실내놀이',
+                      Colors.green.shade50,
+                      () => _openFeature(
+                          context, requiresPairing, '/indoor/play-request')),
+                  _buildMenuItem(
+                      Icons.book_outlined,
+                      '산책일지',
+                      Colors.blue.shade50,
+                      () => _openFeature(context, requiresPairing, '/walk')),
+                  _buildMenuItem(
+                      Icons.auto_awesome,
+                      'AI 사진',
+                      Colors.orange.shade50,
+                      () => _openFeature(
+                          context, requiresPairing, '/walk/ai-photo')),
                 ],
               ),
               const SizedBox(height: 32),
-              
+
               // Weather Banner
               Container(
                 padding: const EdgeInsets.all(16),
@@ -255,20 +316,29 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.cloud_queue, color: Color(0xFF455A64), size: 32),
+                    const Icon(Icons.cloud_queue,
+                        color: Color(0xFF455A64), size: 32),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            walkVm.hasProposal ? '지금 산책하기 좋아요!' : '산책 제안을 기다리고 있어요',
+                            requiresPairing
+                                ? '기기 연결이 필요해요'
+                                : walkVm.hasProposal
+                                    ? '지금 산책하기 좋아요!'
+                                    : '산책 제안을 기다리고 있어요',
                             style: const TextStyle(
-                                fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF2E7D32)),
                           ),
                           // 제안 이유(SCHEDULE_AND_WEATHER 등)를 보조 문구로 노출.
                           Text(
-                            walkVm.proposal?.reason ?? '언제든 산책을 시작할 수 있어요',
+                            requiresPairing
+                                ? '마이페이지에서 마실이 기기를 등록해 주세요'
+                                : walkVm.proposal?.reason ??
+                                    '언제든 산책을 시작할 수 있어요',
                             style: const TextStyle(
                                 fontSize: 12, color: Color(0xFF2E7D32)),
                           ),
@@ -276,44 +346,59 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     ElevatedButton(
-                      onPressed: () => context.push('/walk/suggestion'),
+                      onPressed: () => _openFeature(
+                        context,
+                        requiresPairing,
+                        '/walk/suggestion',
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF558B2F),
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20)),
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                       ),
-                      child: const Text('나가기', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: Text(
+                        requiresPairing ? '연결하기' : '나가기',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 32),
-              
+
               // Mission Card
               _buildWhiteCard(
                 child: Column(
                   children: [
-                    const Row(
+                    Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Expanded(
+                        const Expanded(
                           child: Row(
                             children: [
-                              Icon(Icons.local_fire_department, color: Colors.orange, size: 20),
+                              Icon(Icons.local_fire_department,
+                                  color: Colors.orange, size: 20),
                               SizedBox(width: 8),
                               Flexible(
                                 child: Text(
                                   '연속 산책 미션',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        SizedBox(width: 8),
-                        Text('3 / 7일', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                        const SizedBox(width: 8),
+                        Text(
+                          requiresPairing ? '- / 7일' : '3 / 7일',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, color: Colors.grey),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -324,7 +409,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             height: 8,
                             margin: EdgeInsets.only(right: index == 6 ? 0 : 6),
                             decoration: BoxDecoration(
-                              color: index < 3 ? const Color(0xFFC67C4E) : const Color(0xFFF9F3E7),
+                              color: !requiresPairing && index < 3
+                                  ? const Color(0xFFC67C4E)
+                                  : const Color(0xFFF9F3E7),
                               borderRadius: BorderRadius.circular(4),
                             ),
                           ),
@@ -332,16 +419,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       }),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      '7일 달성하면 마실이가 새 리본을 선물해요 🎀',
+                    Text(
+                      requiresPairing
+                          ? '기기를 연결하면 연속 산책 미션을 시작할 수 있어요'
+                          : '7일 달성하면 마실이가 새 리본을 선물해요 🎀',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 32),
-              
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -349,17 +438,23 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Text(
                       '최근 산책 일지',
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF5D4037)),
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF5D4037)),
                     ),
                   ),
-                  TextButton(onPressed: () => context.go('/walk'), child: const Text('전체 보기', style: TextStyle(color: Color(0xFF8D6E63)))),
+                  TextButton(
+                      onPressed: () => context.go('/walk'),
+                      child: const Text('전체 보기',
+                          style: TextStyle(color: Color(0xFF8D6E63)))),
                 ],
               ),
               // GET /walk-diaries 의 첫 항목
               if (latestWalk != null)
                 _buildLogItem(context, latestWalk)
               else
-                _buildEmptyLogItem(diaryVm.isLoading),
+                _buildEmptyLogItem(diaryVm.isLoading, requiresPairing),
               const SizedBox(height: 40),
             ],
           ),
@@ -380,7 +475,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildMenuItem(IconData icon, String label, Color color, VoidCallback onTap) {
+  Widget _buildMenuItem(
+      IconData icon, String label, Color color, VoidCallback onTap) {
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
@@ -389,7 +485,8 @@ class _HomeScreenState extends State<HomeScreen> {
             Container(
               width: 65,
               height: 65,
-              decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(20)),
+              decoration: BoxDecoration(
+                  color: color, borderRadius: BorderRadius.circular(20)),
               child: Icon(icon, color: const Color(0xFFC67C4E), size: 30),
             ),
             const SizedBox(height: 8),
@@ -397,7 +494,10 @@ class _HomeScreenState extends State<HomeScreen> {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF5D4037)),
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: Color(0xFF5D4037)),
             ),
           ],
         ),
@@ -411,13 +511,16 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: () => context.push('/walk/path-detail', extra: item.walkId),
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+        decoration: BoxDecoration(
+            color: Colors.white, borderRadius: BorderRadius.circular(20)),
         child: Row(
           children: [
             Container(
               width: 60,
               height: 60,
-              decoration: BoxDecoration(color: const Color(0xFFFDF7F0), borderRadius: BorderRadius.circular(15)),
+              decoration: BoxDecoration(
+                  color: const Color(0xFFFDF7F0),
+                  borderRadius: BorderRadius.circular(15)),
               child: const Icon(Icons.pets, color: Color(0xFFD7CCC8)),
             ),
             const SizedBox(width: 16),
@@ -433,7 +536,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     item.summary ?? '산책 기록 · ${item.durationLabel}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ],
               ),
@@ -445,7 +549,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildEmptyLogItem(bool isLoading) {
+  Widget _buildEmptyLogItem(bool isLoading, bool requiresPairing) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 32),
@@ -455,11 +559,31 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Center(
         child: Text(
-          isLoading ? '산책 일지를 불러오는 중...' : '아직 산책 일지가 없어요',
+          requiresPairing
+              ? '기기를 연결하면 산책 일지를 확인할 수 있어요'
+              : isLoading
+                  ? '산책 일지를 불러오는 중...'
+                  : '아직 산책 일지가 없어요',
           style: const TextStyle(color: Colors.grey, fontSize: 13),
         ),
       ),
     );
+  }
+
+  void _openFeature(
+    BuildContext context,
+    bool requiresPairing,
+    String location,
+  ) {
+    if (requiresPairing) {
+      context.push('/user/robot-mgmt');
+      return;
+    }
+    if (location == '/walk') {
+      context.go(location);
+    } else {
+      context.push(location);
+    }
   }
 
   /// 모델에서 이미 대한민국 벽시계 시각으로 변환된 walkedAt을 표시한다.

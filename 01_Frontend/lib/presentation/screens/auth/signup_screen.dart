@@ -41,7 +41,6 @@ class _SignupScreenState extends State<SignupScreen> {
   bool get _isCodeExpired => _isCodeCountdownStarted && _codeSecondsLeft <= 0;
 
   // 이메일 중복 확인 API가 없어 형식 검사만 로컬로 처리한다.
-  // (닉네임은 GET /users/nickname-availability 로 서버에 물어본다)
   bool _isEmailChecked = false;
   bool _isEmailAvailable = false;
 
@@ -231,31 +230,13 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  /// GET /users/nickname-availability — 서버에 닉네임 중복을 물어본다.
-  Future<void> _checkNickname() async {
-    final authViewModel = context.read<AuthViewModel>();
-    final nickname = _nicknameController.text.trim();
-
-    if (!AuthValidation.nickname.hasMatch(nickname)) {
-      _showSnackBar('이름은 한글·영문·숫자 2~20자로 입력해 주세요.', isError: true);
-      return;
-    }
-
-    final available = await authViewModel.checkNickname(nickname);
-    if (!mounted) return;
-    if (!available && authViewModel.hasError) {
-      _showSnackBar(authViewModel.errorMessage!, isError: true);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final authViewModel = context.watch<AuthViewModel>();
 
     bool isFormValid = _isEmailChecked &&
         _isEmailAvailable &&
-        authViewModel.isNicknameChecked &&
-        authViewModel.isNicknameAvailable &&
+        AuthValidation.nickname.hasMatch(_nicknameController.text.trim()) &&
         authViewModel.isPhoneVerified &&
         _isAgreedToTerms &&
         _isPasswordValid &&
@@ -421,50 +402,12 @@ class _SignupScreenState extends State<SignupScreen> {
               // Nickname Card
               _buildSectionCard([
                 _buildLabel('이름'),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _nicknameController,
-                        onChanged: (v) {
-                          // 입력이 바뀌면 서버 확인 결과를 초기화한다.
-                          context.read<AuthViewModel>().resetNicknameCheck();
-                          setState(() {});
-                        },
-                        decoration: _inputDecoration('이름을 입력해 주세요'),
-                        // DO NOT add inputFormatters to allow Hangul
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _buildSmallButton(
-                      label:
-                          authViewModel.isNicknameAvailable ? '확인됨' : '중복 확인',
-                      color: authViewModel.isNicknameAvailable
-                          ? Colors.green
-                          : const Color(0xFFC67C4E),
-                      onPressed: authViewModel.isNicknameAvailable ||
-                              authViewModel.isLoading
-                          ? null
-                          : _checkNickname,
-                    ),
-                  ],
+                TextFormField(
+                  controller: _nicknameController,
+                  onChanged: (_) => setState(() {}),
+                  decoration: _inputDecoration('이름을 입력해 주세요'),
+                  // DO NOT add inputFormatters to allow Hangul
                 ),
-                if (authViewModel.isNicknameChecked)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8.0, left: 4),
-                    child: Text(
-                      authViewModel.isNicknameAvailable
-                          ? '✓ 사용 가능한 이름이에요'
-                          : '! 이미 사용 중인 이름이에요',
-                      style: TextStyle(
-                        color: authViewModel.isNicknameAvailable
-                            ? Colors.green
-                            : Colors.redAccent,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
               ]),
               const SizedBox(height: 16),
 
@@ -537,8 +480,8 @@ class _SignupScreenState extends State<SignupScreen> {
                           suffixIcon: !_isCodeCountdownStarted
                               ? null
                               : Padding(
-                                  padding: const EdgeInsets.only(
-                                      right: 16, left: 8),
+                                  padding:
+                                      const EdgeInsets.only(right: 16, left: 8),
                                   child: Text(
                                     _codeTimeLabel,
                                     style: TextStyle(
@@ -573,8 +516,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       padding: EdgeInsets.only(top: 8.0, left: 4),
                       child: Text(
                         '! 시간이 만료됐어요. 재전송해 주세요',
-                        style:
-                            TextStyle(color: Colors.redAccent, fontSize: 12),
+                        style: TextStyle(color: Colors.redAccent, fontSize: 12),
                       ),
                     ),
                 ],

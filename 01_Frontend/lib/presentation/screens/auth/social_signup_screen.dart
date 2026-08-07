@@ -34,24 +34,6 @@ class _SocialSignupScreenState extends State<SocialSignupScreen> {
   bool get _isFormatValid =>
       AuthValidation.nickname.hasMatch(_nicknameController.text.trim());
 
-  /// GET /users/nickname-availability
-  Future<void> _checkNickname() async {
-    final authViewModel = context.read<AuthViewModel>();
-    final nickname = _nicknameController.text.trim();
-
-    if (!_isFormatValid) {
-      _showMessage('이름은 한글·영문·숫자 2~20자로 입력해 주세요.', isError: true);
-      return;
-    }
-
-    final available = await authViewModel.checkNickname(nickname);
-    if (!mounted) return;
-    _showMessage(
-      available ? '사용 가능한 이름이에요.' : '이미 사용 중인 이름이에요.',
-      isError: !available,
-    );
-  }
-
   /// POST /auth/oauth/signup
   Future<void> _complete() async {
     final authViewModel = context.read<AuthViewModel>();
@@ -63,7 +45,8 @@ class _SocialSignupScreenState extends State<SocialSignupScreen> {
     if (ok) {
       context.go('/home');
     } else {
-      _showMessage(authViewModel.errorMessage ?? '가입을 마치지 못했어요.', isError: true);
+      _showMessage(authViewModel.errorMessage ?? '가입을 마치지 못했어요.',
+          isError: true);
     }
   }
 
@@ -77,10 +60,7 @@ class _SocialSignupScreenState extends State<SocialSignupScreen> {
   @override
   Widget build(BuildContext context) {
     final authViewModel = context.watch<AuthViewModel>();
-    final canSubmit = _isFormatValid &&
-        authViewModel.isNicknameChecked &&
-        authViewModel.isNicknameAvailable &&
-        !authViewModel.isLoading;
+    final canSubmit = _isFormatValid && !authViewModel.isLoading;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F3E7),
@@ -93,8 +73,8 @@ class _SocialSignupScreenState extends State<SocialSignupScreen> {
               Container(
                 width: 100,
                 height: 100,
-                decoration:
-                    const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+                decoration: const BoxDecoration(
+                    shape: BoxShape.circle, color: Colors.white),
                 child: Padding(
                   padding: const EdgeInsets.all(10.0),
                   child: Image.asset('assets/images/mysil_character.png',
@@ -111,7 +91,7 @@ class _SocialSignupScreenState extends State<SocialSignupScreen> {
               ),
               const SizedBox(height: 4),
               const Text(
-                '마실이가 부를 이름만 정해 주세요',
+                '본인 이름(닉네임)을 입력해 주세요',
                 style: TextStyle(color: Color(0xFF8D6E63), fontSize: 15),
               ),
               const SizedBox(height: 40),
@@ -135,78 +115,34 @@ class _SocialSignupScreenState extends State<SocialSignupScreen> {
                               fontSize: 14,
                               color: Colors.black87)),
                     ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _nicknameController,
-                            onChanged: (_) {
-                              authViewModel.resetNicknameCheck();
-                              setState(() {});
-                            },
-                            decoration: InputDecoration(
-                              hintText: '이름을 입력해 주세요',
-                              hintStyle: TextStyle(
-                                  color: Colors.grey.shade400, fontSize: 14),
-                              filled: true,
-                              fillColor: const Color(0xFFFDF7F0),
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 16),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide:
-                                    const BorderSide(color: Color(0xFFF0E0D0)),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide:
-                                    const BorderSide(color: Color(0xFFF0E0D0)),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                    color: Color(0xFFC67C4E), width: 1.5),
-                              ),
-                            ),
-                          ),
+                    TextField(
+                      controller: _nicknameController,
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(
+                        hintText: '이름을 입력해 주세요',
+                        hintStyle: TextStyle(
+                            color: Colors.grey.shade400, fontSize: 14),
+                        filled: true,
+                        fillColor: const Color(0xFFFDF7F0),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 16),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFF0E0D0)),
                         ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: authViewModel.isLoading ? null : _checkNickname,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: authViewModel.isNicknameAvailable
-                                ? Colors.green
-                                : const Color(0xFFC67C4E),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                            elevation: 0,
-                          ),
-                          child: Text(
-                            authViewModel.isNicknameAvailable ? '확인됨' : '중복 확인',
-                            style: const TextStyle(
-                                fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFF0E0D0)),
                         ),
-                      ],
-                    ),
-                    if (authViewModel.isNicknameChecked)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8.0, left: 4),
-                        child: Text(
-                          authViewModel.isNicknameAvailable
-                              ? '✓ 사용 가능한 이름이에요'
-                              : '! 이미 사용 중인 이름이에요',
-                          style: TextStyle(
-                            color: authViewModel.isNicknameAvailable
-                                ? Colors.green
-                                : Colors.redAccent,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                              color: Color(0xFFC67C4E), width: 1.5),
                         ),
                       ),
+                    ),
                   ],
                 ),
               ),

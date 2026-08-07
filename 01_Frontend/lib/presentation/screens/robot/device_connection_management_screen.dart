@@ -15,8 +15,6 @@ class DeviceConnectionManagementScreen extends StatefulWidget {
 
 class _DeviceConnectionManagementScreenState
     extends State<DeviceConnectionManagementScreen> {
-  bool _startingRegistration = false;
-
   @override
   void initState() {
     super.initState();
@@ -27,91 +25,10 @@ class _DeviceConnectionManagementScreenState
   }
 
   Future<void> _startRegistration() async {
-    if (_startingRegistration) return;
-    setState(() => _startingRegistration = true);
-
     final petVm = context.read<PetViewModel>();
-    if (petVm.pet == null) {
-      await petVm.loadCurrentPet(silent: true);
-    }
-
-    if (!mounted) return;
-    if (petVm.pet == null) {
-      final name = await _askPetName();
-      if (name == null || name.isEmpty || !mounted) {
-        setState(() => _startingRegistration = false);
-        return;
-      }
-
-      final created = await petVm.createPet(name: name);
-      if (!mounted) return;
-      if (!created) {
-        setState(() => _startingRegistration = false);
-        _showError(petVm.errorMessage ?? '펫 프로필을 만들지 못했어요.');
-        return;
-      }
-    }
-
-    setState(() => _startingRegistration = false);
     await context.push('/user/robot-mgmt/register');
     if (!mounted) return;
     await petVm.loadCurrentPet(silent: true);
-  }
-
-  Future<String?> _askPetName() async {
-    final controller = TextEditingController();
-    final name = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('함께할 펫 이름'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '기기에 연결할 펫 프로필을 먼저 만들게요.',
-              style: TextStyle(color: Color(0xFF8D6E63), fontSize: 13),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              maxLength: 100,
-              textInputAction: TextInputAction.done,
-              decoration: const InputDecoration(
-                hintText: '이름 (예: 마실이)',
-                border: OutlineInputBorder(),
-              ),
-              onSubmitted: (value) =>
-                  Navigator.of(dialogContext).pop(value.trim()),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('취소'),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.of(dialogContext).pop(controller.text.trim()),
-            child: const Text('다음'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    return name;
-  }
-
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: const Color(0xFFD32F2F),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
   }
 
   @override
@@ -155,105 +72,99 @@ class _DeviceConnectionManagementScreenState
                     ),
                     const SizedBox(height: 24),
                   ],
-                  if (robot == null) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 40,
-                        horizontal: 24,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      child: Column(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFE8F6F3),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.qr_code_scanner,
-                              color: Color(0xFF16A085),
-                              size: 40,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          const Text(
-                            '마실이 기기를 등록해요',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            pet == null
-                                ? '펫 이름을 정한 뒤 기기 밑면의 QR을 스캔하면\n프로필 생성과 기기 연결이 한 번에 끝나요.'
-                                : '${pet.name} 프로필에 연결할 기기의\n밑면 QR 코드를 스캔해 주세요.',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.grey,
-                              fontSize: 14,
-                              height: 1.5,
-                            ),
-                          ),
-                          const SizedBox(height: 32),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 60,
-                            child: ElevatedButton(
-                              onPressed: _startingRegistration
-                                  ? null
-                                  : _startRegistration,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFC67C4E),
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                              ),
-                              child: Text(
-                                _startingRegistration ? '준비 중...' : '기기 등록 시작',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 40,
+                      horizontal: 24,
                     ),
-                    const SizedBox(height: 24),
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF8F1),
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            color: Color(0xFFC67C4E),
-                            size: 20,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE8F6F3),
+                            shape: BoxShape.circle,
                           ),
-                          SizedBox(width: 12),
-                          Expanded(
+                          child: const Icon(
+                            Icons.qr_code_scanner,
+                            color: Color(0xFF16A085),
+                            size: 40,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          robot == null ? '마실이 기기를 등록해요' : '새 기기를 추가해요',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          '기기 밑면의 QR을 먼저 확인한 뒤\n새 반려동물의 이름을 등록해요.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 14,
+                            height: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 60,
+                          child: ElevatedButton(
+                            onPressed: _startRegistration,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFC67C4E),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                            ),
                             child: Text(
-                              '이미 다른 계정에 등록된 기기이거나 QR이 만료된 경우 연결할 수 없어요.',
-                              style: TextStyle(
-                                color: Color(0xFF8D6E63),
-                                fontSize: 12,
+                              robot == null ? '기기 등록 시작' : '기기 추가 등록',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
+                  const SizedBox(height: 24),
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF8F1),
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: Color(0xFFC67C4E),
+                          size: 20,
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            '이미 다른 계정에 등록된 기기이거나 QR이 만료된 경우 연결할 수 없어요.',
+                            style: TextStyle(
+                              color: Color(0xFF8D6E63),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

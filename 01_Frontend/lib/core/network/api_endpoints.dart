@@ -12,9 +12,6 @@ class ApiEndpoints {
   static const String refresh = '/auth/refresh';
   static const String logout = '/auth/logout';
 
-  /// 서버 구현에만 있는 닉네임 중복 확인 (명세서 PDF에는 없음).
-  static const String nicknameAvailability = '/users/nickname-availability';
-
   // --- 회원정보 (명세서 "회원 목록 추가") ---
   /// GET 조회 / PATCH 수정(닉네임·전화번호) / DELETE 회원탈퇴
   static const String me = '/users/me';
@@ -34,6 +31,9 @@ class ApiEndpoints {
   static const String pets = '/pets';
   static String pet(int petId) => '/pets/$petId';
   static const String robotPairings = '/robots/pairings';
+  static const String robotRegistrationValidation =
+      '/robots/registrations/validate';
+  static const String robotRegistrations = '/robots/registrations';
   static String robotStatus(int robotId) => '/robots/$robotId/status';
   static String robotPairing(int robotId) => '/robots/$robotId/pairing';
 

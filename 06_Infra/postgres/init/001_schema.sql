@@ -11,7 +11,6 @@ CREATE TABLE users (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMPTZ,
-    CONSTRAINT uq_users_nickname UNIQUE (nickname),
     CONSTRAINT uq_users_phone_number UNIQUE (phone_number)
 );
 

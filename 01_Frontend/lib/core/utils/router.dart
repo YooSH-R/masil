@@ -40,7 +40,8 @@ import '../../presentation/screens/pet/pet_profile_edit_screen.dart';
 import '../../presentation/screens/pet/pet_delete_confirm_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
-final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>();
+final GlobalKey<NavigatorState> _shellNavigatorKey =
+    GlobalKey<NavigatorState>();
 
 final GoRouter router = GoRouter(
   navigatorKey: _rootNavigatorKey,
@@ -210,11 +211,13 @@ final GoRouter router = GoRouter(
             ),
             GoRoute(
               path: 'robot-mgmt',
-              builder: (context, state) => const DeviceConnectionManagementScreen(),
+              builder: (context, state) =>
+                  const DeviceConnectionManagementScreen(),
               routes: [
                 GoRoute(
                   path: 'register',
-                  builder: (context, state) => const DeviceRegistrationQrScreen(),
+                  builder: (context, state) =>
+                      const DeviceRegistrationQrScreen(),
                 ),
               ],
             ),
@@ -223,8 +226,10 @@ final GoRouter router = GoRouter(
       ],
     ),
     GoRoute(
-      path: '/pet-delete-confirm',
-      builder: (context, state) => const PetDeleteConfirmScreen(),
+      path: '/pet-delete-confirm/:petId',
+      builder: (context, state) => PetDeleteConfirmScreen(
+        petId: int.parse(state.pathParameters['petId']!),
+      ),
     ),
   ],
 );

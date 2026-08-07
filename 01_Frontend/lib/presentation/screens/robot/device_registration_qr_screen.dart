@@ -11,12 +11,8 @@ import '../../viewmodels/robot_view_model.dart';
 /// 마실이 기기 밑면 QR 을 스캔해 기기를 등록한다.
 ///
 /// 흐름:
-///   카메라 권한 → QR 스캔 → 토큰 형식 검증 → POST /robots/pairings
-///
-/// 서버는 등록에 `petId` 를 요구하는데 펫 조회 API 가 아직 배포되지 않았다.
-/// petId 를 못 구하면 스캔 결과를 [RobotViewModel.holdScannedToken] 으로
-/// 보관해두고, petId 가 생기면 `pairWithPendingToken` 으로 이어서 등록한다.
-/// 즉 스캔·권한·검증은 지금 그대로 동작하고, 서버 등록만 나중에 이어진다.
+///   카메라 권한 → QR 스캔 → 서버 유효성 확인 → 새 펫 이름 입력
+///   → 펫 생성과 기기 연결을 하나의 서버 트랜잭션으로 처리
 class DeviceRegistrationQrScreen extends StatefulWidget {
   const DeviceRegistrationQrScreen({super.key});
 
@@ -38,49 +34,10 @@ class _DeviceRegistrationQrScreenState
   String? _message;
   bool _isError = false;
 
-  /// 보관해둔 토큰으로 이어서 등록하는 중인지. 매 rebuild 마다 다시 시도하는
-  /// 것을 막는다.
-  bool _resumingPending = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // 등록에는 petId 가 필요하다. 미리 불러두면 스캔 직후 바로 등록까지 간다.
-    // 펫 API 가 없으면 조용히 실패하고, 스캔은 그대로 동작한다.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      context.read<PetViewModel>().loadCurrentPet(silent: true);
-    });
-  }
-
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
-  }
-
-  /// petId 를 못 구해 보관해둔 토큰으로 등록을 마무리한다.
-  ///
-  /// 스캔 시점에 펫 정보가 없어 미뤄둔 경우, 펫 정보가 도착하면 사용자가
-  /// QR 을 다시 찍지 않아도 등록이 이어진다.
-  Future<void> _resumePendingPairing(int petId) async {
-    final robotVm = context.read<RobotViewModel>();
-
-    final paired = await robotVm.pairWithPendingToken(petId: petId);
-    if (!mounted) return;
-
-    if (!paired) {
-      // 실패했으면 다시 시도할 수 있게 플래그를 풀어준다.
-      _resumingPending = false;
-      _show(robotVm.errorMessage ?? '기기 등록에 실패했어요. 다시 시도해 주세요.',
-          isError: true);
-      return;
-    }
-
-    _show('기기가 등록됐어요!');
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-    if (!mounted) return;
-    context.pop();
   }
 
   Future<void> _onDetect(BarcodeCapture capture) async {
@@ -91,8 +48,7 @@ class _DeviceRegistrationQrScreenState
 
     if (token == null) {
       // 다른 앱 QR·광고 QR 등. 서버에 보내지 않고 바로 안내한다.
-      _show('마실이 기기의 QR 코드가 아니에요. 기기 밑면의 QR을 비춰 주세요.',
-          isError: true);
+      _show('마실이 기기의 QR 코드가 아니에요. 기기 밑면의 QR을 비춰 주세요.', isError: true);
       return;
     }
 
@@ -109,28 +65,94 @@ class _DeviceRegistrationQrScreenState
   /// 확인이 실제 스캔 동작을 보증한다. 갈라지면 한쪽만 되는 상황이 생긴다.
   Future<void> _registerToken(String token) async {
     final robotVm = context.read<RobotViewModel>();
-    final petId = context.read<PetViewModel>().petId;
 
-    if (petId == null) {
-      // 펫이 없어 petId 를 못 구한 경우. 토큰은 버리지 않고 보관한다.
-      robotVm.holdScannedToken(token);
-      _show('QR을 인식했어요. 펫 정보를 불러온 뒤 등록을 완료할 수 있어요.');
+    _show('QR 코드를 확인하고 있어요.');
+    final valid = await robotVm.validateRegistrationQr(token);
+    if (!mounted) return;
+    if (!valid) {
+      _show(robotVm.errorMessage ?? '등록할 수 없는 QR 코드예요.', isError: true);
       return;
     }
 
-    final paired = await robotVm.pairRobot(petId: petId, qrToken: token);
+    final petName = await _askPetName();
+    if (!mounted) return;
+    if (petName == null) {
+      await _retry();
+      return;
+    }
+
+    _show('$petName 프로필과 기기를 등록하고 있어요.');
+    final paired = await robotVm.registerNewPet(
+      qrToken: token,
+      petName: petName,
+    );
     if (!mounted) return;
 
     if (!paired) {
-      _show(robotVm.errorMessage ?? '기기 등록에 실패했어요. 다시 시도해 주세요.',
-          isError: true);
+      _show(robotVm.errorMessage ?? '기기 등록에 실패했어요. 다시 시도해 주세요.', isError: true);
       return;
     }
 
-    _show('기기가 등록됐어요!');
+    await context.read<PetViewModel>().loadCurrentPet(silent: true);
+    if (!mounted) return;
+    _show('$petName 등록이 완료됐어요!');
     await Future<void>.delayed(const Duration(milliseconds: 700));
     if (!mounted) return;
     context.pop();
+  }
+
+  Future<String?> _askPetName() async {
+    var input = '';
+    final name = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('새 반려동물 이름'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'QR 확인이 끝났어요. 이 기기와 함께할 반려동물의 이름을 입력해 주세요.',
+              style: TextStyle(color: Color(0xFF8D6E63), fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              autofocus: true,
+              maxLength: 100,
+              textInputAction: TextInputAction.done,
+              onChanged: (value) => input = value,
+              decoration: const InputDecoration(
+                hintText: '이름 (예: 마실이)',
+                border: OutlineInputBorder(),
+              ),
+              onSubmitted: (value) {
+                final trimmed = value.trim();
+                if (trimmed.isNotEmpty) {
+                  Navigator.of(dialogContext).pop(trimmed);
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final trimmed = input.trim();
+              if (trimmed.isNotEmpty) {
+                Navigator.of(dialogContext).pop(trimmed);
+              }
+            },
+            child: const Text('등록'),
+          ),
+        ],
+      ),
+    );
+    return name;
   }
 
   /// 카메라 없이 토큰을 직접 넣어 등록해 본다. **디버그 빌드에서만** 쓴다.
@@ -139,7 +161,7 @@ class _DeviceRegistrationQrScreenState
   /// 그렇다고 스캔 이후 흐름(형식 검증 → petId 확인 → 서버 등록 → 결과 표시)을
   /// 확인 못 하면 시연 전에 남는 위험이 크다. 그래서 카메라 단계만 건너뛴다.
   Future<void> _openManualEntry() async {
-    final controller = TextEditingController();
+    var value = '';
 
     final input = await showDialog<String>(
       context: context,
@@ -156,10 +178,10 @@ class _DeviceRegistrationQrScreenState
             ),
             const SizedBox(height: 16),
             TextField(
-              controller: controller,
               autofocus: true,
               maxLines: 3,
               minLines: 2,
+              onChanged: (input) => value = input,
               style: const TextStyle(fontSize: 12),
               decoration: const InputDecoration(
                 hintText: 'vWy6ljEwfJ8-jNFG_2tgCk8rFn1Xg3dMXthSV3liX7M',
@@ -175,8 +197,7 @@ class _DeviceRegistrationQrScreenState
             child: const Text('취소'),
           ),
           TextButton(
-            onPressed: () =>
-                Navigator.of(dialogContext).pop(controller.text.trim()),
+            onPressed: () => Navigator.of(dialogContext).pop(value.trim()),
             child: const Text('등록 시도'),
           ),
         ],
@@ -188,8 +209,7 @@ class _DeviceRegistrationQrScreenState
     // 스캔과 똑같이 형식부터 검증한다. 이 단계도 확인 대상이다.
     final token = RobotQr.extractToken(input);
     if (token == null) {
-      _show('토큰 형식이 맞지 않아요. 43자 이상의 영문·숫자·_- 조합이어야 해요.',
-          isError: true);
+      _show('토큰 형식이 맞지 않아요. 43자 이상의 영문·숫자·_- 조합이어야 해요.', isError: true);
       return;
     }
 
@@ -220,19 +240,6 @@ class _DeviceRegistrationQrScreenState
   @override
   Widget build(BuildContext context) {
     final robotVm = context.watch<RobotViewModel>();
-    final petId = context.watch<PetViewModel>().petId;
-
-    // 스캔은 됐지만 petId 가 없어 미뤄둔 등록이 있고, 이제 petId 가 생겼으면
-    // 사용자가 QR 을 다시 찍지 않아도 이어서 등록한다.
-    if (!_resumingPending &&
-        !_handling &&
-        robotVm.hasPendingToken &&
-        petId != null &&
-        !robotVm.isLoading) {
-      _resumingPending = true;
-      WidgetsBinding.instance
-          .addPostFrameCallback((_) => _resumePendingPairing(petId));
-    }
 
     return Scaffold(
       backgroundColor: const Color(0xFF2D2621),
@@ -284,13 +291,13 @@ class _DeviceRegistrationQrScreenState
             ),
 
           // 안내 문구
-          Positioned(
+          const Positioned(
             top: 120,
             left: 24,
             right: 24,
             child: Column(
               children: [
-                const Text(
+                Text(
                   '마실이 기기 하단의\nQR 코드를 스캔해 주세요',
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -299,21 +306,6 @@ class _DeviceRegistrationQrScreenState
                       fontWeight: FontWeight.bold,
                       shadows: [Shadow(blurRadius: 8, color: Colors.black54)]),
                 ),
-                if (robotVm.hasPendingToken && _message == null) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.45),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text(
-                      '인식된 QR이 있어요 · 펫 정보 준비 후 등록됩니다',
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
@@ -369,8 +361,7 @@ class _CameraErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final denied =
-        error.errorCode == MobileScannerErrorCode.permissionDenied;
+    final denied = error.errorCode == MobileScannerErrorCode.permissionDenied;
 
     return Container(
       color: const Color(0xFF2D2621),
@@ -413,8 +404,7 @@ class _CameraErrorView extends StatelessWidget {
                     borderRadius: BorderRadius.circular(30)),
               ),
               child: const Text('돌아가기',
-                  style:
-                      TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
             ),
           ),
         ],
@@ -480,7 +470,8 @@ class _ResultSheet extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: isError ? const Color(0xFFFFF1F0) : const Color(0xFFE8F5E9),
+              color:
+                  isError ? const Color(0xFFFFF1F0) : const Color(0xFFE8F5E9),
               shape: BoxShape.circle,
             ),
             child: Icon(

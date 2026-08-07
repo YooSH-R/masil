@@ -9,9 +9,12 @@ class PetViewModel extends BaseViewModel {
 
   Pet? _pet;
   Affinity? _affinity;
+  bool _hasLoadedCurrentPet = false;
   List<AffinityHistoryEntry> _affinityHistory = const [];
 
   Pet? get pet => _pet;
+  bool get hasLoadedCurrentPet => _hasLoadedCurrentPet;
+  bool get requiresDevicePairing => _hasLoadedCurrentPet && _pet?.robot == null;
   int? get petId => _pet?.id;
   String get petName => _pet?.name ?? '마실이';
   Affinity? get affinity => _affinity ?? _pet?.affinity;
@@ -42,7 +45,16 @@ class PetViewModel extends BaseViewModel {
       () => _petRepository.getCurrentPet(),
       silent: silent,
     );
-    if (pet == null) return;
+    _hasLoadedCurrentPet = true;
+    if (pet == null) {
+      // 조회는 정상적으로 끝났지만 펫이 없으면 이전 세션의 화면 값을 남기지 않는다.
+      if (!hasError) {
+        _pet = null;
+        _affinity = null;
+      }
+      safeNotify();
+      return;
+    }
 
     _pet = pet;
     _affinity = pet.affinity;
@@ -119,6 +131,24 @@ class PetViewModel extends BaseViewModel {
     if (pet == null) return false;
 
     _pet = pet;
+    safeNotify();
+    return true;
+  }
+
+  Future<bool> deletePet(int petId) async {
+    await guard<void>(() => _petRepository.deletePet(petId));
+    if (hasError) return false;
+
+    _pets = _pets.where((pet) => pet.id != petId).toList(growable: false);
+    if (_pet?.id == petId) {
+      _pet = _pets.isEmpty ? null : _pets.first;
+    }
+    _affinity = _pet?.affinity;
+    _affinityHistory = const [];
+    _hasLoadedCurrentPet = true;
+    if (_pet != null) {
+      await _petRepository.setCurrentPet(_pet!.id);
+    }
     safeNotify();
     return true;
   }

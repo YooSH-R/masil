@@ -27,11 +27,15 @@ abstract class PetRepository {
     String? profileImage,
   });
 
+  /// DELETE /pets/{petId} — 페어링을 해제하고 펫 프로필을 삭제한다.
+  Future<void> deletePet(int petId);
+
   /// GET /pets/{petId}/affinity — 친밀도·기분 조회
   Future<Affinity> getAffinity(int petId);
 
   /// GET /pets/{petId}/affinity/history — 친밀도 변화 이력
-  Future<List<AffinityHistoryEntry>> getAffinityHistory(int petId, {int? limit});
+  Future<List<AffinityHistoryEntry>> getAffinityHistory(int petId,
+      {int? limit});
 
   /// 마지막으로 사용한 펫. 캐시가 없으면 서버의 내 펫 목록에서 복구한다.
   Future<Pet?> getCurrentPet();

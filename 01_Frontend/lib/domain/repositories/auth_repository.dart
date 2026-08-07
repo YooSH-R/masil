@@ -21,9 +21,6 @@ abstract class AuthRepository {
     required String code,
   });
 
-  /// GET /users/nickname-availability?nickname= — 닉네임 중복 확인
-  Future<NicknameAvailability> checkNicknameAvailability(String nickname);
-
   /// POST /auth/signup — 회원가입
   ///
   /// 서버 필수값: deviceId, email, nickname, password, phoneNumber, verificationToken

@@ -54,12 +54,6 @@ class AuthViewModel extends BaseViewModel {
   DateTime? _codeExpiresAt;
   DateTime? get codeExpiresAt => _codeExpiresAt;
 
-  // --- 닉네임 중복 확인 상태 ---
-  bool _isNicknameChecked = false;
-  bool _isNicknameAvailable = false;
-  bool get isNicknameChecked => _isNicknameChecked;
-  bool get isNicknameAvailable => _isNicknameAvailable;
-
   /// POST /auth/verifications — 휴대전화로 인증번호 발송
   Future<bool> requestPhoneVerification(
     String phoneNumber, {
@@ -99,18 +93,6 @@ class AuthViewModel extends BaseViewModel {
     return result.verified;
   }
 
-  /// GET /users/nickname-availability
-  Future<bool> checkNickname(String nickname) async {
-    final result = await guard(
-      () => _authRepository.checkNicknameAvailability(nickname),
-    );
-
-    _isNicknameChecked = result != null;
-    _isNicknameAvailable = result?.available ?? false;
-    safeNotify();
-    return _isNicknameAvailable;
-  }
-
   /// 휴대전화 번호를 고치면 인증 단계를 처음부터 다시 밟게 한다.
   void resetPhoneVerification() {
     if (_verificationId == null && !_isPhoneVerified) return;
@@ -119,13 +101,6 @@ class AuthViewModel extends BaseViewModel {
     _verificationToken = null;
     _resendCooldown = 0;
     _codeExpiresAt = null;
-    safeNotify();
-  }
-
-  void resetNicknameCheck() {
-    if (!_isNicknameChecked) return;
-    _isNicknameChecked = false;
-    _isNicknameAvailable = false;
     safeNotify();
   }
 
@@ -183,7 +158,9 @@ class AuthViewModel extends BaseViewModel {
     final idToken = await guard<String?>(getIdToken);
     if (idToken == null) {
       // 오류 없이 null이면 사용자가 취소한 것.
-      return hasError ? SocialSignInOutcome.failed : SocialSignInOutcome.cancelled;
+      return hasError
+          ? SocialSignInOutcome.failed
+          : SocialSignInOutcome.cancelled;
     }
 
     final result = await guard(() => authenticate(idToken));
@@ -385,7 +362,5 @@ class AuthViewModel extends BaseViewModel {
     _verificationToken = null;
     _resendCooldown = 0;
     _codeExpiresAt = null;
-    _isNicknameChecked = false;
-    _isNicknameAvailable = false;
   }
 }

@@ -111,7 +111,9 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
           icon: const Icon(Icons.chevron_left, color: Color(0xFF5D4037)),
           onPressed: () => context.pop(),
         ),
-        title: const Text('펫 프로필 관리', style: TextStyle(color: Color(0xFF5D4037), fontWeight: FontWeight.bold)),
+        title: const Text('펫 프로필 관리',
+            style: TextStyle(
+                color: Color(0xFF5D4037), fontWeight: FontWeight.bold)),
         centerTitle: true,
         actions: [
           IconButton(
@@ -142,7 +144,7 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
               ),
             ),
             const SizedBox(height: 40),
-            
+
             // Name Field
             _buildSectionCard([
               _buildLabel('펫 이름 설정'),
@@ -152,38 +154,49 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
                   _buildTextField(controller: _nameController),
                   const Padding(
                     padding: EdgeInsets.only(right: 16),
-                    child: Text('3/10', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    child: Text('3/10',
+                        style: TextStyle(color: Colors.grey, fontSize: 12)),
                   ),
                 ],
               ),
             ]),
             const SizedBox(height: 16),
-            
+
             // Cycle Field
             _buildSectionCard([
               _buildLabel('산책 주기 설정'),
-              const Text('하루 산책 횟수', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              const Text('하루 산책 횟수',
+                  style: TextStyle(color: Colors.grey, fontSize: 12)),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Expanded(child: _buildTextField(controller: _cycleController, textAlign: TextAlign.center)),
+                  Expanded(
+                      child: _buildTextField(
+                          controller: _cycleController,
+                          textAlign: TextAlign.center)),
                   const SizedBox(width: 12),
-                  const Text('회', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text('회',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                 ],
               ),
               const SizedBox(height: 20),
-              const Text('회당 산책 시간', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              const Text('회당 산책 시간',
+                  style: TextStyle(color: Colors.grey, fontSize: 12)),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Expanded(child: _buildTextField(controller: _timeController, textAlign: TextAlign.center)),
+                  Expanded(
+                      child: _buildTextField(
+                          controller: _timeController,
+                          textAlign: TextAlign.center)),
                   const SizedBox(width: 12),
-                  const Text('분', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text('분',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                 ],
               ),
             ]),
             const SizedBox(height: 16),
-            
+
             // Notification Toggle
             _buildSectionCard([
               Row(
@@ -192,42 +205,56 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
                   const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('알림 수신 동의', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text('알림 수신 동의',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16)),
                       SizedBox(height: 4),
-                      Text('산책 알림 및 중요 공지', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                      Text('산책 알림 및 중요 공지',
+                          style: TextStyle(color: Colors.grey, fontSize: 12)),
                     ],
                   ),
                   Switch(
                     value: _isNotificationEnabled,
-                    onChanged: (val) => setState(() => _isNotificationEnabled = val),
+                    onChanged: (val) =>
+                        setState(() => _isNotificationEnabled = val),
                     activeThumbColor: const Color(0xFFC67C4E),
                   ),
                 ],
               ),
             ]),
             const SizedBox(height: 32),
-            
+
             // Save Button
             SizedBox(
               width: double.infinity,
               height: 60,
               child: ElevatedButton(
-                onPressed: context.watch<PetViewModel>().isLoading ? null : _save,
+                onPressed:
+                    context.watch<PetViewModel>().isLoading ? null : _save,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFC67C4E),
                   foregroundColor: Colors.white,
                   disabledBackgroundColor: const Color(0xFFE0D5C8),
                   disabledForegroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20)),
                   elevation: 0,
                 ),
-                child: const Text('저장하기', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                child: const Text('저장하기',
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ),
             ),
             const SizedBox(height: 16),
             TextButton(
-              onPressed: () => context.push('/pet-delete-confirm'),
-              child: const Text('펫 정보 삭제하기', style: TextStyle(color: Color(0xFFD32F2F), fontWeight: FontWeight.bold)),
+              onPressed: pet == null
+                  ? null
+                  : () => context.push(
+                        '/pet-delete-confirm/${pet.id}',
+                      ),
+              child: const Text('펫 정보 삭제하기',
+                  style: TextStyle(
+                      color: Color(0xFFD32F2F), fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 40),
           ],
@@ -240,19 +267,28 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+      decoration: BoxDecoration(
+          color: Colors.white, borderRadius: BorderRadius.circular(20)),
+      child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start, children: children),
     );
   }
 
   Widget _buildLabel(String label) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF5D4037))),
+      child: Text(label,
+          style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: Color(0xFF5D4037))),
     );
   }
 
-  Widget _buildTextField({required TextEditingController controller, String? hint, TextAlign textAlign = TextAlign.start}) {
+  Widget _buildTextField(
+      {required TextEditingController controller,
+      String? hint,
+      TextAlign textAlign = TextAlign.start}) {
     return TextField(
       controller: controller,
       textAlign: textAlign,
@@ -260,8 +296,12 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
         hintText: hint,
         filled: true,
         fillColor: const Color(0xFFFDF7F0),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Color(0xFFF0E0D0))),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Color(0xFFF0E0D0))),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: const BorderSide(color: Color(0xFFF0E0D0))),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: const BorderSide(color: Color(0xFFF0E0D0))),
       ),
     );
   }

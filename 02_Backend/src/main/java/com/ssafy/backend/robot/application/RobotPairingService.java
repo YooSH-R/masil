@@ -102,6 +102,86 @@ public class RobotPairingService {
         return toResult(pairing, robot, pet);
     }
 
+    @Transactional(readOnly = true)
+    public RobotRegistrationPreview validateRegistration(Long userId, String qrToken) {
+        RobotRegistrationContext context = loadRegistrationContext(userId, qrToken, false);
+        return new RobotRegistrationPreview(
+                context.robot().getSerialNumber(),
+                context.robot().getModelName(),
+                context.robot().getFirmwareVersion()
+        );
+    }
+
+    /**
+     * QR을 마지막으로 다시 검증한 뒤 새 펫 생성과 기기 연결을 한 트랜잭션으로
+     * 처리한다. 어떤 단계에서든 실패하면 펫과 초기 친밀도 상태도 함께 롤백된다.
+     */
+    @Transactional
+    public RobotPairingResult registerNewPet(
+            Long userId,
+            String petName,
+            String qrToken
+    ) {
+        RobotRegistrationContext context = loadRegistrationContext(userId, qrToken, true);
+        Instant now = clock.instant();
+
+        PetJpaEntity pet = petRepository.saveAndFlush(
+                new PetJpaEntity(userId, petName.trim())
+        );
+        context.robot().claimOwnershipIfUnowned(userId, now);
+
+        RobotPairingJpaEntity pairing;
+        try {
+            pairing = pairingRepository.saveAndFlush(
+                    new RobotPairingJpaEntity(pet.getId(), context.robot().getId(), now)
+            );
+        } catch (DataIntegrityViolationException exception) {
+            BusinessException pairingConflict = translatePairingConflict(exception);
+            if (pairingConflict != null) {
+                throw pairingConflict;
+            }
+            throw exception;
+        }
+
+        context.credential().markQrTokenUsed(now);
+        return toResult(pairing, context.robot(), pet);
+    }
+
+    private RobotRegistrationContext loadRegistrationContext(
+            Long userId,
+            String qrToken,
+            boolean lockRobot
+    ) {
+        String qrTokenHash = tokenHashService.hash(qrToken);
+        RobotCredentialJpaEntity credential = (lockRobot
+                ? credentialRepository.findByQrTokenHash(qrTokenHash)
+                : credentialRepository.findFirstByQrTokenHash(qrTokenHash))
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_QR_TOKEN));
+
+        RobotJpaEntity robot = (lockRobot
+                ? robotRepository.findByIdForUpdate(credential.getRobotId())
+                : robotRepository.findById(credential.getRobotId()))
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_QR_TOKEN));
+
+        Instant now = clock.instant();
+        if (credential.isQrTokenExpiredAt(now)) {
+            throw new BusinessException(ErrorCode.QR_TOKEN_EXPIRED);
+        }
+        if (robot.isOwnedByAnotherUser(userId)) {
+            throw new BusinessException(ErrorCode.ROBOT_OWNERSHIP_MISMATCH);
+        }
+        if (pairingRepository.existsByRobotIdAndUnpairedAtIsNull(robot.getId())) {
+            throw new BusinessException(ErrorCode.ROBOT_ALREADY_PAIRED);
+        }
+        return new RobotRegistrationContext(credential, robot);
+    }
+
+    private record RobotRegistrationContext(
+            RobotCredentialJpaEntity credential,
+            RobotJpaEntity robot
+    ) {
+    }
+
     private RobotPairingResult toResult(
             RobotPairingJpaEntity pairing,
             RobotJpaEntity robot,

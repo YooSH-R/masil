@@ -125,21 +125,6 @@ class AuthSession {
   }
 }
 
-/// 닉네임 사용 가능 여부. (서버 OpenAPI: NicknameAvailabilityResponse)
-class NicknameAvailability {
-  const NicknameAvailability({required this.nickname, required this.available});
-
-  final String nickname;
-  final bool available;
-
-  factory NicknameAvailability.fromJson(Map<String, dynamic> json) {
-    return NicknameAvailability(
-      nickname: Json.asString(json['nickname']),
-      available: Json.asBool(json['available']),
-    );
-  }
-}
-
 /// 서버 검증 규칙. OpenAPI 스키마의 pattern/minLength를 그대로 옮긴 것.
 class AuthValidation {
   AuthValidation._();

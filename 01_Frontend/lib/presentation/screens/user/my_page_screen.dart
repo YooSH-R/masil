@@ -45,6 +45,8 @@ class _MyPageScreenState extends State<MyPageScreen> {
     final petViewModel = context.watch<PetViewModel>();
     final pet = petViewModel.pet ??
         (petViewModel.pets.isEmpty ? null : petViewModel.pets.first);
+    final hasRegisteredDevice = pet?.robot != null ||
+        petViewModel.pets.any((registeredPet) => registeredPet.robot != null);
     final user = authViewModel.user;
     final profile = authViewModel.profile;
 
@@ -180,15 +182,6 @@ class _MyPageScreenState extends State<MyPageScreen> {
                                         pet.affinity!.mood.label,
                                         const Color(0xFFFDF2E9),
                                         const Color(0xFFD35400)),
-                                  if (pet.robot != null) ...[
-                                    const SizedBox(width: 8),
-                                    _buildTag(
-                                        pet.robot!.online
-                                            ? '마실이 연결됨'
-                                            : '마실이 오프라인',
-                                        const Color(0xFFE8F6F3),
-                                        const Color(0xFF16A085)),
-                                  ],
                                 ],
                               ),
                             ],
@@ -219,7 +212,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
               const SizedBox(height: 24),
             ],
 
-            // 펫 프로필이 있으면 새 기기를 더 연결하는 흐름임을 명확히 한다.
+            // 기기 등록이 완료될 때 새 펫 프로필도 함께 생성된다.
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(24),
@@ -234,24 +227,13 @@ class _MyPageScreenState extends State<MyPageScreen> {
               child: Row(
                 children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(pet == null ? '기기 등록' : '기기 추가 등록',
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        Text(
-                            pet == null
-                                ? '펫 프로필 생성부터 QR 연결까지\n한 번에 등록해 보세요.'
-                                : '${pet.name}과 연결할 새 기기를\n등록해 보세요.',
-                            style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 13,
-                                height: 1.4)),
-                      ],
+                    child: Text(
+                      hasRegisteredDevice ? '기기 추가 등록' : '기기 등록',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   Container(

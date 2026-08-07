@@ -97,4 +97,9 @@ public class PetJpaEntity {
     public void changeName(String name) {
         this.name = name;
     }
+
+    public void softDelete(Instant now) {
+        deletedAt = now;
+        updatedAt = now;
+    }
 }

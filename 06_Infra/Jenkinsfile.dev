@@ -21,6 +21,7 @@ pipeline {
         K8S_NAMESPACE = 's15a203-dev'
         MANIFEST_DIR = '06_Infra/dev'
         MIGRATION_DIR = '06_Infra/postgres/init'
+        DEV_MIGRATION_DIR = '06_Infra/postgres/dev'
     }
 
     stages {
@@ -69,9 +70,8 @@ pipeline {
                     def migrationChanged = changedFiles
                         .readLines()
                         .any {
-                            it.startsWith(
-                                    '06_Infra/postgres/init/'
-                            )
+                            it.startsWith('06_Infra/postgres/init/') ||
+                            it.startsWith('06_Infra/postgres/dev/')
                         }
 
                     def deploymentChanged = changedFiles
@@ -176,7 +176,9 @@ pipeline {
                       "$MIGRATION_DIR/007_walk_diaries.sql" \
                       "$MIGRATION_DIR/008_users_version_compat.sql" \
                       "$MIGRATION_DIR/009_walk_api.sql" \
-                      "$MIGRATION_DIR/010_behavior_requests_open_unique.sql"
+                      "$MIGRATION_DIR/010_behavior_requests_open_unique.sql" \
+                      "$DEV_MIGRATION_DIR/011_cleanup_rexsung_demo_pets.sql" \
+                      "$DEV_MIGRATION_DIR/013_pair_device001_with_ssafy.sql"
                 '''
             }
         }
