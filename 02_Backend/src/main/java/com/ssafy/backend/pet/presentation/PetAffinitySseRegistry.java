@@ -5,15 +5,21 @@ import com.ssafy.backend.pet.application.PetAffinitySnapshot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayDeque;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.function.Consumer;
 
 @Component
 public class PetAffinitySseRegistry {
@@ -25,10 +31,14 @@ public class PetAffinitySseRegistry {
 
     private final ConcurrentMap<Long, Set<SseEmitter>> emitters =
             new ConcurrentHashMap<>();
+    private final ConcurrentMap<SseEmitter, SerialExecutor> sendExecutors =
+            new ConcurrentHashMap<>();
     private final long timeoutMs;
+    private final Executor sendExecutor;
 
     public PetAffinitySseRegistry(
-            @Value("${pet.affinity.sse.timeout-ms:1800000}") long timeoutMs
+            @Value("${pet.affinity.sse.timeout-ms:1800000}") long timeoutMs,
+            @Qualifier("petAffinitySseExecutor") Executor sendExecutor
     ) {
         if (timeoutMs <= 0) {
             throw new IllegalArgumentException(
@@ -36,15 +46,24 @@ public class PetAffinitySseRegistry {
             );
         }
         this.timeoutMs = timeoutMs;
+        this.sendExecutor = sendExecutor;
     }
 
     public SseEmitter subscribe(PetAffinitySnapshot snapshot) {
         SseEmitter emitter = new SseEmitter(timeoutMs);
         long petId = snapshot.petId();
-        emitters.computeIfAbsent(
-                petId,
-                ignored -> ConcurrentHashMap.newKeySet()
-        ).add(emitter);
+        emitters.compute(petId, (ignored, petEmitters) -> {
+            Set<SseEmitter> result = petEmitters;
+            if (result == null) {
+                result = ConcurrentHashMap.newKeySet();
+            }
+            result.add(emitter);
+            return result;
+        });
+        sendExecutors.put(emitter, new SerialExecutor(
+                sendExecutor,
+                exception -> reject(petId, emitter, exception)
+        ));
         emitter.onCompletion(() -> remove(petId, emitter));
         emitter.onTimeout(() -> {
             remove(petId, emitter);
@@ -72,7 +91,7 @@ public class PetAffinitySseRegistry {
             return;
         }
         for (SseEmitter emitter : Set.copyOf(petEmitters)) {
-            send(
+            sendAsync(
                     event.petId(),
                     emitter,
                     SseEmitter.event()
@@ -92,7 +111,7 @@ public class PetAffinitySseRegistry {
         for (var entry : emitters.entrySet()) {
             long petId = entry.getKey();
             for (SseEmitter emitter : Set.copyOf(entry.getValue())) {
-                send(
+                sendAsync(
                         petId,
                         emitter,
                         SseEmitter.event().comment(
@@ -114,6 +133,7 @@ public class PetAffinitySseRegistry {
             return;
         }
         for (SseEmitter emitter : Set.copyOf(petEmitters)) {
+            sendExecutors.remove(emitter);
             try {
                 emitter.complete();
             } catch (IllegalStateException ignored) {
@@ -149,14 +169,101 @@ public class PetAffinitySseRegistry {
         }
     }
 
-    private void remove(long petId, SseEmitter emitter) {
-        Set<SseEmitter> petEmitters = emitters.get(petId);
-        if (petEmitters == null) {
+    private void sendAsync(
+            long petId,
+            SseEmitter emitter,
+            SseEmitter.SseEventBuilder event
+    ) {
+        SerialExecutor serialExecutor = sendExecutors.get(emitter);
+        if (serialExecutor == null) {
             return;
         }
-        petEmitters.remove(emitter);
-        if (petEmitters.isEmpty()) {
-            emitters.remove(petId, petEmitters);
+        serialExecutor.execute(() -> send(petId, emitter, event));
+    }
+
+    private void remove(long petId, SseEmitter emitter) {
+        sendExecutors.remove(emitter);
+        emitters.computeIfPresent(petId, (ignored, petEmitters) -> {
+            petEmitters.remove(emitter);
+            return petEmitters.isEmpty() ? null : petEmitters;
+        });
+    }
+
+    private void reject(
+            long petId,
+            SseEmitter emitter,
+            RejectedExecutionException exception
+    ) {
+        remove(petId, emitter);
+        try {
+            emitter.completeWithError(exception);
+        } catch (IllegalStateException ignored) {
+            // The connection was already completed concurrently.
+        }
+        log.warn(
+                "Affinity SSE delivery was rejected; reconnect required. "
+                        + "petId={}",
+                petId
+        );
+    }
+
+    private static final class SerialExecutor implements Executor {
+
+        private final Queue<Runnable> tasks = new ArrayDeque<>();
+        private final Executor executor;
+        private final Consumer<RejectedExecutionException> rejectionHandler;
+        private Runnable active;
+
+        private SerialExecutor(
+                Executor executor,
+                Consumer<RejectedExecutionException> rejectionHandler
+        ) {
+            this.executor = executor;
+            this.rejectionHandler = rejectionHandler;
+        }
+
+        @Override
+        public void execute(Runnable command) {
+            Runnable next = null;
+            synchronized (this) {
+                tasks.offer(() -> {
+                    try {
+                        command.run();
+                    } finally {
+                        scheduleNext();
+                    }
+                });
+                if (active == null) {
+                    active = tasks.poll();
+                    next = active;
+                }
+            }
+            if (next != null) {
+                dispatch(next);
+            }
+        }
+
+        private void scheduleNext() {
+            Runnable next;
+            synchronized (this) {
+                active = tasks.poll();
+                next = active;
+            }
+            if (next != null) {
+                dispatch(next);
+            }
+        }
+
+        private void dispatch(Runnable next) {
+            try {
+                executor.execute(next);
+            } catch (RejectedExecutionException exception) {
+                synchronized (this) {
+                    active = null;
+                    tasks.clear();
+                }
+                rejectionHandler.accept(exception);
+            }
         }
     }
 }

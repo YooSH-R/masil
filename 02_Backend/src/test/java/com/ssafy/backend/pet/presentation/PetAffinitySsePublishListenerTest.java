@@ -2,7 +2,6 @@ package com.ssafy.backend.pet.presentation;
 
 import com.ssafy.backend.pet.application.PetAffinityChangedEvent;
 import org.junit.jupiter.api.Test;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -12,6 +11,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -39,7 +39,8 @@ class PetAffinitySsePublishListenerTest {
     }
 
     @Test
-    void publishesOnlyAfterCommitOnDedicatedExecutor() throws Exception {
+    void publishesOnlyAfterCommitWithoutAsyncTransactionThreadFallback()
+            throws Exception {
         Method method = PetAffinitySsePublishListener.class.getDeclaredMethod(
                 "publish",
                 PetAffinityChangedEvent.class
@@ -47,11 +48,11 @@ class PetAffinitySsePublishListenerTest {
         TransactionalEventListener listener = method.getAnnotation(
                 TransactionalEventListener.class
         );
-        Async async = method.getAnnotation(Async.class);
 
         assertNotNull(listener);
-        assertNotNull(async);
         assertEquals(TransactionPhase.AFTER_COMMIT, listener.phase());
-        assertEquals("petAffinitySseExecutor", async.value());
+        assertNull(method.getAnnotation(
+                org.springframework.scheduling.annotation.Async.class
+        ));
     }
 }
