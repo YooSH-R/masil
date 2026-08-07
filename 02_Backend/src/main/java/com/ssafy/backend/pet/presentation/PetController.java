@@ -4,6 +4,7 @@ import com.ssafy.backend.auth.security.UserPrincipal;
 import com.ssafy.backend.common.ApiResponse;
 import com.ssafy.backend.pet.application.PetAffinityResult;
 import com.ssafy.backend.pet.application.PetCreatedResult;
+import com.ssafy.backend.pet.application.PetDeletionService;
 import com.ssafy.backend.pet.application.PetProfileResult;
 import com.ssafy.backend.pet.application.PetRobotResult;
 import com.ssafy.backend.pet.application.PetService;
@@ -21,6 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -38,9 +40,14 @@ import java.util.List;
 public class PetController {
 
     private final PetService petService;
+    private final PetDeletionService petDeletionService;
 
-    public PetController(PetService petService) {
+    public PetController(
+            PetService petService,
+            PetDeletionService petDeletionService
+    ) {
         this.petService = petService;
+        this.petDeletionService = petDeletionService;
     }
 
     @Operation(summary = "펫 생성")
@@ -105,6 +112,17 @@ public class PetController {
         return ApiResponse.success(PetProfileResponse.from(
                 petService.update(principal.userId(), petId, request.name())
         ));
+    }
+
+    @Operation(summary = "펫 삭제 및 기기 페어링 해제")
+    @SecurityRequirement(name = "bearerAuth")
+    @DeleteMapping("/{petId}")
+    public ResponseEntity<Void> delete(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable @Positive Long petId
+    ) {
+        petDeletionService.delete(principal.userId(), petId);
+        return ResponseEntity.noContent().build();
     }
 
     public record CreatePetRequest(

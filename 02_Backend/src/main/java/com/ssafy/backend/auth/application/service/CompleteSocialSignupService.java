@@ -56,8 +56,6 @@ public class CompleteSocialSignupService {
         ticket.validateUsableAt(now);
         validateDevice(ticket, deviceId);
         validateAccountNotLinked(ticket);
-        validateNicknameAvailable(nickname);
-
         User user = userRepository.save(User.newSocialUser(ticket.principal().email(), nickname));
         socialAccountRepository.save(user.id(), ticket.principal());
         signupTicketRepository.markUsed(ticket.id(), now);
@@ -83,9 +81,4 @@ public class CompleteSocialSignupService {
         }
     }
 
-    private void validateNicknameAvailable(String nickname) {
-        if (userRepository.existsByNickname(nickname)) {
-            throw new BusinessException(ErrorCode.NICKNAME_DUPLICATED);
-        }
-    }
 }

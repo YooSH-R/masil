@@ -74,17 +74,11 @@ CREATE INDEX IF NOT EXISTS idx_robot_pairings_pet_lookup
 CREATE INDEX IF NOT EXISTS idx_walks_pairing_lookup
     ON walks (robot_pairing_id, id);
 
+-- API 스모크 테스트용 사용자만 만들고 펫은 만들지 않는다.
 INSERT INTO users (
     id, version, nickname, created_at, updated_at
 ) VALUES (
-    900001, 0, 's3-local-test', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-);
-
-INSERT INTO pets (
-    id, user_id, name, created_at, updated_at
-) VALUES (
-    900001, 900001, 's3-local-test-pet',
-    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    900001, 0, 'local-registration-test', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 );
 
 INSERT INTO robots (id, serial_number, model_name, updated_at)
@@ -96,18 +90,8 @@ INSERT INTO robot_credentials (
 VALUES (
     900001,
     'dcd88bbfef46eddff98b64588474d872d7340862948eb685fc69ef10c09a0dc0',
-    '71f2a06fd7d98bfbdbb5d6ea85c839c60bf7f8ed8fa79ef60883302fa59c4e17',
+    'c383797ee06496f6316870b7ee11a386d2e96874a81c139add7630f63a35b188',
     CURRENT_TIMESTAMP
-);
-
-INSERT INTO robot_pairings (pet_id, robot_id, paired_at)
-VALUES (900001, 900001, CURRENT_TIMESTAMP);
-
-INSERT INTO pet_affinity_states (
-    pet_id, affinity_score, affinity_level, mood,
-    last_interaction_at, updated_at
-) VALUES (
-    900001, 50, 3, 'FRIENDLY', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 );
 
 INSERT INTO robot_current_states (

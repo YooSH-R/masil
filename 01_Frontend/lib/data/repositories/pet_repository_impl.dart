@@ -110,6 +110,13 @@ class PetRepositoryImpl implements PetRepository {
   }
 
   @override
+  Future<void> deletePet(int petId) async {
+    await _client.delete(ApiEndpoints.pet(petId));
+    await _cache.forgetPetId(petId);
+    await _cache.clearRobotId();
+  }
+
+  @override
   Future<Affinity> getAffinity(int petId) async {
     final data = await _client.get(ApiEndpoints.petAffinity(petId));
     return AffinityModel.fromJson(Json.asMap(data));

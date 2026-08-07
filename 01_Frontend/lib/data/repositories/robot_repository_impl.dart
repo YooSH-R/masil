@@ -18,6 +18,34 @@ class RobotRepositoryImpl implements RobotRepository {
   final SessionCache _cache;
 
   @override
+  Future<void> validateRegistrationQr({required String qrToken}) async {
+    await _client.post(
+      ApiEndpoints.robotRegistrationValidation,
+      data: {'qrToken': qrToken},
+    );
+  }
+
+  @override
+  Future<RobotPairing> registerNewPet({
+    required String qrToken,
+    required String petName,
+  }) async {
+    final data = await _client.post(
+      ApiEndpoints.robotRegistrations,
+      data: {
+        'qrToken': qrToken,
+        'petName': petName,
+      },
+      idempotencyKey: 'register-robot-$qrToken',
+    );
+
+    final pairing = RobotPairingModel.fromJson(Json.asMap(data));
+    await _cache.savePetId(pairing.petId);
+    await _cache.saveRobotId(pairing.robotId);
+    return pairing;
+  }
+
+  @override
   Future<RobotPairing> pairRobot({
     required int petId,
     required String qrToken,

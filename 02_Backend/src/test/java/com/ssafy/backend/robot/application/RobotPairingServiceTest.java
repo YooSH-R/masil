@@ -281,4 +281,83 @@ class RobotPairingServiceTest {
 
         assertEquals(ErrorCode.ROBOT_ALREADY_PAIRED, exception.errorCode());
     }
+
+    @Test
+    void validatesQrWithoutCreatingPetOrPairing() {
+        RobotCredentialJpaEntity credential = mock(RobotCredentialJpaEntity.class);
+        RobotJpaEntity robot = mock(RobotJpaEntity.class);
+        when(tokenHashService.hash("available-token")).thenReturn("available-hash");
+        when(credentialRepository.findFirstByQrTokenHash("available-hash"))
+                .thenReturn(Optional.of(credential));
+        when(credential.getRobotId()).thenReturn(ROBOT_ID);
+        when(robotRepository.findById(ROBOT_ID)).thenReturn(Optional.of(robot));
+        when(robot.getId()).thenReturn(ROBOT_ID);
+        when(robot.getSerialNumber()).thenReturn("PETBOT-A203-0003");
+
+        RobotRegistrationPreview preview = service.validateRegistration(
+                USER_ID,
+                "available-token"
+        );
+
+        assertEquals("PETBOT-A203-0003", preview.serialNumber());
+        verify(petRepository, never()).saveAndFlush(any());
+        verify(pairingRepository, never()).saveAndFlush(any());
+        verify(credential, never()).markQrTokenUsed(any());
+    }
+
+    @Test
+    void createsPetAndPairingTogetherAfterFinalQrValidation() {
+        RobotCredentialJpaEntity credential = mock(RobotCredentialJpaEntity.class);
+        RobotJpaEntity robot = mock(RobotJpaEntity.class);
+        PetJpaEntity pet = mock(PetJpaEntity.class);
+        RobotPairingJpaEntity pairing = mock(RobotPairingJpaEntity.class);
+        when(tokenHashService.hash("available-token")).thenReturn("available-hash");
+        when(credentialRepository.findByQrTokenHash("available-hash"))
+                .thenReturn(Optional.of(credential));
+        when(credential.getRobotId()).thenReturn(ROBOT_ID);
+        when(robotRepository.findByIdForUpdate(ROBOT_ID)).thenReturn(Optional.of(robot));
+        when(robot.getId()).thenReturn(ROBOT_ID);
+        when(robot.getSerialNumber()).thenReturn("PETBOT-A203-0003");
+        when(pet.getId()).thenReturn(PET_ID);
+        when(petRepository.saveAndFlush(any(PetJpaEntity.class))).thenReturn(pet);
+        when(pairing.getId()).thenReturn(401L);
+        when(pairing.getPairedAt()).thenReturn(NOW);
+        when(pairingRepository.saveAndFlush(any(RobotPairingJpaEntity.class)))
+                .thenReturn(pairing);
+
+        RobotPairingResult result = service.registerNewPet(
+                USER_ID,
+                "새마실이",
+                "available-token"
+        );
+
+        assertEquals(PET_ID, result.petId());
+        assertEquals(ROBOT_ID, result.robotId());
+        verify(petRepository).saveAndFlush(any(PetJpaEntity.class));
+        verify(pairingRepository).saveAndFlush(any(RobotPairingJpaEntity.class));
+        verify(robot).claimOwnershipIfUnowned(USER_ID, NOW);
+        verify(credential).markQrTokenUsed(NOW);
+    }
+
+    @Test
+    void doesNotCreatePetWhenFinalQrValidationFails() {
+        RobotCredentialJpaEntity credential = mock(RobotCredentialJpaEntity.class);
+        RobotJpaEntity robot = mock(RobotJpaEntity.class);
+        when(tokenHashService.hash("used-token")).thenReturn("used-hash");
+        when(credentialRepository.findByQrTokenHash("used-hash"))
+                .thenReturn(Optional.of(credential));
+        when(credential.getRobotId()).thenReturn(ROBOT_ID);
+        when(robotRepository.findByIdForUpdate(ROBOT_ID)).thenReturn(Optional.of(robot));
+        when(robot.getId()).thenReturn(ROBOT_ID);
+        when(pairingRepository.existsByRobotIdAndUnpairedAtIsNull(ROBOT_ID))
+                .thenReturn(true);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.registerNewPet(USER_ID, "생기면 안 됨", "used-token")
+        );
+
+        assertEquals(ErrorCode.ROBOT_ALREADY_PAIRED, exception.errorCode());
+        verify(petRepository, never()).saveAndFlush(any());
+    }
 }

@@ -87,8 +87,7 @@ public class SecurityConfig {
                                 "/v1/auth/verifications/*/confirm",
                                 "/v1/auth/oauth/google",
                                 "/v1/auth/oauth/kakao",
-                                "/v1/auth/oauth/signup",
-                                "/v1/users/nickname-availability"
+                                "/v1/auth/oauth/signup"
                         ).permitAll()
                         .anyRequest().hasRole("USER")
                 )

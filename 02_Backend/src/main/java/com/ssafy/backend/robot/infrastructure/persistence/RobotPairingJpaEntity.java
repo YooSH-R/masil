@@ -57,4 +57,8 @@ public class RobotPairingJpaEntity {
     public Instant getUnpairedAt() {
         return unpairedAt;
     }
+
+    public void unpair(Instant now) {
+        unpairedAt = now.isBefore(pairedAt) ? pairedAt : now;
+    }
 }

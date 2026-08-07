@@ -11,4 +11,6 @@ public interface SpringDataRobotCredentialRepository
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<RobotCredentialJpaEntity> findByQrTokenHash(String qrTokenHash);
+
+    Optional<RobotCredentialJpaEntity> findFirstByQrTokenHash(String qrTokenHash);
 }

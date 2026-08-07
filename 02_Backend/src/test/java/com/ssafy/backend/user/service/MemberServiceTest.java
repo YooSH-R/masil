@@ -9,7 +9,6 @@ import com.ssafy.backend.user.infrastructure.persistence.SpringDataUserRepositor
 import com.ssafy.backend.user.infrastructure.persistence.UserJpaEntity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -22,7 +21,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,7 +43,7 @@ class MemberServiceTest {
     }
 
     @Test
-    void translatesNicknameConstraintWithoutQueryingFailedTransaction() {
+    void allowsChangingToANameUsedByAnotherUser() {
         UserJpaEntity user = new UserJpaEntity(
                 "member@example.com",
                 "password-hash",
@@ -56,28 +54,13 @@ class MemberServiceTest {
         ReflectionTestUtils.setField(user, "id", 1L);
         when(userRepository.findById(1L))
                 .thenReturn(Optional.of(user));
-        when(userRepository.existsByNicknameAndDeletedAtIsNullAndIdNot(
-                "중복닉네임",
-                1L
-        )).thenReturn(false);
-        doThrow(new DataIntegrityViolationException(
-                "constraint [uq_users_nickname]"
-        )).when(userRepository).flush();
-
-        ApiException exception = assertThrows(
-                ApiException.class,
-                () -> memberService.updateMember(
-                        1L,
-                        new UpdateMemberRequest("중복닉네임", null, null)
-                )
+        memberService.updateMember(
+                1L,
+                new UpdateMemberRequest("중복닉네임", null, null)
         );
 
-        assertEquals("NICKNAME_ALREADY_IN_USE", exception.getCode());
-        verify(userRepository, times(1))
-                .existsByNicknameAndDeletedAtIsNullAndIdNot(
-                        "중복닉네임",
-                        1L
-                );
+        assertEquals("중복닉네임", user.getNickname());
+        verify(userRepository).flush();
     }
 
     @Test
@@ -92,10 +75,6 @@ class MemberServiceTest {
         ReflectionTestUtils.setField(user, "id", 1L);
         when(userRepository.findById(1L))
                 .thenReturn(Optional.of(user));
-        when(userRepository.existsByNicknameAndDeletedAtIsNullAndIdNot(
-                "새닉네임",
-                1L
-        )).thenReturn(false);
         doThrow(new ObjectOptimisticLockingFailureException(
                 UserJpaEntity.class,
                 1L

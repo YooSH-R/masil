@@ -5,6 +5,7 @@ import com.ssafy.backend.common.ApiResponse;
 import com.ssafy.backend.robot.application.RobotPairingRateLimiter;
 import com.ssafy.backend.robot.application.RobotPairingResult;
 import com.ssafy.backend.robot.application.RobotPairingService;
+import com.ssafy.backend.robot.application.RobotRegistrationPreview;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
@@ -56,6 +57,42 @@ public class RobotPairingController {
                 .body(ApiResponse.success(RobotPairingResponse.from(result)));
     }
 
+    @Operation(summary = "QR 기기 등록 가능 여부 확인")
+    @SecurityRequirement(name = "bearerAuth")
+    @PostMapping("/registrations/validate")
+    public ResponseEntity<ApiResponse<RobotRegistrationPreviewResponse>> validateRegistration(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody RobotRegistrationValidationRequest request
+    ) {
+        Long userId = principal.userId();
+        rateLimiter.checkAllowed(userId);
+        RobotRegistrationPreview preview = pairingService.validateRegistration(
+                userId,
+                request.qrToken()
+        );
+        return ResponseEntity.ok(
+                ApiResponse.success(RobotRegistrationPreviewResponse.from(preview))
+        );
+    }
+
+    @Operation(summary = "QR 검증 후 새 펫 생성 및 기기 등록")
+    @SecurityRequirement(name = "bearerAuth")
+    @PostMapping("/registrations")
+    public ResponseEntity<ApiResponse<RobotPairingResponse>> registerNewPet(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody RobotRegistrationRequest request
+    ) {
+        Long userId = principal.userId();
+        rateLimiter.checkAllowed(userId);
+        RobotPairingResult result = pairingService.registerNewPet(
+                userId,
+                request.petName(),
+                request.qrToken()
+        );
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(RobotPairingResponse.from(result)));
+    }
+
     public record RobotPairingRequest(
             @NotNull @Positive Long petId,
             @NotBlank
@@ -63,6 +100,39 @@ public class RobotPairingController {
             @Pattern(regexp = "^[A-Za-z0-9_-]+$")
             String qrToken
     ) {
+    }
+
+    public record RobotRegistrationValidationRequest(
+            @NotBlank
+            @Size(min = 43, max = 512)
+            @Pattern(regexp = "^[A-Za-z0-9_-]+$")
+            String qrToken
+    ) {
+    }
+
+    public record RobotRegistrationRequest(
+            @NotBlank @Size(max = 100) String petName,
+            @NotBlank
+            @Size(min = 43, max = 512)
+            @Pattern(regexp = "^[A-Za-z0-9_-]+$")
+            String qrToken
+    ) {
+    }
+
+    public record RobotRegistrationPreviewResponse(
+            String serialNumber,
+            String modelName,
+            String firmwareVersion,
+            String registrationStatus
+    ) {
+        static RobotRegistrationPreviewResponse from(RobotRegistrationPreview preview) {
+            return new RobotRegistrationPreviewResponse(
+                    preview.serialNumber(),
+                    preview.modelName(),
+                    preview.firmwareVersion(),
+                    "AVAILABLE"
+            );
+        }
     }
 
     public record RobotPairingResponse(

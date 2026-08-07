@@ -159,12 +159,6 @@ public class MemberService {
         if (nickname == null || nickname.equals(user.getNickname())) {
             return;
         }
-        if (userRepository.existsByNicknameAndDeletedAtIsNullAndIdNot(
-                nickname,
-                user.getId()
-        )) {
-            throw nicknameAlreadyInUse();
-        }
         user.changeNickname(nickname);
     }
 
@@ -273,10 +267,6 @@ public class MemberService {
             DataIntegrityViolationException exception
     ) {
         String constraintName = findConstraintName(exception);
-        if (constraintName.contains("uq_users_nickname")
-                || constraintName.contains("users_nickname_key")) {
-            return nicknameAlreadyInUse();
-        }
         if (constraintName.contains("uq_users_phone_number")
                 || constraintName.contains("users_phone_number_key")) {
             return phoneNumberAlreadyInUse();
@@ -298,14 +288,6 @@ public class MemberService {
             cause = cause.getCause();
         }
         return messages.toString().toLowerCase(Locale.ROOT);
-    }
-
-    private ApiException nicknameAlreadyInUse() {
-        return new ApiException(
-                HttpStatus.CONFLICT,
-                "NICKNAME_ALREADY_IN_USE",
-                "이미 사용 중인 닉네임입니다."
-        );
     }
 
     private ApiException phoneNumberAlreadyInUse() {

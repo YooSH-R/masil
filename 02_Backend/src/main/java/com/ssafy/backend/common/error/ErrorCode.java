@@ -13,7 +13,6 @@ public enum ErrorCode {
             "디바이스 인증 토큰이 올바르지 않거나 만료되었습니다."
     ),
     AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, "인증이 필요합니다."),
-    NICKNAME_DUPLICATED(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
     SOCIAL_ACCOUNT_ALREADY_LINKED(HttpStatus.CONFLICT, "이미 연결된 소셜 계정입니다."),
     PET_NOT_FOUND(HttpStatus.NOT_FOUND, "반려봇 정보를 찾을 수 없습니다."),
     PET_AFFINITY_STATE_NOT_FOUND(

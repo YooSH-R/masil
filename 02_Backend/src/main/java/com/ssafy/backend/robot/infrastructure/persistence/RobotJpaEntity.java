@@ -63,4 +63,12 @@ public class RobotJpaEntity {
         }
     }
 
+    public void releaseOwnership(Long userId, Instant now) {
+        if (ownerUserId != null && ownerUserId.equals(userId)) {
+            ownerUserId = null;
+            ownershipClaimedAt = null;
+            updatedAt = now;
+        }
+    }
+
 }

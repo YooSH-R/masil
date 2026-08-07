@@ -6,7 +6,6 @@ import com.ssafy.backend.auth.application.service.CompleteSocialSignupService;
 import com.ssafy.backend.auth.application.service.GoogleAuthenticationService;
 import com.ssafy.backend.auth.application.service.KakaoAuthenticationService;
 import com.ssafy.backend.common.api.ApiResponse;
-import com.ssafy.backend.user.application.port.out.UserRepository;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -14,11 +13,9 @@ import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
@@ -33,18 +30,15 @@ public class SocialAuthenticationController {
     private final GoogleAuthenticationService googleAuthenticationService;
     private final KakaoAuthenticationService kakaoAuthenticationService;
     private final CompleteSocialSignupService completeSocialSignupService;
-    private final UserRepository userRepository;
 
     public SocialAuthenticationController(
             GoogleAuthenticationService googleAuthenticationService,
             KakaoAuthenticationService kakaoAuthenticationService,
-            CompleteSocialSignupService completeSocialSignupService,
-            UserRepository userRepository
+            CompleteSocialSignupService completeSocialSignupService
     ) {
         this.googleAuthenticationService = googleAuthenticationService;
         this.kakaoAuthenticationService = kakaoAuthenticationService;
         this.completeSocialSignupService = completeSocialSignupService;
-        this.userRepository = userRepository;
     }
 
     @PostMapping("/auth/oauth/google")
@@ -80,18 +74,6 @@ public class SocialAuthenticationController {
         );
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(AuthenticationResponse.from(result)));
-    }
-
-    @GetMapping("/users/nickname-availability")
-    public ApiResponse<NicknameAvailabilityResponse> checkNickname(
-            @RequestParam
-            @Pattern(regexp = NICKNAME_PATTERN)
-            String nickname
-    ) {
-        return ApiResponse.success(new NicknameAvailabilityResponse(
-                nickname,
-                !userRepository.existsByNickname(nickname)
-        ));
     }
 
     public record GoogleAuthenticationRequest(
@@ -196,6 +178,4 @@ public class SocialAuthenticationController {
     ) {
     }
 
-    public record NicknameAvailabilityResponse(String nickname, boolean available) {
-    }
 }

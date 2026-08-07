@@ -19,10 +19,6 @@ import java.util.UUID;
         name = "users",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uq_users_nickname",
-                        columnNames = "nickname"
-                ),
-                @UniqueConstraint(
                         name = "uq_users_phone_number",
                         columnNames = "phone_number"
                 )

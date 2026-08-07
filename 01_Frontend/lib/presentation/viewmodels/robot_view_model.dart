@@ -18,6 +18,29 @@ class RobotViewModel extends BaseViewModel {
   bool get isConnected => _robot?.online ?? false;
   bool get hasRobot => _robot != null;
 
+  Future<bool> validateRegistrationQr(String qrToken) async {
+    await guard(
+        () => _robotRepository.validateRegistrationQr(qrToken: qrToken));
+    return !hasError;
+  }
+
+  Future<bool> registerNewPet({
+    required String qrToken,
+    required String petName,
+  }) async {
+    final pairing = await guard(() => _robotRepository.registerNewPet(
+          qrToken: qrToken,
+          petName: petName,
+        ));
+    if (pairing == null) return false;
+
+    _pairing = pairing;
+    _pendingQrToken = null;
+    safeNotify();
+    await loadStatus(silent: true);
+    return pairing.isPaired;
+  }
+
   /// GET /robots/{robotId}/status — 캐시된 robotId 기준.
   Future<void> loadStatus({bool silent = false}) async {
     final robot = await guard<Robot?>(
@@ -97,14 +120,21 @@ class RobotViewModel extends BaseViewModel {
     return true;
   }
 
+  void clearAfterPetDeletion() {
+    _robot = null;
+    _pairing = null;
+    _pendingQrToken = null;
+    stopWatching();
+    safeNotify();
+  }
+
   /// 연결 관리 화면에서 상태를 주기적으로 갱신.
   void startWatching({Duration interval = const Duration(seconds: 10)}) {
     final id = _robot?.id;
     if (id == null || _watchSub != null) return;
 
-    _watchSub = _robotRepository
-        .watchStatus(id, interval: interval)
-        .listen((robot) {
+    _watchSub =
+        _robotRepository.watchStatus(id, interval: interval).listen((robot) {
       _robot = robot;
       safeNotify();
     });
