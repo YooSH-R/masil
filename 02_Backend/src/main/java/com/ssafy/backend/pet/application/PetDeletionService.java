@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Objects;
 
 @Service
 public class PetDeletionService {
@@ -45,19 +46,37 @@ public class PetDeletionService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.PET_NOT_FOUND));
         Instant now = clock.instant();
 
-        pairingRepository.findActiveByPetIdForUpdate(petId)
-                .ifPresent(pairing -> unpairAndReleaseRobot(userId, pairing, now));
+        pairingRepository.findByPetIdAndUnpairedAtIsNull(petId)
+                .ifPresent(pairing -> unpairAndReleaseRobot(
+                        userId,
+                        petId,
+                        pairing,
+                        now
+                ));
         pet.softDelete(now);
     }
 
     private void unpairAndReleaseRobot(
             Long userId,
-            RobotPairingJpaEntity pairing,
+            Long petId,
+            RobotPairingJpaEntity pairingSnapshot,
             Instant now
     ) {
         RobotJpaEntity robot = robotRepository
-                .findByIdForUpdate(pairing.getRobotId())
+                .findByIdForUpdate(pairingSnapshot.getRobotId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REQUEST));
+
+        RobotPairingJpaEntity pairing = pairingRepository
+                .findActiveByPetIdForUpdate(petId)
+                .orElse(null);
+        if (pairing == null) {
+            return;
+        }
+        if (!Objects.equals(pairing.getPetId(), petId)
+                || !Objects.equals(pairing.getRobotId(), robot.getId())) {
+            throw new BusinessException(ErrorCode.ROBOT_PAIRING_STATE_CONFLICT);
+        }
+
         pairing.unpair(now);
         robot.releaseOwnership(userId, now);
     }

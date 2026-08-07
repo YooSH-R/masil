@@ -10,6 +10,7 @@ import com.ssafy.backend.robot.infrastructure.persistence.SpringDataRobotPairing
 import com.ssafy.backend.robot.infrastructure.persistence.SpringDataRobotRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -20,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -55,13 +57,20 @@ class PetDeletionServiceTest {
         RobotJpaEntity robot = mock(RobotJpaEntity.class);
         when(petRepository.findByIdAndUserIdAndDeletedAtIsNull(PET_ID, USER_ID))
                 .thenReturn(Optional.of(pet));
-        when(pairingRepository.findActiveByPetIdForUpdate(PET_ID))
+        when(pairingRepository.findByPetIdAndUnpairedAtIsNull(PET_ID))
                 .thenReturn(Optional.of(pairing));
         when(pairing.getRobotId()).thenReturn(ROBOT_ID);
+        when(pairing.getPetId()).thenReturn(PET_ID);
         when(robotRepository.findByIdForUpdate(ROBOT_ID)).thenReturn(Optional.of(robot));
+        when(robot.getId()).thenReturn(ROBOT_ID);
+        when(pairingRepository.findActiveByPetIdForUpdate(PET_ID))
+                .thenReturn(Optional.of(pairing));
 
         service.delete(USER_ID, PET_ID);
 
+        InOrder locks = inOrder(robotRepository, pairingRepository);
+        locks.verify(robotRepository).findByIdForUpdate(ROBOT_ID);
+        locks.verify(pairingRepository).findActiveByPetIdForUpdate(PET_ID);
         verify(pairing).unpair(NOW);
         verify(robot).releaseOwnership(USER_ID, NOW);
         verify(pet).softDelete(NOW);
@@ -73,13 +82,63 @@ class PetDeletionServiceTest {
         PetJpaEntity pet = mock(PetJpaEntity.class);
         when(petRepository.findByIdAndUserIdAndDeletedAtIsNull(PET_ID, USER_ID))
                 .thenReturn(Optional.of(pet));
-        when(pairingRepository.findActiveByPetIdForUpdate(PET_ID))
+        when(pairingRepository.findByPetIdAndUnpairedAtIsNull(PET_ID))
                 .thenReturn(Optional.empty());
 
         service.delete(USER_ID, PET_ID);
 
         verify(pet).softDelete(NOW);
         verify(robotRepository, never()).findByIdForUpdate(ROBOT_ID);
+    }
+
+    @Test
+    void stopsWhenPairingDisappearsAfterRobotLock() {
+        PetJpaEntity pet = mock(PetJpaEntity.class);
+        RobotPairingJpaEntity snapshot = mock(RobotPairingJpaEntity.class);
+        RobotJpaEntity robot = mock(RobotJpaEntity.class);
+        when(petRepository.findByIdAndUserIdAndDeletedAtIsNull(PET_ID, USER_ID))
+                .thenReturn(Optional.of(pet));
+        when(pairingRepository.findByPetIdAndUnpairedAtIsNull(PET_ID))
+                .thenReturn(Optional.of(snapshot));
+        when(snapshot.getRobotId()).thenReturn(ROBOT_ID);
+        when(robotRepository.findByIdForUpdate(ROBOT_ID)).thenReturn(Optional.of(robot));
+        when(pairingRepository.findActiveByPetIdForUpdate(PET_ID))
+                .thenReturn(Optional.empty());
+
+        service.delete(USER_ID, PET_ID);
+
+        verify(robot, never()).releaseOwnership(USER_ID, NOW);
+        verify(pet).softDelete(NOW);
+    }
+
+    @Test
+    void rejectsPairingChangedToAnotherRobotAfterLock() {
+        Long changedRobotId = 4L;
+        PetJpaEntity pet = mock(PetJpaEntity.class);
+        RobotPairingJpaEntity snapshot = mock(RobotPairingJpaEntity.class);
+        RobotPairingJpaEntity changedPairing = mock(RobotPairingJpaEntity.class);
+        RobotJpaEntity robot = mock(RobotJpaEntity.class);
+        when(petRepository.findByIdAndUserIdAndDeletedAtIsNull(PET_ID, USER_ID))
+                .thenReturn(Optional.of(pet));
+        when(pairingRepository.findByPetIdAndUnpairedAtIsNull(PET_ID))
+                .thenReturn(Optional.of(snapshot));
+        when(snapshot.getRobotId()).thenReturn(ROBOT_ID);
+        when(robotRepository.findByIdForUpdate(ROBOT_ID)).thenReturn(Optional.of(robot));
+        when(robot.getId()).thenReturn(ROBOT_ID);
+        when(pairingRepository.findActiveByPetIdForUpdate(PET_ID))
+                .thenReturn(Optional.of(changedPairing));
+        when(changedPairing.getPetId()).thenReturn(PET_ID);
+        when(changedPairing.getRobotId()).thenReturn(changedRobotId);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.delete(USER_ID, PET_ID)
+        );
+
+        assertEquals(ErrorCode.ROBOT_PAIRING_STATE_CONFLICT, exception.errorCode());
+        verify(changedPairing, never()).unpair(NOW);
+        verify(robot, never()).releaseOwnership(USER_ID, NOW);
+        verify(pet, never()).softDelete(NOW);
     }
 
     @Test
