@@ -97,13 +97,16 @@ class PetRepositoryImpl implements PetRepository {
     required int petId,
     required String name,
     String? profileImage,
+    int? dailyWalkCount,
   }) async {
     final data = await _client.patch(
       ApiEndpoints.pet(petId),
       // name 은 서버에서 required 다. 조건부로 빼면 사진만 바꿀 때 400 이 난다.
+      // dailyWalkCount 는 부분 수정이라 보내지 않으면 서버가 기존 값을 유지한다.
       data: {
         'name': name,
         if (profileImage != null) 'profileImage': profileImage,
+        if (dailyWalkCount != null) 'dailyWalkCount': dailyWalkCount,
       },
     );
     return PetModel.fromJson(Json.asMap(data));

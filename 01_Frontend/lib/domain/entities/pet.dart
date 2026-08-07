@@ -73,14 +73,23 @@ class Pet {
   const Pet({
     required this.id,
     required this.name,
+    this.dailyWalkCount = defaultDailyWalkCount,
     this.profileImageUrl,
     this.affinity,
     this.robot,
     this.createdAt,
   });
 
+  /// 서버 `PetJpaEntity.DEFAULT_DAILY_WALK_COUNT` 와 같은 값이다.
+  static const int defaultDailyWalkCount = 2;
+  static const int minDailyWalkCount = 1;
+  static const int maxDailyWalkCount = 24;
+
   final int id;
   final String name;
+
+  /// 하루 산책 횟수. 마실이가 산책을 조르는 간격을 정한다.
+  final int dailyWalkCount;
   final String? profileImageUrl;
   final Affinity? affinity;
   final PairedRobotSummary? robot;

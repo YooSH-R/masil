@@ -8,10 +8,13 @@ import com.ssafy.backend.pet.application.PetDeletionService;
 import com.ssafy.backend.pet.application.PetProfileResult;
 import com.ssafy.backend.pet.application.PetRobotResult;
 import com.ssafy.backend.pet.application.PetService;
+import com.ssafy.backend.pet.infrastructure.persistence.PetJpaEntity;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Null;
 import jakarta.validation.constraints.Pattern;
@@ -110,7 +113,12 @@ public class PetController {
             @Valid @RequestBody UpdatePetRequest request
     ) {
         return ApiResponse.success(PetProfileResponse.from(
-                petService.update(principal.userId(), petId, request.name())
+                petService.update(
+                        principal.userId(),
+                        petId,
+                        request.name(),
+                        request.dailyWalkCount()
+                )
         ));
     }
 
@@ -135,7 +143,11 @@ public class PetController {
     public record UpdatePetRequest(
             @NotBlank @Size(max = 100) String name,
             @Null(message = "프로필 이미지 업로드는 현재 지원하지 않습니다.")
-            String profileImage
+            String profileImage,
+            /// 하루 산책 횟수. 보내지 않으면 기존 값을 유지한다.
+            @Min(PetJpaEntity.MIN_DAILY_WALK_COUNT)
+            @Max(PetJpaEntity.MAX_DAILY_WALK_COUNT)
+            Integer dailyWalkCount
     ) {
     }
 
@@ -159,6 +171,7 @@ public class PetController {
             Long petId,
             String name,
             String profileImageUrl,
+            int dailyWalkCount,
             AffinityResponse affinity,
             RobotResponse robot
     ) {
@@ -167,6 +180,7 @@ public class PetController {
                     result.petId(),
                     result.name(),
                     result.profileImageUrl(),
+                    result.dailyWalkCount(),
                     AffinityResponse.from(result.affinity()),
                     RobotResponse.from(result.robot())
             );

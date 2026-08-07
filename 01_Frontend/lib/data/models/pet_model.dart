@@ -82,6 +82,7 @@ class PetModel extends Pet {
   const PetModel({
     required super.id,
     required super.name,
+    super.dailyWalkCount,
     super.profileImageUrl,
     super.affinity,
     super.robot,
@@ -94,6 +95,11 @@ class PetModel extends Pet {
     return PetModel(
       id: Json.asInt(json['petId'] ?? json['id']),
       name: Json.asString(json['name']),
+      // 이 항목이 없던 시기의 응답(펫 생성 응답 등)도 기본값으로 받아준다.
+      dailyWalkCount: Json.asInt(
+        json['dailyWalkCount'],
+        fallback: Pet.defaultDailyWalkCount,
+      ),
       profileImageUrl: Json.asStringOrNull(
         json['profileImageUrl'] ?? json['profileImage'],
       ),
