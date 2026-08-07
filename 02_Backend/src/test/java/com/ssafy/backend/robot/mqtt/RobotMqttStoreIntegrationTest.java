@@ -1,5 +1,6 @@
 package com.ssafy.backend.robot.mqtt;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -30,6 +31,26 @@ class RobotMqttStoreIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @BeforeEach
+    void setUpPairedPet() {
+        jdbcTemplate.update("""
+                INSERT INTO pets (id, user_id, name, created_at, updated_at)
+                VALUES (900001, 900001, 'mqtt-test-pet', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """);
+        jdbcTemplate.update("""
+                INSERT INTO robot_pairings (pet_id, robot_id, paired_at)
+                VALUES (900001, 900001, CURRENT_TIMESTAMP)
+                """);
+        jdbcTemplate.update("""
+                INSERT INTO pet_affinity_states (
+                    pet_id, affinity_score, affinity_level, mood,
+                    last_interaction_at, updated_at
+                ) VALUES (
+                    900001, 50, 3, 'FRIENDLY', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                )
+                """);
+    }
 
     @Test
     void storesAffinityEventAndReadsIdempotentResult() {
