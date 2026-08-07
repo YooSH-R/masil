@@ -255,7 +255,7 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     final labels = ['일', '월', '화', '수', '목', '금', '토'];
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(25),
@@ -295,8 +295,8 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 7,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
+              mainAxisExtent: 44,
+              mainAxisSpacing: 4,
             ),
             itemCount: daysInMonth + startWeekday,
             itemBuilder: (context, index) {
@@ -315,37 +315,45 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
                   today.day == date.day;
 
               return GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: () => _selectDate(date),
                 child: Stack(
+                  fit: StackFit.expand,
                   alignment: Alignment.center,
                   children: [
                     if (isSelected)
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: const BoxDecoration(
-                            color: Color(0xFFC67C4E), shape: BoxShape.circle),
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: const BoxDecoration(
+                              color: Color(0xFFC67C4E), shape: BoxShape.circle),
+                        ),
                       )
                     else if (isToday)
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                              color: const Color(0xFFC67C4E), width: 1),
-                          shape: BoxShape.circle,
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                                color: const Color(0xFFC67C4E), width: 1),
+                            shape: BoxShape.circle,
+                          ),
                         ),
                       ),
-                    Text(
-                      day.toString(),
-                      style: TextStyle(
-                        color: isSelected
-                            ? Colors.white
-                            : (hasLog
-                                ? const Color(0xFF5D4037)
-                                : Colors.grey.shade400),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                    Center(
+                      child: Text(
+                        day.toString(),
+                        style: TextStyle(
+                          color: isSelected
+                              ? Colors.white
+                              : (hasLog
+                                  ? const Color(0xFF5D4037)
+                                  : Colors.grey.shade400),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                     if (hasLog && !isSelected)
@@ -558,7 +566,7 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
         Row(
           children: [
             _buildMiniStatCard(Icons.timer_outlined, stats.durationLabel,
-                '산책 시간', const Color(0xFFF9F3E7)),
+                '산책 시간', const Color(0xFFE8EDF8)),
             const SizedBox(width: 16),
             _buildMiniStatCard(Icons.straighten, stats.averageDistanceLabel,
                 '평균 거리', const Color(0xFFFFF8F1)),

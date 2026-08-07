@@ -3,13 +3,21 @@ import '../../domain/entities/pet.dart';
 
 const _moodMapping = <String, PetMood>{
   'HAPPY': PetMood.happy,
-  'NEUTRAL': PetMood.neutral,
-  'LONELY': PetMood.lonely,
-  'SLEEPING': PetMood.sleeping,
-  'EXCITED': PetMood.excited,
-  // 현재 로컬 백엔드 시드와 MQTT 친밀도 상태값.
-  'FRIENDLY': PetMood.happy,
+  'FRIENDLY': PetMood.friendly,
+  'CALM': PetMood.calm,
+  'WARY': PetMood.wary,
+  // 과거 API 상태값도 관계 단계로 안전하게 호환한다.
+  'LONELY': PetMood.wary,
+  'SLEEPING': PetMood.calm,
+  'EXCITED': PetMood.happy,
 };
+
+PetMood _relationshipFromScore(int score) {
+  if (score >= 80) return PetMood.happy;
+  if (score >= 50) return PetMood.friendly;
+  if (score >= 20) return PetMood.calm;
+  return PetMood.wary;
+}
 
 class AffinityModel extends Affinity {
   const AffinityModel({
@@ -22,10 +30,13 @@ class AffinityModel extends Affinity {
   });
 
   factory AffinityModel.fromJson(Map<String, dynamic> json) {
+    final score = Json.asInt(json['score']);
+    final moodKey = Json.asString(json['mood']).toUpperCase();
     return AffinityModel(
-      score: Json.asInt(json['score']),
+      score: score,
       level: Json.asInt(json['level'], fallback: 1),
-      mood: Json.asEnum(json['mood'], _moodMapping, PetMood.neutral),
+      // 현재 서버 상태값을 우선하고, 과거 NEUTRAL 또는 누락 값은 점수로 판정한다.
+      mood: _moodMapping[moodKey] ?? _relationshipFromScore(score),
       change: Json.asIntOrNull(json['change']),
       changeReason: Json.asStringOrNull(json['changeReason']),
       updatedAt: Json.asDateTime(json['updatedAt']),
