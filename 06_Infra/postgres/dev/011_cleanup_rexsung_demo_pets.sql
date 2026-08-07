@@ -68,8 +68,12 @@ WHERE credential.robot_id = robot.id
 DELETE FROM pets pet
 WHERE pet.id IN (SELECT id FROM cleanup_demo_pets);
 
+-- 정리 대상이 하나도 없었으면 키를 남기지 않는다. 무조건 기록하면 아무 일도
+-- 하지 않은 실행이 "완료"로 박히고, 위의 device-001 QR 해시 보정까지 영구히
+-- 비활성화된다. 실제로 그렇게 되어 dev 의 QR 등록이 막혔다.
 INSERT INTO dev_maintenance_runs (maintenance_key)
-VALUES ('011_cleanup_rexsung_demo_pets')
+SELECT '011_cleanup_rexsung_demo_pets'
+WHERE EXISTS (SELECT 1 FROM cleanup_demo_pets)
 ON CONFLICT (maintenance_key) DO NOTHING;
 
 COMMIT;

@@ -148,6 +148,33 @@ export QR_EXPIRES_DAYS=7
 export DEVICE_TOKEN_EXPIRES_DAYS=365
 ```
 
+#### dev 클러스터를 대상으로 실행
+
+기본 대상은 로컬 docker 컨테이너입니다. `POSTGRES_BACKEND=kubectl`을 주면
+같은 스크립트로 dev 클러스터의 `postgres-0`에 직접 적용합니다. 이 옵션이
+없던 동안 QR 이미지는 발급됐는데 클러스터 DB에는 해시가 들어가지 않아,
+앱이 QR을 정상으로 읽고도 서버가 `INVALID_QR_TOKEN`을 내는 상태가
+device-001~003에서 발생했습니다.
+
+```bash
+POSTGRES_BACKEND=kubectl K8S_NAMESPACE=s15a203-dev \
+  ./scripts/provision-robot-qr.sh --device-token-only device-001
+```
+
+`KUBECTL_BIN`(기본 `kubectl`)과 `POSTGRES_POD`(기본 `postgres-0`)로 세부
+대상을 바꿀 수 있습니다. 스크립트로 넘어가는 값은 SHA-256 해시와
+메타데이터뿐이고 `qr_token`·`device_token` 원문은 로컬 셸을 벗어나지
+않으며 성공 출력에서 한 번만 표시됩니다.
+
+#### 시연 기기의 QR 해시
+
+dev 클러스터의 시연 기기 QR 해시는 `dev/014`, `dev/015` 마이그레이션이
+관리합니다. 두 파일은 해시만 담고 QR 원문은 Git에 두지 않습니다. QR을 새로
+발급하면 해당 파일의 해시도 함께 갱신해야 합니다.
+
+- `dev/014_reset_device001_qr_token.sql` — device-001
+- `dev/015_sync_demo_device_qr_tokens.sql` — device-002, device-003
+
 ### 주의
 
 - 초기 SQL은 PVC가 비어 있는 최초 기동에만 자동 실행됩니다.
@@ -155,7 +182,15 @@ export DEVICE_TOKEN_EXPIRES_DAYS=365
 - 기존 PVC가 있는 상태에서 Secret의 비밀번호만 바꾸면 실제 DB 비밀번호는 자동 변경되지 않습니다.
 - 운영 스키마 변경은 이후 Flyway 같은 마이그레이션 도구로 관리해야 합니다.
 - `init/007_walk_diaries.sql` 이후 변경도 반드시 별도 번호의 멱등성
-  마이그레이션 파일로 추가하고 Jenkins 적용 목록에 포함합니다.
+  마이그레이션 파일로 추가하고 Jenkins 적용 목록에 포함합니다. 목록에 넣지
+  않으면 파일만 있고 한 번도 적용되지 않습니다(`dev/012`가 그 상태였습니다).
+- `dev_maintenance_runs`에 키를 남기는 일회성 마이그레이션은 **실제로 작업이
+  일어났을 때만** 기록해야 합니다. 아무 일도 하지 않은 실행을 "완료"로
+  기록하면 그 파일은 영구히 다시 실행되지 않습니다(`dev/011`이 그렇게
+  device-001 QR 보정을 막았습니다).
+- 마이그레이션 스테이지는 변경 파일 목록으로 실행 여부를 정합니다. 목록을
+  못 구하는 경우 첫 부모와 비교하므로 머지 커밋도 정상 인식되지만, 확인이
+  필요하면 Jenkins에서 `FORCE_MIGRATION` 파라미터로 강제 실행할 수 있습니다.
 - PostgreSQL Service는 클러스터 내부 전용이며 Ingress나 NodePort로 외부에 노출하지 않습니다.
 - PVC를 삭제하면 DB 데이터가 삭제될 수 있으므로 운영에서는 백업 없이 삭제하지 않습니다.
 - QR 등록 Rate Limit은 현재 단일 백엔드 인스턴스 메모리에서 관리됩니다.
