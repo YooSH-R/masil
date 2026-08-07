@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../domain/entities/pet.dart';
 import '../../viewmodels/pet_view_model.dart';
 
-/// 친밀도 · 기분 화면.
+/// 친밀도 상세 화면.
 ///
 /// **어디서 값이 오는가**: `GET /v1/pets/{petId}` 응답의 `affinity`
 /// (`score`·`level`·`mood`)다. 명세서에 있는 `GET /pets/{petId}/affinity` 는
@@ -15,8 +15,6 @@ import '../../viewmodels/pet_view_model.dart';
 /// [PetViewModel.affinity] 가 `_affinity ?? _pet?.affinity` 순으로 돌려주므로,
 /// 전용 엔드포인트가 배포되면 이 화면은 손대지 않아도 그 값을 쓰게 된다.
 ///
-/// 변화 이력(`/affinity/history`)은 아직 배포되지 않았다. 없는 값을 그럴듯하게
-/// 지어내지 않고 "이력이 없다"고 알린다.
 class IntimacyMoodScreen extends StatefulWidget {
   const IntimacyMoodScreen({super.key});
 
@@ -36,9 +34,8 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
       if (petVm.pet == null) {
         petVm.loadCurrentPet(silent: true);
       }
-      // 아래 둘은 아직 미배포다. 조용히 실패하고, 배포되면 값이 채워진다.
+      // 전용 친밀도 API가 배포되면 최신 값으로 덮어쓴다.
       petVm.refreshAffinity();
-      petVm.loadAffinityHistory();
     });
   }
 
@@ -46,7 +43,6 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
   Widget build(BuildContext context) {
     final petVm = context.watch<PetViewModel>();
     final affinity = petVm.affinity;
-    final history = petVm.affinityHistory;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F3E7),
@@ -56,7 +52,7 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
         leading: IconButton(
             icon: const Icon(Icons.chevron_left, color: Color(0xFF5D4037)),
             onPressed: () => context.pop()),
-        title: const Text('친밀도 · 기분',
+        title: const Text('친밀도',
             style: TextStyle(
                 color: Color(0xFF5D4037), fontWeight: FontWeight.bold)),
         centerTitle: true,
@@ -72,8 +68,6 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
                   _buildMoodBanner(affinity.mood),
                   const SizedBox(height: 24),
                   _buildEvolutionCard(affinity.level),
-                  const SizedBox(height: 24),
-                  _buildHistoryCard(history),
                   const SizedBox(height: 40),
                 ],
               ),
@@ -181,7 +175,7 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
   }
 
   Widget _buildMoodBanner(PetMood mood) {
-    final isGood = mood == PetMood.happy || mood == PetMood.excited;
+    final isGood = mood == PetMood.happy || mood == PetMood.friendly;
     final bg = isGood ? const Color(0xFFE8F5E9) : const Color(0xFFFDF7F0);
     final fg = isGood ? const Color(0xFF2E7D32) : const Color(0xFF8D6E63);
 
@@ -193,8 +187,8 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(12),
-            decoration:
-                const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+            decoration: const BoxDecoration(
+                color: Colors.white, shape: BoxShape.circle),
             child: Text(_moodEmoji(mood), style: const TextStyle(fontSize: 24)),
           ),
           const SizedBox(width: 16),
@@ -267,13 +261,16 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
         children: [
           Row(
             children: [
-              if (!isFirst)
-                Expanded(
-                    child: Container(
-                        height: 2,
-                        color: isReached
-                            ? const Color(0xFFC67C4E)
-                            : Colors.grey.shade200)),
+              Expanded(
+                child: Container(
+                  height: 2,
+                  color: isFirst
+                      ? Colors.transparent
+                      : isReached
+                          ? const Color(0xFFC67C4E)
+                          : Colors.grey.shade200,
+                ),
+              ),
               Container(
                 width: 44,
                 height: 44,
@@ -287,95 +284,46 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
                 child: Center(
                     child: Text(icon, style: const TextStyle(fontSize: 20))),
               ),
-              if (!isLast)
-                Expanded(
-                    child: Container(
-                        height: 2,
-                        color: isNextReached
-                            ? const Color(0xFFC67C4E)
-                            : Colors.grey.shade200)),
+              Expanded(
+                child: Container(
+                  height: 2,
+                  color: isLast
+                      ? Colors.transparent
+                      : isNextReached
+                          ? const Color(0xFFC67C4E)
+                          : Colors.grey.shade200,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
-          Text(label,
-              style: TextStyle(
+          SizedBox(
+            height: 32,
+            child: Center(
+              child: Text(
+                label,
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                style: TextStyle(
                   fontSize: 12,
+                  height: 1.2,
                   fontWeight: FontWeight.bold,
-                  color: isReached ? const Color(0xFF5D4037) : Colors.grey)),
-        ],
-      ),
-    );
-  }
-
-  /// 변화 이력. `/pets/{petId}/affinity/history` 가 배포되면 채워진다.
-  Widget _buildHistoryCard(List<AffinityHistoryEntry> history) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(25)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('변화 이력',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 20),
-          if (history.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Text('아직 기록된 변화가 없어요',
-                  style: TextStyle(color: Colors.grey, fontSize: 13)),
-            )
-          else
-            for (var i = 0; i < history.length; i++) ...[
-              if (i > 0) const Divider(height: 32),
-              _buildHistoryItem(history[i]),
-            ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHistoryItem(AffinityHistoryEntry entry) {
-    final isUp = entry.change >= 0;
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-              color: const Color(0xFFF9F3E7),
-              borderRadius: BorderRadius.circular(12)),
-          child: Icon(isUp ? Icons.trending_up : Icons.trending_down,
-              color: const Color(0xFFC67C4E), size: 18),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(entry.reason ?? '친밀도 변화',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 15)),
-              Text(_relativeTime(entry.recordedAt),
-                  style: const TextStyle(color: Colors.grey, fontSize: 12)),
-            ],
+                  color: isReached ? const Color(0xFF5D4037) : Colors.grey,
+                ),
+              ),
+            ),
           ),
-        ),
-        Text('${isUp ? '+' : ''}${entry.change}',
-            style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: isUp ? Colors.green : Colors.redAccent)),
-      ],
+        ],
+      ),
     );
   }
 
-  /// 기분에 맞는 이모지. 문구는 엔티티가, 그림은 화면이 정한다.
+  /// 관계 단계에 맞는 이모지.
   static String _moodEmoji(PetMood mood) => switch (mood) {
+        PetMood.wary => '🥺',
+        PetMood.calm => '🙂',
+        PetMood.friendly => '😊',
         PetMood.happy => '🥰',
-        PetMood.excited => '🤩',
-        PetMood.neutral => '🙂',
-        PetMood.lonely => '🥺',
-        PetMood.sleeping => '😴',
       };
 
   /// 레벨 이름. 서버는 숫자만 주므로 표기는 앱이 정한다.
@@ -385,14 +333,4 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
         3 => '단짝 친구',
         _ => '영혼의 단짝',
       };
-
-  static String _relativeTime(DateTime? at) {
-    if (at == null) return '';
-    final diff = DateTime.now().difference(at.toLocal());
-    if (diff.inMinutes < 1) return '방금';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}분 전';
-    if (diff.inHours < 24) return '${diff.inHours}시간 전';
-    if (diff.inDays < 7) return '${diff.inDays}일 전';
-    return '${at.toLocal().month}월 ${at.toLocal().day}일';
-  }
 }
