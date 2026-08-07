@@ -28,10 +28,10 @@ BEGIN
       AND LOWER(robot.serial_number) = 'device-001';
 
     GET DIAGNOSTICS updated_credentials = ROW_COUNT;
-    IF updated_credentials <> 1 THEN
-        RAISE EXCEPTION
-            'Expected one credential for device-001, updated %',
-            updated_credentials;
+    IF updated_credentials = 0 THEN
+        RAISE NOTICE
+            'Credential for device-001 was not found; retrying on the next deployment';
+        RETURN;
     END IF;
 
     INSERT INTO dev_maintenance_runs (maintenance_key)
