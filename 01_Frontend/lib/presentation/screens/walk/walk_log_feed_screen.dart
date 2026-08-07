@@ -416,37 +416,9 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     showDialog<void>(
       context: context,
       barrierColor: Colors.black87,
-      builder: (dialogContext) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: PageView.builder(
-                controller: PageController(initialPage: initialIndex),
-                itemCount: imageUrls.length,
-                itemBuilder: (_, index) => InteractiveViewer(
-                  child: Image.network(
-                    imageUrls[index],
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Center(
-                      child: Icon(Icons.broken_image_outlined,
-                          size: 48, color: Colors.white54),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('닫기',
-                  style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
+      builder: (_) => _ImageViewerDialog(
+        imageUrls: imageUrls,
+        initialIndex: initialIndex,
       ),
     );
   }
@@ -850,6 +822,139 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
                     fontSize: 13)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 산책일지 사진을 전체 화면으로 넘겨 보는 뷰어.
+///
+/// **왜 StatefulWidget 인가**: 확대 상태를 알아야 하고, [PageController] 를
+/// 한 번만 만들어 폐기해야 한다. `showDialog` 의 builder 안에서 컨트롤러를
+/// 만들면 다이얼로그가 다시 빌드될 때마다 새로 생기고 폐기되지 않는다.
+class _ImageViewerDialog extends StatefulWidget {
+  const _ImageViewerDialog({
+    required this.imageUrls,
+    required this.initialIndex,
+  });
+
+  final List<String> imageUrls;
+  final int initialIndex;
+
+  @override
+  State<_ImageViewerDialog> createState() => _ImageViewerDialogState();
+}
+
+class _ImageViewerDialogState extends State<_ImageViewerDialog> {
+  late final PageController _pageController;
+
+  /// 페이지마다 확대 상태를 따로 가진다. 한 컨트롤러를 공유하면 옆 사진으로
+  /// 넘어갔을 때 앞 사진의 확대·이동이 그대로 따라온다.
+  late final List<TransformationController> _transformControllers;
+
+  late int _currentPage;
+  bool _isZoomed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentPage = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+    _transformControllers = List.generate(
+      widget.imageUrls.length,
+      (_) => TransformationController(),
+    );
+    for (final controller in _transformControllers) {
+      controller.addListener(_syncZoomState);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    for (final controller in _transformControllers) {
+      controller.removeListener(_syncZoomState);
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  /// 확대 중인지 갱신한다.
+  ///
+  /// 확대한 상태에서 가로로 끌면 PageView 가 그 제스처를 가로채 다음 장으로
+  /// 넘겨버린다. 그러면 확대한 부분을 좌우로 훑어볼 수 없다. 확대 중에는
+  /// PageView 의 스크롤을 막아 드래그를 InteractiveViewer 에게 넘긴다.
+  void _syncZoomState() {
+    final scale = _transformControllers[_currentPage]
+        .value
+        .getMaxScaleOnAxis();
+    // 부동소수 오차로 1.0 이 1.0000001 로 나오는 경우가 있어 여유를 둔다.
+    final zoomed = scale > 1.01;
+    if (zoomed != _isZoomed) {
+      setState(() => _isZoomed = zoomed);
+    }
+  }
+
+  void _onPageChanged(int index) {
+    // 넘어간 뒤에도 앞 장이 확대된 채로 남으면, 되돌아왔을 때 갑자기 확대된
+    // 화면이 뜬다. 떠난 장은 원래 배율로 되돌린다.
+    _transformControllers[_currentPage].value = Matrix4.identity();
+    setState(() {
+      _currentPage = index;
+      _isZoomed = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: PageView.builder(
+              controller: _pageController,
+              physics: _isZoomed
+                  ? const NeverScrollableScrollPhysics()
+                  : const PageScrollPhysics(),
+              onPageChanged: _onPageChanged,
+              itemCount: widget.imageUrls.length,
+              itemBuilder: (_, index) => InteractiveViewer(
+                transformationController: _transformControllers[index],
+                minScale: 1,
+                maxScale: 4,
+                child: Image.network(
+                  widget.imageUrls[index],
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Center(
+                    child: Icon(Icons.broken_image_outlined,
+                        size: 48, color: Colors.white54),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (widget.imageUrls.length > 1)
+                Text(
+                  '${_currentPage + 1} / ${widget.imageUrls.length}',
+                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+                ),
+              if (widget.imageUrls.length > 1) const SizedBox(width: 16),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('닫기',
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
