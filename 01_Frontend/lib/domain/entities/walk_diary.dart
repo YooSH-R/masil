@@ -117,7 +117,9 @@ class WalkDiaryFeedItem {
     this.durationSeconds,
     this.distanceMeters,
     this.thumbnailUrl,
+    this.imageUrls = const [],
     this.summary,
+    this.markdown,
     this.deviceId,
     this.session,
   });
@@ -127,7 +129,16 @@ class WalkDiaryFeedItem {
   final int? durationSeconds;
   final int? distanceMeters;
   final String? thumbnailUrl;
+
+  /// 세션의 이미지 전부(`event_01` → `event_04` 순서). 상세 조회 후에 채워진다.
+  final List<String> imageUrls;
+
+  /// 목록에 보여줄 한 줄. 마크다운 기호를 걷어낸 평문이다.
   final String? summary;
+
+  /// 일지 원문(마크다운). 서식을 살려 그리려면 이 값을 쓴다.
+  final String? markdown;
+
   final String? deviceId;
   final int? session;
 
@@ -135,7 +146,9 @@ class WalkDiaryFeedItem {
 
   WalkDiaryFeedItem copyWith({
     String? thumbnailUrl,
+    List<String>? imageUrls,
     String? summary,
+    String? markdown,
   }) =>
       WalkDiaryFeedItem(
         walkId: walkId,
@@ -143,7 +156,9 @@ class WalkDiaryFeedItem {
         durationSeconds: durationSeconds,
         distanceMeters: distanceMeters,
         thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+        imageUrls: imageUrls ?? this.imageUrls,
         summary: summary ?? this.summary,
+        markdown: markdown ?? this.markdown,
         deviceId: deviceId,
         session: session,
       );
@@ -161,7 +176,7 @@ class WalkDiaryContent {
     required this.deviceId,
     required this.walkDate,
     required this.session,
-    required this.imageUrl,
+    required this.imageUrls,
     required this.markdown,
     this.imageUrlExpiresAt,
   });
@@ -169,7 +184,14 @@ class WalkDiaryContent {
   final String deviceId;
   final DateTime walkDate;
   final int session;
-  final String imageUrl;
+
+  /// 세션의 이미지 전부. 서버가 `event_01 → event_04` 순서로 준다.
+  /// 예전 세션은 `story_image.png` 한 장뿐이라 길이가 1일 수 있다.
+  final List<String> imageUrls;
+
   final String markdown;
   final DateTime? imageUrlExpiresAt;
+
+  /// 대표 이미지(첫 장). 목록 썸네일에 쓴다.
+  String? get coverImageUrl => imageUrls.isEmpty ? null : imageUrls.first;
 }

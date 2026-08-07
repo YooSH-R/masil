@@ -6,6 +6,7 @@ import '../../../core/services/sample_walk_diaries.dart';
 import '../../../core/utils/korea_time.dart';
 import '../../../domain/entities/walk_diary.dart';
 import '../../viewmodels/walk_diary_view_model.dart';
+import '../../widgets/markdown_view.dart';
 
 /// 산책 일지. GET /walk-diaries 로 받은 기록을 달력에 표시하고,
 /// 날짜를 누르면 그 날의 장소·거리·시간을 보여준다.
@@ -379,6 +380,77 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
   /// 산책 사진. 서버 사진을 우선하고, 없으면 예시 asset, 둘 다 없으면 안내 아이콘.
   ///
   /// asset 파일이 빠져 있어도 화면이 깨지지 않게 errorBuilder 로 받아준다.
+  /// 세션의 나머지 사진들. 대표 한 장은 위에 이미 크게 떠 있으므로 여기서는
+  /// 첫 장을 포함한 전체를 작게 늘어놓아, 어느 장을 보고 있는지 알기 쉽게 한다.
+  Widget _buildImageStrip(BuildContext context, List<String> imageUrls) {
+    return SizedBox(
+      height: 72,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: imageUrls.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, index) => GestureDetector(
+          onTap: () => _openImageViewer(context, imageUrls, index),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              width: 72,
+              height: 72,
+              child: _buildWalkImage(
+                thumbnailUrl: imageUrls[index],
+                imageAsset: null,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 사진을 전체 화면으로 넘겨 본다. 72px 썸네일로는 그림을 볼 수 없다.
+  void _openImageViewer(
+    BuildContext context,
+    List<String> imageUrls,
+    int initialIndex,
+  ) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: PageView.builder(
+                controller: PageController(initialPage: initialIndex),
+                itemCount: imageUrls.length,
+                itemBuilder: (_, index) => InteractiveViewer(
+                  child: Image.network(
+                    imageUrls[index],
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Center(
+                      child: Icon(Icons.broken_image_outlined,
+                          size: 48, color: Colors.white54),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('닫기',
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   static Widget _buildWalkImage({
     required String? thumbnailUrl,
     required String? imageAsset,
@@ -621,6 +693,8 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
       showPathButton: !item.isS3Diary,
       // 7월 예시 기록은 서버 사진이 없어 asset 그림을 쓴다.
       imageAsset: SampleWalkDiaries.imageAssetOf(item.walkId),
+      markdown: item.markdown,
+      imageUrls: item.imageUrls,
     );
   }
 
@@ -634,6 +708,8 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     required String? thumbnailUrl,
     required bool showPathButton,
     String? imageAsset,
+    String? markdown,
+    List<String> imageUrls = const [],
   }) {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -684,6 +760,12 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
               ],
             ),
           ),
+          // 한 세션에 event_01~04 로 여러 장이 온다. 대표 한 장은 위에 크게
+          // 띄우고, 나머지는 아래 줄에 눌러 볼 수 있게 늘어놓는다.
+          if (imageUrls.length > 1) ...[
+            const SizedBox(height: 12),
+            _buildImageStrip(context, imageUrls),
+          ],
           const SizedBox(height: 20),
 
           Text(
@@ -699,10 +781,19 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
                 color: Color(0xFF5D4037)),
           ),
           const SizedBox(height: 12),
-          Text(
-            summary ?? '이 산책에 남긴 기록이 아직 없어요.',
-            style: TextStyle(color: Colors.grey.shade700, height: 1.5),
-          ),
+          // 원문이 있으면 서식을 살려 그린다. 마크다운을 Text 로 그대로 뿌리면
+          // `##` 이나 `**` 가 사용자에게 보인다.
+          if (markdown != null && markdown.trim().isNotEmpty)
+            MarkdownView(
+              markdown,
+              baseStyle: TextStyle(
+                  fontSize: 14, height: 1.6, color: Colors.grey.shade700),
+            )
+          else
+            Text(
+              summary ?? '이 산책에 남긴 기록이 아직 없어요.',
+              style: TextStyle(color: Colors.grey.shade700, height: 1.5),
+            ),
           const SizedBox(height: 24),
 
           Row(

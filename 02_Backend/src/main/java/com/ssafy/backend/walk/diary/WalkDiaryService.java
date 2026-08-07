@@ -47,12 +47,27 @@ public class WalkDiaryService {
             WalkDiaryService.class
     );
 
-    private static final String IMAGE_FILE = "story_image.png";
     private static final String MARKDOWN_FILE = "walk_log.md";
+
+    /**
+     * 세션 폴더에 바로 놓인 이미지 파일명.
+     *
+     * <p>한 세션에 {@code event_01.png ~ event_NN.png} 로 여러 장이 올라온다.
+     * 예전 세션은 {@code story_image.png} 한 장뿐이라 둘 다 인정한다. 앵커가
+     * 붙어 있어 {@code flow_panels/event_01.png} 같은 하위 폴더 산출물은
+     * 걸리지 않는다 — 일지에 보여줄 이미지는 세션 폴더 최상위만이다.
+     */
+    private static final Pattern IMAGE_FILE_NAME = Pattern.compile(
+            "^(event_\\d{2}\\.png|story_image\\.png)$"
+    );
     private static final Pattern DIARY_OBJECT = Pattern.compile(
             "^(\\d{4}-\\d{2}-\\d{2})/session([1-6])/"
-                    + "(story_image\\.png|walk_log\\.md)$"
+                    + "(event_\\d{2}\\.png|story_image\\.png|walk_log\\.md)$"
     );
+
+    private static boolean isImageFile(String fileName) {
+        return IMAGE_FILE_NAME.matcher(fileName).matches();
+    }
 
     private final WalkDiaryStore store;
     private final S3Client s3Client;
@@ -83,32 +98,27 @@ public class WalkDiaryService {
                         ErrorCode.WALK_DIARY_NOT_FOUND
                 ));
         String objectPrefix = objectPrefix(deviceId, walkDate, session);
-        String imageKey = objectPrefix + IMAGE_FILE;
         String markdownKey = objectPrefix + MARKDOWN_FILE;
 
         try {
-            requireCompleteDiary(ownedDevice, objectPrefix);
+            List<String> imageKeys = requireCompleteDiary(
+                    ownedDevice,
+                    objectPrefix
+            );
             String markdown = readMarkdown(markdownKey);
             Instant expiresAt = Instant.now().plusSeconds(
                     properties.presignDurationSeconds()
             );
-            String imageUrl = presigner.presignGetObject(
-                    GetObjectPresignRequest.builder()
-                            .signatureDuration(Duration.ofSeconds(
-                                    properties.presignDurationSeconds()
-                            ))
-                            .getObjectRequest(GetObjectRequest.builder()
-                                    .bucket(properties.bucket())
-                                    .key(imageKey)
-                                    .build())
-                            .build()
-            ).url().toString();
+            List<String> imageUrls = imageKeys.stream()
+                    .map(this::presignImage)
+                    .toList();
 
             return new DiaryDetail(
                     deviceId,
                     walkDate,
                     session,
-                    imageUrl,
+                    imageUrls.getFirst(),
+                    imageUrls,
                     expiresAt,
                     markdown
             );
@@ -206,8 +216,10 @@ public class WalkDiaryService {
         ));
 
         return filesByDiary.entrySet().stream()
-                .filter(entry -> entry.getValue().contains(IMAGE_FILE)
-                        && entry.getValue().contains(MARKDOWN_FILE))
+                // 일지와 이미지가 최소 한 장은 있어야 완성된 세션으로 본다.
+                .filter(entry -> entry.getValue().contains(MARKDOWN_FILE)
+                        && entry.getValue().stream()
+                        .anyMatch(WalkDiaryService::isImageFile))
                 .map(Map.Entry::getKey)
                 .sorted(Comparator.comparing(DiaryReference::walkDate)
                         .reversed()
@@ -215,24 +227,53 @@ public class WalkDiaryService {
                 .toList();
     }
 
-    private void requireCompleteDiary(
+    /**
+     * 세션의 이미지 키를 파일명 순서로 돌려준다.
+     *
+     * <p>일지나 이미지가 하나도 없으면 아직 완성되지 않은 세션이므로 404 로
+     * 본다. S3 목록 순서를 믿지 않고 직접 정렬해서 {@code event_01 → event_04}
+     * 순서를 보장한다 — 화면이 이 순서대로 보여준다.
+     */
+    private List<String> requireCompleteDiary(
             WalkDiaryStore.OwnedDevice device,
             String objectPrefix
     ) {
+        List<String> imageKeys = new ArrayList<>();
         Set<String> files = new HashSet<>();
         listObjects(objectPrefix, object -> {
             if (!belongsToCurrentPairing(device, object)) {
                 return;
             }
-            if (object.key().equals(objectPrefix + IMAGE_FILE)) {
-                files.add(IMAGE_FILE);
-            } else if (object.key().equals(objectPrefix + MARKDOWN_FILE)) {
+            String key = object.key();
+            if (!key.startsWith(objectPrefix)) {
+                return;
+            }
+            String fileName = key.substring(objectPrefix.length());
+            if (fileName.equals(MARKDOWN_FILE)) {
                 files.add(MARKDOWN_FILE);
+            } else if (isImageFile(fileName)) {
+                imageKeys.add(key);
             }
         });
-        if (!files.contains(IMAGE_FILE) || !files.contains(MARKDOWN_FILE)) {
+        if (!files.contains(MARKDOWN_FILE) || imageKeys.isEmpty()) {
             throw new BusinessException(ErrorCode.WALK_DIARY_NOT_FOUND);
         }
+        imageKeys.sort(Comparator.naturalOrder());
+        return imageKeys;
+    }
+
+    private String presignImage(String imageKey) {
+        return presigner.presignGetObject(
+                GetObjectPresignRequest.builder()
+                        .signatureDuration(Duration.ofSeconds(
+                                properties.presignDurationSeconds()
+                        ))
+                        .getObjectRequest(GetObjectRequest.builder()
+                                .bucket(properties.bucket())
+                                .key(imageKey)
+                                .build())
+                        .build()
+        ).url().toString();
     }
 
     private void listObjects(String prefix, Consumer<S3Object> consumer) {
@@ -360,7 +401,13 @@ public class WalkDiaryService {
             String deviceId,
             LocalDate walkDate,
             int session,
+            /**
+             * 첫 장({@code event_01.png}). 이미 배포된 앱이 이 필드만 읽으므로
+             * 남겨둔다. 새 화면은 {@link #imageUrls} 를 쓴다.
+             */
             String imageUrl,
+            /** 세션의 이미지 전부. 파일명 순서(event_01 → event_04)다. */
+            List<String> imageUrls,
             Instant imageUrlExpiresAt,
             String markdown
     ) {

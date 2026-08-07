@@ -156,8 +156,9 @@ class WalkProposalCreationServiceIntegrationTest {
 
     @Test
     void higherDailyWalkCountShortensProposalInterval() {
-        // 하루 7회면 간격은 2시간이므로 3시간 전 산책은 더 이상 최근이 아니다.
-        updateDailyWalkCount(7);
+        // 하루 6회(상한)면 간격은 2시간 20분이라 3시간 전 산책은 더 이상
+        // 최근이 아니다. 상한은 S3 경로의 session1~6 과 맞춰 6 이다.
+        updateDailyWalkCount(6);
         insertCompletedWalk(NOW.minus(Duration.ofHours(3)));
 
         assertEquals(

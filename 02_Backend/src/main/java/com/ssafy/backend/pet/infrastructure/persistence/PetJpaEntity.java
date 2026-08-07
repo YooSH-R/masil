@@ -21,7 +21,13 @@ public class PetJpaEntity {
 
     public static final int DEFAULT_DAILY_WALK_COUNT = 2;
     public static final int MIN_DAILY_WALK_COUNT = 1;
-    public static final int MAX_DAILY_WALK_COUNT = 24;
+
+    /**
+     * 산책일지 S3 경로가 {@code .../{yyyy-MM-dd}/session{1~6}/} 이라 하루 7회
+     * 이상은 담을 자리가 없다. 더 열어두면 7번째 산책부터 일지가 조용히
+     * 사라진다. DB 제약(pets_daily_walk_count_check)도 같은 값이다.
+     */
+    public static final int MAX_DAILY_WALK_COUNT = 6;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

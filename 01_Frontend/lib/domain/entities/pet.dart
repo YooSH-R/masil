@@ -83,7 +83,10 @@ class Pet {
   /// 서버 `PetJpaEntity.DEFAULT_DAILY_WALK_COUNT` 와 같은 값이다.
   static const int defaultDailyWalkCount = 2;
   static const int minDailyWalkCount = 1;
-  static const int maxDailyWalkCount = 24;
+
+  /// 산책일지 S3 경로가 `session1~6` 이라 하루 7회 이상은 담을 자리가 없다.
+  /// 서버 `PetJpaEntity.MAX_DAILY_WALK_COUNT` 와 같은 값이어야 한다.
+  static const int maxDailyWalkCount = 6;
 
   final int id;
   final String name;

@@ -281,7 +281,8 @@ pipeline {
                       "$MIGRATION_DIR/008_users_version_compat.sql" \
                       "$MIGRATION_DIR/009_walk_api.sql" \
                       "$MIGRATION_DIR/010_behavior_requests_open_unique.sql" \
-                      "$MIGRATION_DIR/016_pet_walk_schedule.sql"
+                      "$MIGRATION_DIR/016_pet_walk_schedule.sql" \
+                      "$MIGRATION_DIR/017_pet_daily_walk_count_max_six.sql"
                 '''
             }
         }

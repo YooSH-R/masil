@@ -18,9 +18,11 @@ BEGIN
         FROM pg_constraint
         WHERE conname = 'pets_daily_walk_count_check'
     ) THEN
+        -- 상한은 017 에서 6 으로 내렸다. 아직 이 파일을 실행하지 않은 DB 가
+        -- 곧바로 맞는 제약을 갖도록 여기도 같은 값으로 둔다.
         ALTER TABLE pets
             ADD CONSTRAINT pets_daily_walk_count_check
-            CHECK (daily_walk_count BETWEEN 1 AND 24);
+            CHECK (daily_walk_count BETWEEN 1 AND 6);
     END IF;
 END
 $$;
