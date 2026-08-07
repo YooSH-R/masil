@@ -128,7 +128,7 @@ class WalkDiaryServiceTest {
                 result.imageUrls()
         );
         // imageUrl 은 배포된 앱 호환용으로 첫 장을 가리킨다.
-        assertEquals(result.imageUrls().getFirst(), result.imageUrl());
+        assertEquals(result.imageUrls().get(0), result.imageUrl());
     }
 
     @Test
@@ -165,7 +165,10 @@ class WalkDiaryServiceTest {
         WalkDiaryService.DiaryFeed feed = service.getFeed(10L, null, 30);
 
         assertEquals(1, feed.items().size());
-        assertEquals(LocalDate.parse("2026-08-07"), feed.items().getFirst().walkDate());
+        assertEquals(
+                LocalDate.parse("2026-08-07"),
+                feed.items().get(0).walkDate()
+        );
     }
 
     @Test

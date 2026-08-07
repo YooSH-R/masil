@@ -117,7 +117,7 @@ public class WalkDiaryService {
                     deviceId,
                     walkDate,
                     session,
-                    imageUrls.getFirst(),
+                    imageUrls.get(0),
                     imageUrls,
                     expiresAt,
                     markdown
