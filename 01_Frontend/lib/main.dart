@@ -24,6 +24,7 @@ import 'presentation/viewmodels/robot_view_model.dart';
 import 'presentation/viewmodels/walk_diary_view_model.dart';
 import 'presentation/viewmodels/walk_photo_view_model.dart';
 import 'presentation/viewmodels/walk_view_model.dart';
+import 'presentation/widgets/affinity_stream_binder.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -108,7 +109,9 @@ void main() {
         // 들고 있어야 한쪽에서 바꾼 사진이 다른 쪽에도 바로 반영된다.
         ChangeNotifierProvider(create: (_) => ProfileImageViewModel()),
       ],
-      child: const MysilApp(),
+      // 친밀도 SSE 는 화면이 아니라 세션 단위로 붙인다. 홈과 친밀도 화면이
+      // 같은 PetViewModel 을 보므로 한 번만 연결하면 둘 다 갱신된다.
+      child: const AffinityStreamBinder(child: MysilApp()),
     ),
   );
 }

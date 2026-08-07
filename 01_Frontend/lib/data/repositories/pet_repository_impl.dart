@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'package:dio/dio.dart';
+
 import '../../core/network/api_client.dart';
 import '../../core/network/api_endpoints.dart';
 import '../../core/network/api_exception.dart';
@@ -123,6 +127,43 @@ class PetRepositoryImpl implements PetRepository {
   Future<Affinity> getAffinity(int petId) async {
     final data = await _client.get(ApiEndpoints.petAffinity(petId));
     return AffinityModel.fromJson(Json.asMap(data));
+  }
+
+  @override
+  Stream<Affinity> streamAffinity(int petId) async* {
+    // SSE 는 봉투(success/data)를 쓰지 않고 payload 를 그대로 보낸다.
+    final cancelToken = CancelToken();
+    try {
+      final events = await _client.eventStream(
+        ApiEndpoints.petAffinityStream(petId),
+        cancelToken: cancelToken,
+      );
+      await for (final event in events) {
+        if (event.name != _affinitySnapshotEvent &&
+            event.name != _affinityChangedEvent) {
+          continue;
+        }
+        final affinity = _parseAffinityEvent(event.data);
+        if (affinity != null) yield affinity;
+      }
+    } finally {
+      // 구독 취소·정상 종료·오류 어느 쪽으로 끝나도 소켓을 닫는다.
+      cancelToken.cancel();
+    }
+  }
+
+  /// 연결 직후 현재값. 변경 이벤트와 같은 형태라 똑같이 처리한다.
+  static const String _affinitySnapshotEvent = 'affinity-snapshot';
+  static const String _affinityChangedEvent = 'affinity-changed';
+
+  /// 깨진 프레임 하나가 연결 전체를 끊지 않게 한다. SSE 는 오래 유지되는
+  /// 연결이라, 한 번의 파싱 실패로 스트림을 죽이면 실시간 갱신이 멈춘다.
+  Affinity? _parseAffinityEvent(String data) {
+    try {
+      return AffinityModel.fromJson(Json.asMap(jsonDecode(data)));
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
