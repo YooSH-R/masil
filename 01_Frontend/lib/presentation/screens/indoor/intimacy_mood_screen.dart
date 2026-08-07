@@ -266,10 +266,8 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
   /// "산책 미션" 과 같은 계산을 쓰므로 두 화면의 숫자가 어긋나지 않는다.
   /// 아직 못 받은 리본도 흐리게 함께 보여줘서 무엇을 더 모을 수 있는지 알린다.
   Widget _buildRewardCard(String nickname) {
-    final diaryVm = context.watch<WalkDiaryViewModel>();
-    final progress = WalkProgress.from(
-      diaryVm.feed.map((item) => item.walkedAt).whereType<DateTime>(),
-    );
+    // 계산은 뷰모델이 피드가 바뀔 때 한 번만 한다. 홈과 같은 값을 읽는다.
+    final progress = context.watch<WalkDiaryViewModel>().progress;
     final earnedCount = progress.earnedRibbons.length;
 
     return Container(

@@ -61,13 +61,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final latestWalk =
         requiresPairing || diaryVm.feed.isEmpty ? null : diaryVm.feed.first;
 
-    // 오늘 산책 횟수·누적 횟수·받은 리본을 산책 기록에서 함께 계산한다.
-    // 친밀도 화면의 "받은 보상" 도 같은 계산을 쓴다([WalkProgress]).
-    final progress = requiresPairing
-        ? WalkProgress.none
-        : WalkProgress.from(
-            diaryVm.feed.map((item) => item.walkedAt).whereType<DateTime>(),
-          );
+    // 계산은 뷰모델이 피드가 바뀔 때 한 번만 한다([WalkDiaryViewModel.progress]).
+    // 친밀도 화면의 "받은 보상" 도 같은 값을 읽는다.
+    final progress = requiresPairing ? WalkProgress.none : diaryVm.progress;
     final dailyWalkGoal = petVm.pet?.dailyWalkCount ?? Pet.defaultDailyWalkCount;
     final goalReached = !requiresPairing && progress.todayCount >= dailyWalkGoal;
 
