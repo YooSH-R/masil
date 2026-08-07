@@ -1,11 +1,18 @@
-"""run.py - 전체 파이프라인: 관찰 -> 이야기 -> 산책일지 이미지(journal, 기본) / (선택) 스토리보드.
+"""run.py - 전체 파이프라인: 관찰 -> 이야기 -> 이벤트 패널(panels, 기본) / (선택) 스토리보드·보드.
 감성 이미지(story_image.png)는 opt-in이다.
 
-산책일지(walk_journal.png, 이벤트 삽화 보드)가 이 파이프라인의 기본 최종
-산출물이다. --no-journal로만 끌 수 있다(API 비용 절감 등). AI가 생성하는
-이미지는 저널의 이벤트 패널(flow_panels/)로 일원화됐고, walk_journal.png는
-그 패널들의 로컬(Pillow) 합성본이다. 감성 이미지(story_image.png)는
-별도 산출물이 필요할 때만 --story-image로 켠다.
+이 파이프라인의 기본 최종 산출물은 관찰 기록 + 산책 일지(md) + 가장 의미
+있는 이벤트 4장면의 수채화 패널 4장(세션 폴더에 바로 event_01~04.png)이다.
+보드 합성(walk_journal.png, 여러 패널을 한 장으로 붙인 Pillow 합성본)은
+2026-08-06부터 기본 경로에서 빠졌다 - --board로만 켤 수 있다(opt-in).
+--no-panels로 패널 생성 자체를 끌 수 있다(API 비용 절감 등). 감성 이미지
+(story_image.png)는 별도 산출물이 필요할 때만 --story-image로 켠다.
+
+[panels 기본값의 근거 - 2026-08-05 session4 실측]
+참조 사진을 붙인 수채화 생성 7회 중 6회가 화풍 검사 불합격이었고, 불합격은
+전부 검증 사다리 3차(참조 제거)에서야 합격했다. 그래서 flow_image의 panels
+모드는 기본이 참조 없음이다(--use-reference로 뒤집을 수 있다) - 사다리
+비용이 줄고 세트 안 화풍이 참조 유/무로 갈리지 않아 더 균일하다.
 
 [S3 업로드]
 --upload-s3 는 이 스크립트 자체가 아니라 walk_log.main()/flow_image.main()에
@@ -34,17 +41,21 @@ def main(argv=None) -> int:
                              "전체 프레임의 약 10%%(최소 4, 최대 12)로 자동 계산한다")
     parser.add_argument("--storyboard", action="store_true",
                         help="감성 이미지에 더해 스토리보드도 생성")
-    parser.add_argument("--journal", dest="journal", action="store_true",
+    parser.add_argument("--panels", dest="panels", action="store_true",
                         default=True,
-                        help="이벤트 삽화 보드 형태의 산책일지 이미지"
-                             "(walk_journal.png)를 생성한다 (기본값)")
-    parser.add_argument("--no-journal", dest="journal", action="store_false",
-                        help="산책일지 이미지 생성을 건너뛴다 (API 비용 절감)")
+                        help="가장 의미 있는 이벤트 4장면의 수채화 패널을 "
+                             "세션 폴더에 event_01~04.png 로 생성한다 (기본값, "
+                             "보드 합성 없음)")
+    parser.add_argument("--no-panels", dest="panels", action="store_false",
+                        help="이벤트 패널 생성을 건너뛴다 (API 비용 절감)")
+    parser.add_argument("--board", action="store_true",
+                        help="panels 대신 이벤트 삽화 보드 형태의 산책일지 이미지"
+                             "(walk_journal.png)를 생성한다 (opt-in)")
     parser.add_argument("--story-image", dest="story_image", action="store_true",
                         default=False,
                         help="이야기 기반 감성 이미지(story_image.png)도 생성한다 "
                              "(opt-in, API 비용 추가). 기본 파이프라인 산출물은 "
-                             "저널(flow_panels/ + walk_journal.png)뿐이다")
+                             "이벤트 패널(세션 폴더의 event_01~04.png)뿐이다")
     parser.add_argument("--verify-image", dest="verify_image", action="store_true",
                         default=True,
                         help="감성 이미지가 여정을 반영했는지 검증 후 필요시 재생성 "
@@ -75,8 +86,10 @@ def main(argv=None) -> int:
         outputs_plan.append("감성 이미지")
     if args.storyboard:
         outputs_plan.append("스토리보드")
-    if args.journal:
+    if args.board:
         outputs_plan.append("산책일지 이미지(journal)")
+    elif args.panels:
+        outputs_plan.append("이벤트 패널 4장")
     step(f"[계획] 이번 실행 산출물: {', '.join(outputs_plan)}")
 
     def s3_argv(*, upload: bool) -> list[str]:
@@ -112,7 +125,7 @@ def main(argv=None) -> int:
     # 2단계(스토리보드/저널)가 하나라도 있으면 이 단계는 마지막이 아니므로 업로드를
     # 끈다. 없으면 이 단계가 파이프라인의 마지막이라 여기서 올린다.
     # (그렇지 않으면 일지/감성 이미지가 여러 번 업로드된다)
-    has_stage2 = args.storyboard or args.journal
+    has_stage2 = args.storyboard or args.panels or args.board
     log_argv += s3_argv(upload=args.upload_s3 and not has_stage2)
     code = walk_log.main(log_argv)
     if code != 0:
@@ -124,8 +137,10 @@ def main(argv=None) -> int:
     stage2: list[list[str]] = []
     if args.storyboard:
         stage2.append(["--style", args.image_style])
-    if args.journal:
+    if args.board:
         stage2.append(["--mode", "journal", "--style", args.image_style])
+    elif args.panels:
+        stage2.append(["--mode", "panels", "--style", args.image_style])
 
     for index, flow_argv in enumerate(stage2):
         is_last = index == len(stage2) - 1

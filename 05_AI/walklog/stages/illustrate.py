@@ -1,14 +1,17 @@
-"""Stage 3 - 관찰 기록 -> 삽화 -> 스토리보드 / 저널.
+"""Stage 3 - 관찰 기록 -> 삽화 -> 스토리보드 / 저널 / 패널.
 
   A. 장면 전환 감지 -> 대표 프레임 N개 선정      (로컬, API 없음)
-  A'. 이벤트 중요도 -> 대표 프레임 N개 선정      (로컬, API 없음. 저널 전용)
+  A'. 이벤트 중요도 -> 대표 프레임 N개 선정      (로컬, API 없음. 저널/패널 전용)
   B. 각 장면 -> 영어 이미지 프롬프트              (LLM)
   C. 각 장면 -> 삽화                              (이미지 모델)
-  D. 삽화들 -> 스토리보드 한 장 / 저널 한 장       (로컬, Pillow)
+  D. 삽화들 -> 스토리보드 한 장 / 저널 한 장       (로컬, Pillow. 패널 모드는 없음)
 
-스토리보드(select_key_scenes)는 "장면 전환"이 기준이고, 저널
+스토리보드(select_key_scenes)는 "장면 전환"이 기준이고, 저널·패널
 (select_key_events)은 "이벤트 중요도"가 기준이다. 서로 다른 산출물이므로
 선정 함수를 공유하지 않는다 - 하나를 고치면 둘 다 흔들리는 결합을 피한다.
+
+build_panels(2026-08-06)는 build_journal과 A'~C를 공유하지만 D(보드 합성)가
+없다 - 이벤트 삽화 자체가 최종 산출물이다(파이프라인 간소화, run.py 참고).
 
 [분할 전에서 바뀐 점]
 1. Scene 클래스가 사라졌다. FrameRecord가 관찰 결과·경과 시각·신뢰도·캡션을
@@ -65,6 +68,7 @@ __all__ = [
     "build_single_image",
     "build_story_image",
     "build_journal",
+    "build_panels",
 ]
 
 
@@ -1105,6 +1109,16 @@ def _render_with_style_enforcement(
       2차: 참조 포함, extra=STYLE_EMPHASIS                           -> 검사
       3차: 참조 제거(reference=None, with_reference=False),
            2차와 같은 extra                                         -> 검사
+
+    호출부가 처음부터 reference=None을 넘기면(참조 자체가 없는 무참조 생성 -
+    build_panels가 기본으로 쓰는 경로) with_reference=(reference is not None)이
+    1차부터 이미 False로 평가되므로 1~3차 전부 참조 없이 조립된다(_REFERENCE_RULE
+    미포함). 이 경우 3차는 "참조를 새로 제거"하는 단계가 아니라 2차와 동일한
+    조건(참조 없음 + STYLE_EMPHASIS)으로 한 번 더 생성하는 것과 같다 - 단계
+    수·비용 상한(이미지 최대 3회)은 그대로다. 2026-08-05 실측(참조 포함 수채화
+    생성 7회 중 6회가 화풍 검사 불합격, 전부 3차에서야 합격)이 무참조 기본값의
+    근거다.
+
     각 단계 합격 시 즉시 채택. 합격 판정은 세 조건 모두를 요구한다:
     사진풍이 아니고(is_photographic=False), 화풍이 전체에 균일하게
     적용됐고(matches_style=True), 식별 가능한 얼굴이 없다(face_visible=False).
@@ -1349,3 +1363,112 @@ def build_journal(
         walk_date=walk_date, time_range=time_range, duration=duration,
         weather=weather, subjects=subjects, note=note, font_path=font_path,
     )
+
+
+def build_panels(
+    client: GMSClient,
+    records: Sequence[FrameRecord],
+    panel_dir: str | Path,
+    *,
+    event_count: int = 4,
+    style: str = P.DEFAULT_IMAGE_STYLE,
+    use_reference: bool = False,
+    verify_style: bool = True,
+) -> Path:
+    """관찰 기록 -> 이벤트 선정 -> 이벤트별 삽화(panel_dir/event_XX.png)만.
+
+    build_journal과 골격(선정 -> 프롬프트 -> 삽화)은 같지만, 캡션 작성과
+    보드 합성(compose_journal)이 없다. 2026-08-05 session4 실측 이후, 이
+    파이프라인의 최종 산출물은 이벤트 패널 그 자체이지 Pillow로 합친 보드가
+    아니게 됐다 - 캡션은 보드 전용 장식이었으므로 여기서는 이벤트당 LLM 호출을
+    1회(프롬프트 작성) 아낀다.
+
+    panel_dir은 호출부가 정한다. flow_image.py의 panels 모드(기본값)는 별도
+    하위 폴더 없이 세션 폴더(run_dir)를 그대로 panel_dir로 넘긴다 - 패널이
+    유일한 이미지 산출물이라 flow_panels/로 한 단계 더 감쌀 이유가 없다.
+    image_manifest.json과 output 상대 경로도 panel_dir 기준이므로, panel_dir이
+    세션 폴더 자체면 manifest도 세션 폴더에 곧바로 쓰인다.
+
+    use_reference=False(기본)면 _render_with_style_enforcement에 reference=None을
+    넘긴다 - 사다리 1차부터 참조 없이(텍스트 전용) 조립된다. 2026-08-05 실측:
+    참조를 붙인 수채화 생성 7회 중 6회가 화풍 검사 불합격이었고, 불합격은 전부
+    사다리 3차(참조 제거)에서야 합격했다. 참조를 처음부터 빼면 사다리 비용이
+    줄고(대부분 1차 합격) 세트 안 화풍이 참조 유/무로 갈리지 않아 더 균일하다.
+    photoreal처럼 참조와 화풍이 싸우지 않는 스타일에서는 호출부가 use_reference=True로
+    이 기본을 뒤집을 수 있다.
+
+    이벤트 하나의 프롬프트/삽화 생성이 실패해도(GMSError) 그 이벤트만 건너뛰고
+    나머지로 계속 진행한다(build_journal과 같은 원칙). 전부 실패하면
+    IllustrateError를 던진다.
+    """
+    events = select_key_events(records, event_count)
+    total = len(events)
+
+    panel_dir = Path(panel_dir)
+    panel_dir.mkdir(parents=True, exist_ok=True)
+
+    for position, event in enumerate(events, 1):
+        focus_subject = _primary_subject(event.record)
+        focus = (f"this scene's main subject: {focus_subject} "
+                 "(make it the clear focal point)") if focus_subject \
+            else "this scene's main subject"
+
+        step(f"[Stage B] {position}/{total} 이벤트 프롬프트 작성 "
+             f"(피사체: {focus_subject or '?'})")
+        try:
+            english = client.generate_text(
+                P.IMAGE_PROMPT_WRITER,
+                tag=f"panel_prompt_{position}",
+                json_lines=json.dumps(event.observation, ensure_ascii=False),
+                focus=focus,
+            )
+
+            reference = event.reference if use_reference else None
+            step(f"[Stage C] {position}/{total} 이벤트 삽화 생성"
+                 f"{f' (참조: {reference.name})' if reference else ''}")
+            panel, final_prompt, attempts_log = _render_with_style_enforcement(
+                client, english,
+                style=style,
+                reference=reference,
+                tag_base=f"panel_{position}",
+                verify_style=verify_style,
+            )
+            event.panel = panel
+            event.prompt = final_prompt
+        except GMSError as exc:
+            warn(f"{position}번 이벤트 삽화 생성 실패({exc}). "
+                 f"이 이벤트는 건너뛰고 계속 진행합니다.")
+            continue
+
+        panel_filename = f"event_{position:02d}.png"
+        panel_path = panel_dir / panel_filename
+        panel_path.write_bytes(event.panel)
+        output_rel = _relative_output(panel_path, panel_dir)
+        adopted = attempts_log[-1]
+        _log_image_generation(panel_dir, {
+            "output": output_rel,
+            "tag": adopted["tag"],
+            "adopted_tag": adopted["tag"],
+            "trimmed": adopted.get("trimmed", False),
+            "style": style,
+            "style_text": P.IMAGE_STYLES.get(style, ""),
+            "with_reference": adopted.get("with_reference", reference is not None),
+            "reference_file": reference.name if (reference and adopted.get("with_reference"))
+                              else None,
+            "final_prompt": final_prompt,
+            "model": config.IMAGE_MODEL,
+            "attempts": attempts_log,
+            "created_at": datetime.now().isoformat(timespec="seconds"),
+        })
+
+    succeeded = [e for e in events if e.panel]
+    if not succeeded:
+        raise IllustrateError(
+            f"이벤트 {total}개 전부 삽화 생성에 실패해 패널을 만들 수 없습니다."
+        )
+    if len(succeeded) < total:
+        warn(f"이벤트 {total}개 중 {len(succeeded)}개만 삽화 생성에 성공했습니다. "
+             f"패널은 성공한 {len(succeeded)}개로 만듭니다.")
+
+    step(f"[완료] 이벤트 패널 {len(succeeded)}/{total}개: {panel_dir}")
+    return panel_dir

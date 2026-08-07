@@ -23,6 +23,9 @@ PC 또는 Jetson에서 실행하세요. Pi Zero W에서는 돌리지 마세요.
 --max-frames로 목표 장수 상한을 주면 구간 길이를 영상 총 길이에서 역산합니다.
 --stride로 평가 간격을 늘리면 건너뛰는 프레임은 디코딩 없이(cap.grab())
 넘어가 처리 시간을 줄입니다.
+--clean을 주면 추출 전에 출력 폴더의 이전 산출물(f_*.jpg, manifest.json)을
+지웁니다. 자동화 경로(세션 재처리)에서 이전 실행의 프레임이 새 manifest와
+섞이는 것을 막습니다. 이 스크립트가 만들지 않은 파일은 건드리지 않습니다.
 
 설치
     pip install opencv-python numpy
@@ -33,6 +36,7 @@ PC 또는 Jetson에서 실행하세요. Pi Zero W에서는 돌리지 마세요.
     python3 extract_best_frames.py walk.mp4 -o frames/ --metric tenengrad
     python3 extract_best_frames.py walk.mp4 -o frames/ --no-dedup
     python3 extract_best_frames.py walk.mp4 -o frames/ --max-frames 48 --stride 3
+    python3 extract_best_frames.py walk.mp4 -o frames/ --clean
 """
 
 from __future__ import annotations
@@ -125,6 +129,35 @@ def thumbnail(gray: np.ndarray) -> np.ndarray:
 
 
 # ─────────────────────────────────────────────────────────
+# 출력 폴더 초기화
+# ─────────────────────────────────────────────────────────
+
+
+def clean_outputs(output_dir: Path) -> int:
+    """출력 폴더에서 이 스크립트의 이전 산출물만 지운다.
+
+    폴더를 통째로 지우지 않는 이유: 잘못된 경로(-o ~ 같은)가 넘어와도
+    이 스크립트가 만든 파일(f_*.jpg, manifest.json) 외에는 아무것도
+    잃지 않게 하기 위해서다. 세션 재처리(FAILED -> TRANSFER_DONE 복귀)
+    시 이전 실행의 프레임이 새 manifest와 섞여 하류(walklog)가 잘못된
+    기록을 만드는 것을 막는다.
+
+    반환값은 삭제한 파일 수. output_dir이 없으면 0을 반환한다.
+    """
+    if not output_dir.is_dir():
+        return 0
+    removed = 0
+    for path in sorted(output_dir.glob("f_*.jpg")):
+        path.unlink()
+        removed += 1
+    manifest_path = output_dir / "manifest.json"
+    if manifest_path.is_file():
+        manifest_path.unlink()
+        removed += 1
+    return removed
+
+
+# ─────────────────────────────────────────────────────────
 
 
 @dataclass
@@ -184,6 +217,7 @@ def extract(
     fps_override: float | None = None,
     max_frames: int = 0,
     stride: int = 1,
+    clean: bool = False,
 ) -> dict:
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
@@ -239,6 +273,15 @@ def extract(
 
     metric = METRICS[metric_name]
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # 이전 실행 산출물 초기화. 영상을 열고 fps 검증까지 끝난 뒤에 지운다 -
+    # 입력이 잘못된 실행(파일 없음, fps 미상)이 기존 산출물만 날리고
+    # 새 결과는 못 만드는 최악의 순서를 피하기 위해서다.
+    if clean:
+        removed = clean_outputs(output_dir)
+        if removed:
+            print(f"초기화      : 이전 산출물 {removed}개 삭제 "
+                  f"(f_*.jpg, manifest.json)")
 
     print(f"입력      : {video_path}")
     print(f"프레임레이트: {fps:.2f} fps"
@@ -421,6 +464,10 @@ def main() -> int:
                    help="평가 스트라이드. K>1이면 K프레임마다 1장만 평가해 디코딩을 "
                         "아낀다. 15fps 영상이면 2~3 권장 — 인접 프레임의 선명도는 "
                         f"거의 같아 구간 1등 품질에 영향이 미미하다. 기본 {DEFAULT_STRIDE}")
+    p.add_argument("--clean", action="store_true",
+                   help="추출 전에 출력 폴더의 이전 산출물(f_*.jpg, manifest.json)을 "
+                        "삭제한다. 이 스크립트가 만들지 않은 파일은 건드리지 않는다. "
+                        "세션 재처리 자동화 경로에서 사용을 권장")
     args = p.parse_args()
 
     if not args.video.exists():
@@ -462,6 +509,7 @@ def main() -> int:
             fps_override=args.fps,
             max_frames=args.max_frames,
             stride=args.stride,
+            clean=args.clean,
         )
     except RuntimeError as e:
         print(f"오류: {e}", file=sys.stderr)

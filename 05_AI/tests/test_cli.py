@@ -547,7 +547,7 @@ def test_flow_image_dry_run_makes_no_calls(tmp_path, fake_client, capsys):
     frames, path = prepare_records(tmp_path)
 
     code = flow_image.main(["--records", str(path), "--frames", str(frames),
-                            "--dry-run", "-n", "2"])
+                            "--mode", "storyboard", "--dry-run", "-n", "2"])
 
     assert code == 0
     assert not fake_client.calls
@@ -560,7 +560,7 @@ def test_flow_image_storyboard(tmp_path, fake_client):
     out_dir = tmp_path / "sb"
 
     code = flow_image.main(["--records", str(path), "--frames", str(frames),
-                            "--out-dir", str(out_dir), "-n", "2"])
+                            "--out-dir", str(out_dir), "--mode", "storyboard", "-n", "2"])
 
     assert code == 0
     assert (out_dir / config.FLOW_IMAGE_NAME).is_file()
@@ -586,8 +586,8 @@ def test_flow_image_single_mode(tmp_path, fake_client):
 def test_flow_image_no_caption_llm(tmp_path, fake_client):
     frames, path = prepare_records(tmp_path)
     flow_image.main(["--records", str(path), "--frames", str(frames),
-                     "--out-dir", str(tmp_path / "nc"), "-n", "2",
-                     "--no-caption-llm"])
+                     "--out-dir", str(tmp_path / "nc"), "--mode", "storyboard",
+                     "-n", "2", "--no-caption-llm"])
     from walklog import prompts as P
     assert not any(c[1] is P.PANEL_CAPTION_WRITER for c in fake_client.calls)
 
@@ -595,7 +595,8 @@ def test_flow_image_no_caption_llm(tmp_path, fake_client):
 def test_flow_image_no_ref_skips_reference(tmp_path, fake_client):
     frames, path = prepare_records(tmp_path)
     flow_image.main(["--records", str(path), "--frames", str(frames),
-                     "--out-dir", str(tmp_path / "nr"), "-n", "1", "--no-ref"])
+                     "--out-dir", str(tmp_path / "nr"), "--mode", "storyboard",
+                     "-n", "1", "--no-ref"])
     image_calls = [c for c in fake_client.calls if c[0] == "image"]
     assert image_calls[0][2]["reference"] is None
 
@@ -630,7 +631,8 @@ def test_flow_image_defaults_to_latest_session(tmp_path, fake_client, monkeypatc
     walk_log.main(["--frames", str(frames), "--date", "2026-08-03", "--no-diary"])
     walk_log.main(["--frames", str(frames), "--date", "2026-08-03", "--no-diary"])
 
-    code = flow_image.main(["--frames", str(frames), "--date", "2026-08-03", "-n", "2"])
+    code = flow_image.main(["--frames", str(frames), "--date", "2026-08-03",
+                            "--mode", "storyboard", "-n", "2"])
 
     assert code == 0
     day_dir = tmp_path / "outputs" / "2026-08-03"
@@ -680,3 +682,60 @@ def test_flow_image_journal_note_parsed_from_diary(tmp_path):
 def test_flow_image_journal_note_empty_without_diary(tmp_path):
     from walklog.cli.flow_image import _diary_note
     assert _diary_note(tmp_path) == ""
+
+
+# ============================================================ flow_image --mode panels (기본값)
+
+def test_flow_image_panels_dry_run(tmp_path, fake_client, capsys):
+    frames, path = prepare_records(tmp_path)
+
+    code = flow_image.main(["--records", str(path), "--frames", str(frames),
+                            "--dry-run", "--events", "2"])
+
+    assert code == 0
+    assert not fake_client.calls
+    out = capsys.readouterr().out
+    assert "선정된 이벤트" in out and "score=" in out
+
+
+def test_flow_image_panels_is_default_mode(tmp_path, fake_client):
+    """--mode를 생략하면 panels가 기본값이라 flow_panels/ 없이 세션 폴더에 바로
+    패널이 생기고 보드/캡션은 없다."""
+    frames, path = prepare_records(tmp_path)
+    out_dir = tmp_path / "panels_out"
+
+    code = flow_image.main(["--records", str(path), "--frames", str(frames),
+                            "--out-dir", str(out_dir), "--events", "2"])
+
+    assert code == 0
+    assert not (out_dir / config.JOURNAL_NAME).exists()
+    assert not (out_dir / config.FLOW_IMAGE_NAME).exists()
+    assert not (out_dir / config.PANELS_DIRNAME).exists()
+    panels = sorted(p.name for p in out_dir.glob("event_*.png"))
+    assert panels == ["event_01.png", "event_02.png"]
+    image_calls = [c for c in fake_client.calls if c[0] == "image"]
+    assert len(image_calls) == 2
+    from walklog import prompts as P
+    assert not any(c[1] is P.PANEL_CAPTION_WRITER for c in fake_client.calls)
+
+
+def test_flow_image_panels_default_omits_reference(tmp_path, fake_client):
+    """panels 기본값은 참조 없음이다(2026-08-05 실측: 참조 포함 생성 86% 화풍 불합격)."""
+    frames, path = prepare_records(tmp_path)
+
+    flow_image.main(["--records", str(path), "--frames", str(frames),
+                     "--out-dir", str(tmp_path / "nr"), "--events", "1"])
+
+    image_calls = [c for c in fake_client.calls if c[0] == "image"]
+    assert image_calls[0][2]["reference"] is None
+
+
+def test_flow_image_panels_use_reference_flag_passes_reference(tmp_path, fake_client):
+    frames, path = prepare_records(tmp_path)
+
+    flow_image.main(["--records", str(path), "--frames", str(frames),
+                     "--out-dir", str(tmp_path / "wr"), "--events", "1",
+                     "--use-reference"])
+
+    image_calls = [c for c in fake_client.calls if c[0] == "image"]
+    assert image_calls[0][2]["reference"] is not None

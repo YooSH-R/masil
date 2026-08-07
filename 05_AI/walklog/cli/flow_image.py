@@ -1,18 +1,25 @@
 """산책 흐름 삽화 생성 CLI.
 
   Stage A  관찰 기록 -> 장면 전환 감지 -> 대표 프레임 N장  (로컬, API 없음)
-  Stage A' 관찰 기록 -> 이벤트 중요도 -> 대표 프레임 N장   (로컬, API 없음. --mode journal)
+  Stage A' 관찰 기록 -> 이벤트 중요도 -> 대표 프레임 N장   (로컬, API 없음. --mode journal/panels)
   Stage B  각 장면 -> 영어 이미지 프롬프트                  (LLM)
   Stage C  각 장면 -> 삽화                                  (이미지 모델)
-  Stage D  삽화들 -> 스토리보드 / 저널 한 장                 (로컬, Pillow)
+  Stage D  삽화들 -> 스토리보드 / 저널 한 장                 (로컬, Pillow. panels 모드는 없음)
+
+기본 모드는 panels다: 이벤트 중요도 기준 삽화 패널 N장(세션 폴더에 바로
+event_XX.png)만 만들고 보드로 합성하지 않는다. 보드가 필요하면 --mode journal을
+쓴다(opt-in, run.py 기준으로는 --board). journal/storyboard 모드는 최종
+합성본(walk_journal.png/walk_flow.png)과 개별 삽화가 섞이지 않도록 개별
+삽화를 flow_panels/ 하위 폴더에 담는다 - panels 모드는 개별 삽화 자체가
+유일한 산출물이라 그 구분이 필요 없다.
 
 사용:
-    python run_flow_image.py --dry-run                 # API 없이 장면 선정만
-    python run_flow_image.py -n 5 --style watercolor
+    python run_flow_image.py --dry-run                 # API 없이 이벤트 선정만 (기본: panels)
+    python run_flow_image.py --events 5 --style watercolor
+    python run_flow_image.py --mode storyboard -n 5     # 장면 전환 기준 스토리보드
     python run_flow_image.py --mode single             # 한 장으로 요약
-    python run_flow_image.py --no-ref --layout grid
-    python run_flow_image.py --mode journal --dry-run   # 저널: 이벤트 선정만
-    python run_flow_image.py --mode journal --events 5  # 저널: 이벤트 5개짜리 산책일지
+    python run_flow_image.py --use-reference            # panels: 이벤트 프레임을 참조로 사용
+    python run_flow_image.py --mode journal --events 5  # 저널: 이벤트 5개짜리 산책일지(보드)
 
 [분할 전에서 바뀐 점]
 1. 기록 형식을 추측하지 않는다. records.load_records 가 형식을 소유한다.
@@ -47,7 +54,13 @@ from ..records import (
     walk_duration,
     walk_time_range,
 )
-from ..stages import IllustrateError, build_journal, build_single_image, build_storyboard
+from ..stages import (
+    IllustrateError,
+    build_journal,
+    build_panels,
+    build_single_image,
+    build_storyboard,
+)
 from ..stages.illustrate import _primary_subject, event_score, select_key_events, select_key_scenes
 from . import common
 
@@ -69,16 +82,25 @@ def build_parser() -> argparse.ArgumentParser:
     shape = parser.add_argument_group("생성 방식")
     shape.add_argument("-n", "--scenes", type=int, default=4, help="대표 장면 수")
     shape.add_argument("--events", type=int, default=4,
-                       help="저널(--mode journal)에 실을 이벤트 수 (2~6 권장)")
-    shape.add_argument("--mode", choices=("storyboard", "single", "journal"),
-                       default="storyboard",
-                       help="storyboard: 칸 여러 개 / single: 전체를 한 장으로 / "
-                            "journal: 이벤트 중요도 기준 스크랩북형 산책일지")
+                       help="저널/패널(--mode journal/panels)에 실을 이벤트 수 (2~6 권장)")
+    shape.add_argument("--mode", choices=("panels", "storyboard", "single", "journal"),
+                       default="panels",
+                       help="panels: 이벤트 중요도 기준 삽화 패널 N장을 세션 폴더에 "
+                            "바로 저장, 보드 합성 없음 (기본값) / storyboard: 칸 여러 개 / "
+                            "single: 전체를 한 장으로 / "
+                            "journal: 이벤트 중요도 기준 스크랩북형 산책일지(보드, opt-in)")
     shape.add_argument("--layout", choices=("row", "grid"), default="row")
     shape.add_argument("--style", default=P.DEFAULT_IMAGE_STYLE,
                        choices=list(P.IMAGE_STYLES))
     shape.add_argument("--no-ref", action="store_true",
-                       help="실제 프레임을 참조하지 않고 텍스트만으로 생성")
+                       help="실제 프레임을 참조하지 않고 텍스트만으로 생성 "
+                            "(storyboard/single/journal 전용. panels는 --use-reference 참고)")
+    shape.add_argument("--use-reference", dest="use_reference", action="store_true",
+                       default=False,
+                       help="panels 전용: 이벤트의 실제 프레임을 참조로 사용한다 "
+                            "(기본은 참조 없음 - 수채화에서는 화풍 불일치 위험이 있다. "
+                            "2026-08-05 실측상 참조 포함 생성의 86%가 화풍 검사 불합격이었다). "
+                            "photoreal 스타일은 이 플래그와 무관하게 항상 참조를 쓴다")
     shape.add_argument("--no-caption-llm", action="store_true",
                        help="캡션을 LLM 대신 location_type 으로 채운다 "
                             "(storyboard 전용. journal은 항상 LLM 캡션을 쓴다)")
@@ -184,7 +206,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.dry_run:
         try:
-            if args.mode == "journal":
+            if args.mode in ("journal", "panels"):
                 return _print_dry_run_events(records, args.events)
             return _print_dry_run(records, args.scenes)
         except IllustrateError as exc:
@@ -219,6 +241,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             paths["산책일지"] = path
             paths["이벤트 삽화"] = panel_dir
+        elif args.mode == "panels":
+            panel_dir = run_dir
+            # photoreal은 참조와 화풍이 싸우지 않으므로 --use-reference와 무관하게
+            # 기존 동작(참조 사용)을 유지한다. 그 외 스타일은 기본이 참조 없음이다
+            # (2026-08-05 실측: 참조 포함 수채화 생성의 86%가 화풍 검사 불합격).
+            use_reference = True if args.style in P.PHOTO_STYLES else args.use_reference
+            path = build_panels(
+                client, records, panel_dir,
+                event_count=args.events, style=args.style,
+                use_reference=use_reference, verify_style=args.verify_style,
+            )
+            paths["이벤트 패널"] = path
         else:
             panel_dir = run_dir / config.PANELS_DIRNAME
             path, scenes = build_storyboard(

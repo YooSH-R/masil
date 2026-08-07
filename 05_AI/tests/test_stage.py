@@ -25,6 +25,7 @@ from walklog.stages import (
     IllustrateError,
     KeyScene,
     build_journal,
+    build_panels,
     build_single_image,
     build_story_image,
     build_storyboard,
@@ -995,6 +996,74 @@ def test_build_journal_all_events_fail_raises(tmp_path):
                       event_count=3)
 
 
+# ============================================================ Stage 3 (패널 전용, 보드 없음)
+
+def test_build_panels_creates_expected_files_no_caption(tmp_path):
+    """이벤트 4개 -> 이미지 4회(화풍 검사 자동 합격이라 재시도 없음) + 캡션 호출 0회
+    + panel_dir에 event_01~04.png 4개(+manifest). 보드(walk_journal.png)는 만들지 않는다."""
+    records = make_journal_records(tmp_path, 4)
+    client = FakeClient()
+    panel_dir = tmp_path / "out"
+
+    result = build_panels(client, records, panel_dir, event_count=4)
+
+    assert result == panel_dir
+    saved = sorted(p.name for p in panel_dir.glob("event_*.png"))
+    assert saved == ["event_01.png", "event_02.png", "event_03.png", "event_04.png"]
+    assert (panel_dir / config.IMAGE_MANIFEST_NAME).is_file()
+    assert not (tmp_path / "out" / config.JOURNAL_NAME).exists()
+
+    image_calls = [c for c in client.calls if c["kind"] == "image"]
+    assert len(image_calls) == 4
+    assert not any(c["spec"] is P.PANEL_CAPTION_WRITER for c in client.calls)
+
+
+def test_build_panels_default_no_reference(tmp_path):
+    """use_reference=False(기본)면 참조 없이 생성되고 재해석 지시도 없다."""
+    records = make_journal_records(tmp_path, 4)
+    client = FakeClient()
+
+    build_panels(client, records, tmp_path / "panels", event_count=2)
+
+    image_calls = [c for c in client.calls if c["kind"] == "image"]
+    assert image_calls and all(c["kwargs"].get("reference") is None for c in image_calls)
+    assert not any(_REPAINT in c["spec"] for c in image_calls)
+
+
+def test_build_panels_use_reference_true_passes_reference(tmp_path):
+    """use_reference=True면 실제 참조 파일이 있는 이벤트에 재해석 지시가 붙는다."""
+    records = make_journal_records(tmp_path, 4)
+    client = FakeClient()
+
+    build_panels(client, records, tmp_path / "panels", event_count=2, use_reference=True)
+
+    image_calls = [c for c in client.calls if c["kind"] == "image"]
+    assert image_calls and any(_REPAINT in c["spec"] for c in image_calls)
+
+
+def test_build_panels_all_events_fail_raises(tmp_path):
+    records = make_journal_records(tmp_path, 3)
+    client = FakeClient(errors=[GMSNetworkError("끊김")] * 3)
+
+    with pytest.raises(IllustrateError, match="전부 삽화 생성에 실패"):
+        build_panels(client, records, tmp_path / "panels", event_count=3)
+
+
+def test_build_panels_partial_failure_still_returns_dir(tmp_path, capsys):
+    """이벤트 하나의 삽화 생성이 실패해도 나머지 패널로 계속 진행한다."""
+    records = make_journal_records(tmp_path, 3)
+    # 1번째 이벤트: 프롬프트(text) 성공 -> 2번째 이벤트의 프롬프트 작성에서 실패.
+    client = FakeClient(errors=[None, None, GMSNetworkError("끊김")])
+
+    result = build_panels(client, records, tmp_path / "panels", event_count=3,
+                          verify_style=False)
+
+    assert result.is_dir()
+    saved = sorted(p.name for p in result.glob("event_*.png"))
+    assert len(saved) == 2
+    assert "삽화 생성 실패" in capsys.readouterr().err
+
+
 # ============================================================ Stage 3 (저널 패널 화풍 검사-재생성)
 
 def style_verdict(*, is_photographic: bool, matches_style: bool = True,
@@ -1251,6 +1320,39 @@ def test_render_with_style_enforcement_skips_check_when_verify_style_false(tmp_p
     assert not [c for c in client.calls if c["kind"] == "json"]
     assert len(client.calls) == 1
     assert len(attempts) == 1
+
+
+def test_render_with_style_enforcement_no_reference_from_start_stays_without_reference(tmp_path):
+    """reference=None으로 호출되면(panels 기본값) 1~3차 전부 참조 없이 조립된다.
+
+    with_reference = (reference is not None)이 1차부터 이미 False로 평가되므로
+    _REFERENCE_RULE("Completely repaint it")이 세 단계 어디에도 없다. 3차는
+    "참조를 새로 제거"하는 단계가 아니라 2차와 같은 조건(참조 없음 +
+    STYLE_EMPHASIS)으로 한 번 더 생성하는 것과 동치다.
+    """
+    client = FakeClient(
+        image_results=[_png_bytes(color=(1, 1, 1)), _png_bytes(color=(2, 2, 2)),
+                       _png_bytes(color=(3, 3, 3))],
+        json_results=[
+            style_verdict(is_photographic=True, matches_style=False),
+            style_verdict(is_photographic=True, matches_style=False),
+            style_verdict(is_photographic=False, matches_style=True),
+        ],
+    )
+
+    image, prompt, attempts = _render_with_style_enforcement(
+        client, "a quiet path", style="watercolor", reference=None,
+        tag_base="panel_1",
+    )
+
+    image_calls = [c for c in client.calls if c["kind"] == "image"]
+    assert len(image_calls) == 3
+    assert all(c["kwargs"].get("reference") is None for c in image_calls)
+    assert not any(_REPAINT in c["spec"] for c in image_calls)
+    assert P.STYLE_EMPHASIS in image_calls[1]["spec"]
+    assert P.STYLE_EMPHASIS in image_calls[2]["spec"]
+    assert len(attempts) == 3
+    assert all(a["with_reference"] is False for a in attempts)
 
 
 def test_render_with_style_enforcement_uses_initial_without_regenerating(tmp_path):
