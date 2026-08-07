@@ -194,8 +194,10 @@ pipeline {
                       "$MIGRATION_DIR/009_walk_api.sql" \
                       "$MIGRATION_DIR/010_behavior_requests_open_unique.sql" \
                       "$DEV_MIGRATION_DIR/011_cleanup_rexsung_demo_pets.sql" \
+                      "$DEV_MIGRATION_DIR/012_allow_duplicate_user_nicknames.sql" \
                       "$DEV_MIGRATION_DIR/013_pair_device001_with_ssafy.sql" \
-                      "$DEV_MIGRATION_DIR/014_reset_device001_qr_token.sql"
+                      "$DEV_MIGRATION_DIR/014_reset_device001_qr_token.sql" \
+                      "$DEV_MIGRATION_DIR/015_sync_demo_device_qr_tokens.sql"
                 '''
             }
         }

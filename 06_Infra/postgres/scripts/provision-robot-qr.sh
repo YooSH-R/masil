@@ -29,14 +29,63 @@ else
   exit 2
 fi
 
-for command_name in docker openssl sha256sum; do
+# QR 이미지는 로컬에서 발급하는데 실제 DB 는 dev 클러스터에 있다. 대상을 고를 수
+# 없으면 해시가 로컬 컨테이너에만 남아, 앱은 QR 을 정상으로 읽는데 서버가
+# INVALID_QR_TOKEN 을 낸다. device-001~003 이 실제로 그 상태였다.
+postgres_backend="${POSTGRES_BACKEND:-docker}"
+postgres_container="${POSTGRES_CONTAINER:-pet-robot-postgres}"
+postgres_pod="${POSTGRES_POD:-postgres-0}"
+kubectl_bin="${KUBECTL_BIN:-kubectl}"
+
+case "$postgres_backend" in
+  docker)
+    required_commands=(docker openssl sha256sum)
+    ;;
+  kubectl)
+    if [[ -z "${K8S_NAMESPACE:-}" ]]; then
+      echo "K8S_NAMESPACE is required when POSTGRES_BACKEND=kubectl." >&2
+      exit 2
+    fi
+    required_commands=("$kubectl_bin" openssl sha256sum)
+    ;;
+  *)
+    echo "POSTGRES_BACKEND must be either docker or kubectl." >&2
+    exit 2
+    ;;
+esac
+
+for command_name in "${required_commands[@]}"; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "Required command not found: $command_name" >&2
     exit 1
   fi
 done
 
-postgres_container="${POSTGRES_CONTAINER:-pet-robot-postgres}"
+# 사용법: postgres_psql VAR=VALUE ... -- '<sh -c 로 실행할 psql 명령>'  (SQL 은 stdin)
+#
+# 여기로 넘기는 값은 해시와 메타데이터뿐이다. qr_token·device_token 원문은
+# 로컬 셸을 벗어나지 않으며 성공 출력에서 한 번만 보여준다.
+postgres_psql() {
+  local env_pairs=()
+  while [[ $# -gt 0 && "$1" != "--" ]]; do
+    env_pairs+=("$1")
+    shift
+  done
+  shift
+
+  if [[ "$postgres_backend" == "kubectl" ]]; then
+    "$kubectl_bin" -n "$K8S_NAMESPACE" exec -i "$postgres_pod" -- \
+      env "${env_pairs[@]}" sh -c "$1"
+  else
+    local docker_env=()
+    local pair
+    for pair in "${env_pairs[@]}"; do
+      docker_env+=(-e "$pair")
+    done
+    docker exec -i "${docker_env[@]}" "$postgres_container" sh -c "$1"
+  fi
+}
+
 qr_expires_days="${QR_EXPIRES_DAYS:-30}"
 device_token_expires_days="${DEVICE_TOKEN_EXPIRES_DAYS:-365}"
 if [[ "$mode" == "full" && ! "$qr_expires_days" =~ ^[1-9][0-9]*$ ]]; then
@@ -76,12 +125,11 @@ device_token_hash="$(
 
 if [[ "$mode" == "device-token-only" ]]; then
   robot_id="$(
-    docker exec -i \
-      -e PROVISION_SERIAL="$serial_number" \
-      -e PROVISION_DEVICE_HASH="$device_token_hash" \
-      -e PROVISION_DEVICE_EXPIRES_DAYS="$device_token_expires_days" \
-      "$postgres_container" \
-      sh -c '
+    postgres_psql \
+      PROVISION_SERIAL="$serial_number" \
+      PROVISION_DEVICE_HASH="$device_token_hash" \
+      PROVISION_DEVICE_EXPIRES_DAYS="$device_token_expires_days" \
+      -- '
         psql -X -qAt -v ON_ERROR_STOP=1 \
           -U "$POSTGRES_USER" \
           -d "$POSTGRES_DB" \
@@ -103,16 +151,15 @@ SQL
   )"
 else
   robot_id="$(
-  docker exec -i \
-    -e PROVISION_SERIAL="$serial_number" \
-    -e PROVISION_MODEL="$model_name" \
-    -e PROVISION_FIRMWARE="$firmware_version" \
-    -e PROVISION_QR_HASH="$qr_token_hash" \
-    -e PROVISION_QR_EXPIRES_DAYS="$qr_expires_days" \
-    -e PROVISION_DEVICE_HASH="$device_token_hash" \
-    -e PROVISION_DEVICE_EXPIRES_DAYS="$device_token_expires_days" \
-    "$postgres_container" \
-    sh -c '
+  postgres_psql \
+    PROVISION_SERIAL="$serial_number" \
+    PROVISION_MODEL="$model_name" \
+    PROVISION_FIRMWARE="$firmware_version" \
+    PROVISION_QR_HASH="$qr_token_hash" \
+    PROVISION_QR_EXPIRES_DAYS="$qr_expires_days" \
+    PROVISION_DEVICE_HASH="$device_token_hash" \
+    PROVISION_DEVICE_EXPIRES_DAYS="$device_token_expires_days" \
+    -- '
       psql -X -qAt -v ON_ERROR_STOP=1 \
         -U "$POSTGRES_USER" \
         -d "$POSTGRES_DB" \
