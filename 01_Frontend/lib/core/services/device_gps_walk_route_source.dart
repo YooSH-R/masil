@@ -22,27 +22,37 @@ enum GpsUnavailableReason {
 /// 마실이 기기의 GPS 를 받아오는 게 아니라 이 휴대폰의 위치를 쓴다. 그래서
 /// 거리·평균 페이스·발자국 수가 모두 사용자가 실제로 걸은 값이 된다.
 ///
-/// 수집 규칙은 명세서 2.4 "배치 처리 속도"를 따른다.
-///   측정 3초 간격 / 최소 이동거리 2m / accuracy 가 나쁜 좌표는 제외
-///
 /// 역할을 나눠 두었다.
-/// - **여기**: OS 에게 3초·2m 조건으로 위치를 요청한다.
-/// - **[WalkViewModel]**: accuracy 에 따라 저장 기준을 조절해 흔들림을 거른다.
+/// - **여기**: OS 에게 1초 간격으로 원본 좌표를 요청하기만 한다. 거르지 않는다.
+/// - **[WalkTrackProcessor]**: 이상치를 걷어내고 EMA 를 걸어 화면용 위치와
+///   저장용 경로점을 따로 만든다.
 ///
-/// OS 가 요청을 항상 정확히 지키지는 않기 때문에 양쪽에서 거른다. 서버 전송은
-/// 이것과 별개로 뷰모델이 30초마다 묶어서 한다.
+/// 예전에는 여기서도 3초·2m 로 미리 줄였다. 그러면 화면에 찍을 좌표까지 같이
+/// 사라져서 마커가 멈춰 있다가 순간이동한다. 무엇을 버릴지는 판단에 필요한
+/// 재료를 다 본 뒤에 정하는 편이 낫다. 서버 전송은 이것과 별개로 뷰모델이
+/// 30초마다 묶어서 한다.
 class DeviceGpsWalkRouteSource implements WalkRouteSource {
   DeviceGpsWalkRouteSource();
 
-  /// 지도 반응성과 배터리 소모 사이의 절충값. 일반 보행이면 약 3~5m마다 온다.
-  static const Duration interval = Duration(seconds: 3);
+  /// 원본을 촘촘히 받는다. 솎아내는 일은 [WalkTrackProcessor] 가 한다.
+  ///
+  /// 예전에는 3초였다. OS 단계에서 미리 줄여 두면 배터리는 아끼지만, 화면에
+  /// 찍을 좌표까지 같이 사라져서 마커가 3초씩 멈춰 있었다. 판단에 필요한
+  /// 재료는 다 받아 놓고 무엇을 버릴지는 위에서 정하는 편이 낫다.
+  static const Duration interval = Duration(seconds: 1);
 
-  /// 제자리 GPS 흔들림을 OS 단계에서 먼저 줄인다.
-  static const int distanceFilterMeters = 2;
+  /// 0 이면 거리와 무관하게 [interval] 마다 준다.
+  ///
+  /// 제자리 흔들림은 EMA 와 A-B-C 확정이 걸러낸다. 여기서 미리 자르면 아주
+  /// 천천히 걸을 때 좌표가 아예 안 와서 경로가 멈춘다.
+  static const int distanceFilterMeters = 0;
 
   /// 좌표가 이만큼 안 오면 멈춘 것으로 보고 직접 물어본다.
-  /// 측정 간격(3초)보다 넉넉히 잡아, 정상 지연을 실패로 오인하지 않는다.
-  static const Duration _stallThreshold = Duration(seconds: 12);
+  /// 측정 간격(1초)보다 넉넉히 잡아, 정상 지연을 실패로 오인하지 않는다.
+  static const Duration _stallThreshold = Duration(seconds: 6);
+
+  /// 요청할 정확도. 산책 경로는 보행자 단위 정밀도가 필요하다.
+  static const LocationAccuracy _accuracy = LocationAccuracy.best;
 
   StreamController<WalkLocationPoint>? _controller;
   StreamSubscription<Position>? _positionSub;
@@ -111,9 +121,7 @@ class DeviceGpsWalkRouteSource implements WalkRouteSource {
     // 지도가 빈 채로 남아서 고장난 것처럼 보인다.
     try {
       final first = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
+        locationSettings: const LocationSettings(accuracy: _accuracy),
       );
       if (!controller.isClosed) controller.add(_toPoint(first));
     } catch (_) {
@@ -175,9 +183,7 @@ class DeviceGpsWalkRouteSource implements WalkRouteSource {
 
       try {
         final position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-          ),
+          locationSettings: const LocationSettings(accuracy: _accuracy),
         );
         if (controller.isClosed) return;
         _lastStreamAt = DateTime.now();
@@ -197,7 +203,7 @@ class DeviceGpsWalkRouteSource implements WalkRouteSource {
   /// 서비스를 포기하고라도 좌표를 받는 쪽을 택한다(화면이 켜져 있는 동안 기록).
   LocationSettings _settings({required bool foreground}) {
     return AndroidSettings(
-      accuracy: LocationAccuracy.high,
+      accuracy: _accuracy,
       distanceFilter: distanceFilterMeters,
       intervalDuration: interval,
       foregroundNotificationConfig: foreground
@@ -236,6 +242,28 @@ class DeviceGpsWalkRouteSource implements WalkRouteSource {
       case LocationPermission.unableToDetermine:
         // 판단이 안 되면 일단 시도한다. 실제로 막히면 스트림이 조용히 끝난다.
         return true;
+    }
+  }
+
+  /// OS 캐시에 남아 있는 마지막 위치. 측위를 기다리지 않고 즉시 돌아온다.
+  ///
+  /// 지도 첫 중심에만 쓴다. sequence 를 0 으로 두어 경로용 좌표와 구분한다 —
+  /// 실수로 경로에 섞이면 몇 시간 전 위치까지 선이 그어진다.
+  @override
+  Future<WalkLocationPoint?> lastKnownPosition() async {
+    try {
+      final position = await Geolocator.getLastKnownPosition();
+      if (position == null) return null;
+      return WalkLocationPoint(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        accuracy: position.accuracy,
+        sequence: 0,
+        recordedAt: position.timestamp.toUtc(),
+      );
+    } catch (_) {
+      // 권한이 없거나 캐시가 비었다. 지도는 기본 좌표로 뜬다.
+      return null;
     }
   }
 

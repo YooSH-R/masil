@@ -37,8 +37,14 @@ void main() {
       accuracy: 5,
     ));
     await Future<void>.delayed(Duration.zero);
-    expect(viewModel.routePoints, hasLength(2));
 
+    // 두 번째 좌표는 아직 후보점이다. 다음 좌표가 와야 튐인지 코너인지 직선인지
+    // 판단할 수 있어서 바로 확정하지 않는다. 그래도 현재 위치는 갱신된다 —
+    // 이 분리가 마커를 멈추지 않게 하는 핵심이다.
+    expect(viewModel.routePoints, hasLength(1));
+    expect(viewModel.livePosition, isNotNull);
+
+    // 종료 시 남은 후보점을 확정하므로 마지막 구간이 잘리지 않는다.
     await viewModel.endWalk();
     expect(viewModel.isWalking, isFalse);
     expect(viewModel.routePoints, hasLength(2));
@@ -71,6 +77,9 @@ class _TestRouteSource implements WalkRouteSource {
 
   @override
   String? get unavailableMessage => null;
+
+  @override
+  Future<WalkLocationPoint?> lastKnownPosition() async => null;
 }
 
 class _UnusedWalkRepository implements WalkRepository {
