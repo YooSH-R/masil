@@ -96,12 +96,34 @@ class _WalkRouteMapState extends State<WalkRouteMap> {
 
   Timer? _animTimer;
 
+  // --- 지도 그리기 직렬화 ---
+  //
+  // 지도에 무언가 그리는 일은 전부 WebView 로 가는 비동기 호출이다
+  // (`addMarker` 는 마커마다 `await runJavaScript(...)` 를 돈다). 한 번 그리는
+  // 데 100ms 를 넘길 수 있는데 마커 애니메이션 타이머는 100ms 마다 돌므로,
+  // 그냥 두면 이전 그리기가 끝나기 전에 다음 그리기가 시작된다. 그러면
+  // 명령이 순서를 잃고 마커가 앞뒤로 튀거나, 채널에 그리기 명령이 쌓인다.
+  //
+  // **그냥 "실행 중이면 무시"하면 안 된다.** 애니메이션의 마지막 프레임(도착
+  // 지점)이 버려지면 마커가 중간 지점에 멈춘 채 다음 GPS 좌표를 기다린다 —
+  // 이번 작업에서 고치려던 바로 그 증상이 약한 형태로 돌아온다.
+  //
+  // 그래서 '무시'가 아니라 '미뤄 두고 끝나면 한 번 더'다. 요청이 몰리면
+  // 중간 것들은 합쳐지고 **마지막 상태는 반드시 그려진다.**
+  //
+  // 경로와 실시간 오버레이가 같은 잠금을 쓴다. 따로 두면, 새 산책이 시작돼
+  // 경로를 지우는 사이에 진행 중이던 실시간 그리기가 마커를 다시 찍어
+  // 이전 산책의 핀이 남는다.
+  bool _drawing = false;
+  bool _routeDrawPending = false;
+  bool _liveDrawPending = false;
+
   @override
   void didUpdateWidget(WalkRouteMap oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     if (widget.points.length != _drawnAnchorCount) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _syncRoute());
+      WidgetsBinding.instance.addPostFrameCallback((_) => _requestRouteDraw());
     }
 
     final live = widget.livePosition;
@@ -116,11 +138,45 @@ class _WalkRouteMapState extends State<WalkRouteMap> {
     super.dispose();
   }
 
-  /// 확정 경로선과 출발 핀. 확정점이 늘어날 때만 부른다.
+  void _requestRouteDraw() {
+    _routeDrawPending = true;
+    _drain();
+  }
+
+  void _requestLiveDraw() {
+    _liveDrawPending = true;
+    _drain();
+  }
+
+  /// 밀린 그리기 요청을 하나씩 순서대로 처리한다.
+  ///
+  /// 경로를 먼저 그린다. 임시 선분이 마지막 확정점에서 출발하므로, 경로가
+  /// 갱신된 뒤에 그려야 이어진 모양이 된다.
+  Future<void> _drain() async {
+    if (_drawing) return;
+    _drawing = true;
+    try {
+      while (mounted && (_routeDrawPending || _liveDrawPending)) {
+        if (_routeDrawPending) {
+          _routeDrawPending = false;
+          await _drawRoute();
+        } else {
+          _liveDrawPending = false;
+          await _drawLive();
+        }
+      }
+    } finally {
+      _drawing = false;
+    }
+  }
+
+  /// 확정 경로선과 출발 핀. 확정점이 늘어날 때만 그린다.
   ///
   /// 확정점은 2~3m 마다 또는 방향이 꺾일 때만 늘어나므로, 좌표가 들어올 때마다
   /// 폴리라인 전체를 다시 만들던 예전보다 호출이 훨씬 뜸하다.
-  Future<void> _syncRoute() async {
+  ///
+  /// [_drain] 만 부른다. 직접 부르면 직렬화가 깨진다.
+  Future<void> _drawRoute() async {
     final controller = _controller;
     final points = widget.points;
     if (controller == null || !mounted) return;
@@ -172,7 +228,7 @@ class _WalkRouteMapState extends State<WalkRouteMap> {
     // 첫 좌표는 비교할 이전 자리가 없다. 그냥 그 자리에 찍는다.
     if (from == null) {
       _markerAt = target;
-      _updateLiveOverlays();
+      _requestLiveDraw();
       return;
     }
 
@@ -189,21 +245,24 @@ class _WalkRouteMapState extends State<WalkRouteMap> {
         from.latitude + (target.latitude - from.latitude) * t,
         from.longitude + (target.longitude - from.longitude) * t,
       );
-      _updateLiveOverlays();
+      _requestLiveDraw();
       if (t >= 1) timer.cancel();
     });
   }
 
   /// 현재 위치 마커와, 마지막 확정점에서 거기까지 잇는 임시 선분.
   ///
-  /// 임시 선분은 다음 확정점이 나오면 [_syncRoute] 가 그리는 영구 경로선에
+  /// 임시 선분은 다음 확정점이 나오면 [_drawRoute] 가 그리는 영구 경로선에
   /// 흡수된다. 그때까지는 경로가 마커 뒤에서 끊겨 보이지 않게 메워 준다.
-  Future<void> _updateLiveOverlays() async {
+  /// [_drain] 만 부른다. 직접 부르면 직렬화가 깨진다.
+  Future<void> _drawLive() async {
     final controller = _controller;
     final at = _markerAt;
     if (controller == null || at == null || !mounted) return;
 
-    final icon = await _endIcon();
+    // 캐시가 차 있으면 await 없이 바로 쓴다. 프레임마다 마이크로태스크로
+    // 한 번 끊기는 것도 그리기 순서가 뒤섞일 틈이 된다.
+    final icon = _cachedEnd ?? await _endIcon();
     if (!mounted) return;
 
     await controller.addMarker(markers: [
@@ -330,11 +389,11 @@ class _WalkRouteMapState extends State<WalkRouteMap> {
         _controller = controller;
         // 지도가 늦게 준비될 수 있어, 이미 쌓인 좌표를 즉시 반영한다.
         _drawnAnchorCount = 0;
-        _syncRoute();
+        _requestRouteDraw();
         final live = widget.livePosition;
         if (live != null) {
           _markerAt = LatLng(live.latitude, live.longitude);
-          _updateLiveOverlays();
+          _requestLiveDraw();
         }
       },
       center: LatLng(
