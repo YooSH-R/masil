@@ -43,6 +43,16 @@ abstract class WalkRouteSource {
   ///
   /// 값은 [points] 를 부른 뒤에 정해진다(권한 확인이 비동기라서).
   String? get unavailableMessage;
+
+  /// OS 가 캐시해 둔 마지막 위치. 없으면 null.
+  ///
+  /// **지도의 첫 중심을 잡는 용도로만 쓴다.** 경로나 서버 전송에는 넣지 않는다 —
+  /// 몇 시간 전 값일 수 있어서 경로에 섞이면 엉뚱한 선이 그어진다.
+  ///
+  /// 첫 GPS 측위는 실외에서도 수 초, 실내면 그 이상 걸린다. 그동안 지도가
+  /// 기본 좌표(광화문)에 머물러 "왜 여기가 뜨지" 하게 되는데, 캐시된 위치는
+  /// 측위를 기다리지 않고 즉시 돌아오므로 그 공백을 메운다.
+  Future<WalkLocationPoint?> lastKnownPosition() async => null;
 }
 
 /// 백엔드 GPS 푸시가 준비되기 전까지 화면을 검증하기 위한 임시 소스.
@@ -110,6 +120,10 @@ class MockWalkRouteSource implements WalkRouteSource {
   /// 목 소스는 항상 좌표를 흘려보내므로 막히는 경우가 없다.
   @override
   String? get unavailableMessage => null;
+
+  /// 목 소스는 캐시된 위치가 없다. 첫 좌표가 곧바로 오므로 필요도 없다.
+  @override
+  Future<WalkLocationPoint?> lastKnownPosition() async => null;
 
   @override
   Future<void> stop() async {
