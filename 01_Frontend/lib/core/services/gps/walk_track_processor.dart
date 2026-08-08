@@ -76,12 +76,15 @@ class WalkTrackProcessor {
       originLongitude: raw.longitude,
     );
 
-    final smoothed = _ema.add(projection.toMeters(raw.latitude, raw.longitude));
+    final measured = projection.toMeters(raw.latitude, raw.longitude);
+    final smoothed = _ema.add(measured);
     final live = _toPoint(projection, smoothed, raw);
     _livePosition = live;
 
     final committed = _tracker.add(AnchorSample<WalkLocationPoint>(
       position: smoothed,
+      // 튐 판정은 EMA 를 거치지 않은 값으로 해야 한다. 이유는 AnchorSample 참고.
+      rawPosition: measured,
       recordedAt: raw.recordedAt,
       payload: live,
       candidateOnly: verdict.isCandidateOnly,

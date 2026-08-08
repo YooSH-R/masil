@@ -78,6 +78,7 @@ class _WalkInProgressScreenState extends State<WalkInProgressScreen>
             _buildStatsCard(walkVm),
             Expanded(
                 child: _buildMapCard(
+                    walkVm,
                     points,
                     // 위치가 막힌 이유가 있으면 그걸, 없으면 좌표가 걸러지는
                     // 이유(진단)를 보여준다. 둘 다 없으면 기본 안내가 나온다.
@@ -191,8 +192,8 @@ class _WalkInProgressScreenState extends State<WalkInProgressScreen>
     );
   }
 
-  Widget _buildMapCard(
-      List<WalkLocationPoint> points, String? unavailableMessage) {
+  Widget _buildMapCard(WalkViewModel walkVm, List<WalkLocationPoint> points,
+      String? unavailableMessage) {
     // 주의: 이 컨테이너에 clipBehavior/borderRadius 를 걸지 않는다.
     // KakaoMap 은 WebView(안드로이드 플랫폼 뷰)라서 클리핑을 걸면 렌더링이
     // 비어버린다(지도가 안 보이고 배경색만 나옴).
@@ -201,8 +202,9 @@ class _WalkInProgressScreenState extends State<WalkInProgressScreen>
       decoration: const BoxDecoration(color: Color(0xFFE8F6F3)),
       child: Stack(
         children: [
-          Positioned.fill(child: _buildMap(points)),
-          if (points.isEmpty)
+          Positioned.fill(child: _buildMap(walkVm, points)),
+          // 확정점이 아직 없어도 현재 위치가 잡혔으면 지도는 살아 있는 것이다.
+          if (points.isEmpty && walkVm.livePosition == null)
             Positioned(
               bottom: 16,
               left: 16,
@@ -214,9 +216,17 @@ class _WalkInProgressScreenState extends State<WalkInProgressScreen>
     );
   }
 
-  Widget _buildMap(List<WalkLocationPoint> points) {
+  Widget _buildMap(WalkViewModel walkVm, List<WalkLocationPoint> points) {
     // 지도·경로선은 경로 상세 화면과 공용 위젯을 쓴다.
-    return WalkRouteMap(points: points, followLast: true);
+    //
+    // 확정 경로(points)와 현재 위치(livePosition)를 따로 넘긴다. 마커는 현재
+    // 위치를 1초 단위로 부드럽게 따라가고, 경로선은 확정점이 늘 때만 자란다.
+    return WalkRouteMap(
+      points: points,
+      livePosition: walkVm.livePosition,
+      centerHint: walkVm.mapCenterHint,
+      followLast: true,
+    );
   }
 
   Widget _buildControls(WalkViewModel walkVm) {

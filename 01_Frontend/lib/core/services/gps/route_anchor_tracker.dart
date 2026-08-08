@@ -7,10 +7,21 @@ class AnchorSample<T> {
     required this.position,
     required this.recordedAt,
     required this.payload,
+    Vec2? rawPosition,
     this.candidateOnly = false,
-  });
+  }) : rawPosition = rawPosition ?? position;
 
+  /// EMA 를 거친 좌표. 경로 모양 판단과 실제로 기록되는 값이 모두 이것이다.
   final Vec2 position;
+
+  /// EMA 를 거치기 **전** 좌표. 튐 판정에만 쓴다.
+  ///
+  /// **왜 따로 필요한가**: EMA 는 튄 좌표를 없애지 않고 alpha 만큼 줄여서 이후
+  /// 좌표에 번지게 한다. 18m 튄 값이 alpha 0.45 를 지나면 약 8m 로 줄고, 그
+  /// 8m 가 다음 좌표에도 섞인다. 보정된 좌표만 보면 "크게 튀었다가 제자리로
+  /// 돌아왔다"는 모양이 무너져서 튐을 못 잡는다. 원본으로 보면 그대로 보인다.
+  final Vec2 rawPosition;
+
   final DateTime recordedAt;
 
   /// 호출자가 들고 다니는 원본 정보. 뷰모델은 여기에 원본 좌표를 넣어 sequence
@@ -74,10 +85,15 @@ class RouteAnchorTracker<T> {
     }
 
     final ab = a.position.distanceTo(b.position);
-    final ac = a.position.distanceTo(c.position);
 
     // 1) 튐: B 만 멀리 떨어졌다가 C 가 제자리로 돌아왔다. B 를 버린다.
-    if (ab >= config.spikeMinMeters && ac <= ab * config.spikeReturnRatio) {
+    //
+    // 여기서만 원본 좌표를 본다. 보정된 좌표는 EMA 가 튐을 이미 절반쯤 깎고
+    // 다음 좌표에도 번뜨려 놔서, 튐 특유의 '갔다가 돌아옴' 모양이 남지 않는다.
+    final rawAb = a.rawPosition.distanceTo(b.rawPosition);
+    final rawAc = a.rawPosition.distanceTo(c.rawPosition);
+    if (rawAb >= config.spikeMinMeters &&
+        rawAc <= rawAb * config.spikeReturnRatio) {
       _pending = c;
       return const [];
     }

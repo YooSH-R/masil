@@ -56,6 +56,75 @@ void main() {
     await viewModel.endWalk();
     viewModel.dispose();
   });
+
+  test('서버 업로드 버퍼에는 확정된 경로점만 들어간다', () async {
+    SharedPreferences.setMockInitialValues({});
+    final source = _TestRouteSource();
+    final viewModel =
+        WalkViewModel(_UnusedWalkRepository(), routeSource: source);
+    viewModel.startRouteTracking();
+
+    // 1초 간격으로 북쪽으로 곧게 걷는다 (1초에 약 1.4m).
+    final startedAt = DateTime.utc(2026, 8, 5, 1);
+    for (var i = 0; i < 20; i++) {
+      source.add(WalkLocationPoint(
+        latitude: 37.0 + i * 1.4 / 111320,
+        longitude: 127.0,
+        sequence: i + 1,
+        recordedAt: startedAt.add(Duration(seconds: i)),
+        accuracy: 5,
+      ));
+    }
+    await Future<void>.delayed(Duration.zero);
+
+    // 마커용 현재 위치는 좌표마다 갱신되지만, 버퍼에는 확정점만 쌓인다.
+    expect(viewModel.livePosition, isNotNull);
+    expect(viewModel.pendingPointCount, viewModel.routePoints.length);
+    expect(viewModel.routePoints.length, lessThan(20),
+        reason: '직선 구간의 중간점은 솎여야 한다');
+
+    await viewModel.endWalk();
+    viewModel.dispose();
+  });
+
+  test('튄 좌표는 경로에도 업로드 버퍼에도 남지 않는다', () async {
+    SharedPreferences.setMockInitialValues({});
+    final source = _TestRouteSource();
+    final viewModel =
+        WalkViewModel(_UnusedWalkRepository(), routeSource: source);
+    viewModel.startRouteTracking();
+
+    final startedAt = DateTime.utc(2026, 8, 5, 1);
+    // 정상 → 동쪽으로 크게 튐 → 원래 경로 복귀
+    const offsets = <(double, double)>[
+      (0, 0),
+      (0, 2),
+      (18, 4), // 튐
+      (0, 6),
+      (0, 8),
+    ];
+    for (var i = 0; i < offsets.length; i++) {
+      final (dx, dy) = offsets[i];
+      source.add(WalkLocationPoint(
+        latitude: 37.0 + dy / 111320,
+        longitude: 127.0 + dx / (111320 * 0.7934),
+        sequence: i + 1,
+        recordedAt: startedAt.add(Duration(seconds: i * 2)),
+        accuracy: 5,
+      ));
+    }
+    await Future<void>.delayed(Duration.zero);
+    await viewModel.endWalk();
+
+    // 튄 좌표는 동쪽으로 18m 다. 경로점 중 그쪽으로 간 것이 없어야 한다.
+    for (final point in viewModel.routePoints) {
+      final eastMeters = (point.longitude - 127.0) * 111320 * 0.7934;
+      expect(eastMeters, lessThan(8),
+          reason: '튄 좌표가 경로에 남았다 (동쪽 ${eastMeters.round()}m)');
+    }
+
+    viewModel.dispose();
+  });
 }
 
 class _TestRouteSource implements WalkRouteSource {
