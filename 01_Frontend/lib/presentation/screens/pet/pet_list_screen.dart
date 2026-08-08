@@ -200,7 +200,7 @@ class _PetListScreenState extends State<PetListScreen> {
               borderWidth: 0,
               backgroundColor: const Color(0xFFF9F3E7),
               placeholder:
-                  Image.asset('assets/images/mysil_character.png'),
+                  Image.asset('assets/images/mysil_pet.png'),
             ),
             const SizedBox(width: 16),
             Expanded(
