@@ -200,7 +200,7 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
               placeholder: Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: ClipOval(
-                  child: Image.asset('assets/images/mysil_character.png',
+                  child: Image.asset('assets/images/mysil_pet.png',
                       fit: BoxFit.contain),
                 ),
               ),

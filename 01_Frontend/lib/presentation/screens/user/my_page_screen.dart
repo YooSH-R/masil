@@ -153,6 +153,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
                     Row(
                       children: [
                         // 펫 프로필 관리에서 등록한 사진. 없으면 기본 마실이 그림.
+                        // 반려동물 자체를 가리키므로 스테이션이 아닌 인형 이미지를 쓴다.
                         ProfileAvatar(
                           imageKey: ProfileImageStore.petKeyOrCurrent(pet.id),
                           size: 50,
@@ -160,7 +161,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
                           borderWidth: 0,
                           backgroundColor: const Color(0xFFFDF7F0),
                           placeholder:
-                              Image.asset('assets/images/mysil_character.png'),
+                              Image.asset('assets/images/mysil_pet.png'),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
