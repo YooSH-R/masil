@@ -57,6 +57,60 @@ void main() {
     viewModel.dispose();
   });
 
+  // 뷰모델은 산책 하나 분량의 요약만 들고 있다. 앞서 본 산책의 값이 남으면
+  // 방금 끝낸 산책의 경로를 보려는데 며칠 전 지도가 뜬다.
+  test('다른 산책을 조회하면 이전 요약을 먼저 비운다', () async {
+    SharedPreferences.setMockInitialValues({});
+    final repository = _SummaryRepository();
+    final viewModel = WalkViewModel(repository);
+
+    await viewModel.loadSummary(1);
+    expect(viewModel.summary?.walkId, 1);
+
+    // 2번 조회가 실패해도 1번 요약이 남으면 안 된다. 남으면 화면이 남의 경로를
+    // 그린 채 굳는다.
+    repository.fails = true;
+    await viewModel.loadSummary(2);
+    expect(viewModel.summary, isNull);
+
+    viewModel.dispose();
+  });
+
+  // 목록에서 여러 산책을 빠르게 눌러 들어가면 조회가 겹친다. 먼저 시작한
+  // 조회가 나중에 끝나면, 화면은 최신 산책을 보고 있는데 값만 이전 것으로
+  // 덮인다.
+  test('늦게 도착한 옛 조회가 최신 요약을 덮지 않는다', () async {
+    SharedPreferences.setMockInitialValues({});
+    final viewModel = WalkViewModel(_SummaryRepository(delays: {
+      1: const Duration(milliseconds: 60), // 먼저 요청했지만 늦게 온다
+      2: const Duration(milliseconds: 5),
+    }));
+
+    final stale = viewModel.loadSummary(1);
+    final latest = viewModel.loadSummary(2);
+    await Future.wait([stale, latest]);
+
+    expect(viewModel.summary?.walkId, 2);
+
+    viewModel.dispose();
+  });
+
+  test('새 산책을 시작하면 지난 산책의 요약을 버린다', () async {
+    SharedPreferences.setMockInitialValues({});
+    final source = _TestRouteSource();
+    final viewModel = WalkViewModel(_SummaryRepository(), routeSource: source);
+
+    await viewModel.loadSummary(1);
+    expect(viewModel.summary, isNotNull);
+
+    // 남겨 두면 요약 화면이 "이미 있다"고 보고 새 산책을 안 불러온다.
+    viewModel.startRouteTracking();
+    expect(viewModel.summary, isNull);
+
+    await viewModel.endWalk();
+    viewModel.dispose();
+  });
+
   test('서버 업로드 버퍼에는 확정된 경로점만 들어간다', () async {
     SharedPreferences.setMockInitialValues({});
     final source = _TestRouteSource();
@@ -127,6 +181,28 @@ void main() {
   });
 }
 
+class _SummaryRepository extends _UnusedWalkRepository {
+  _SummaryRepository({this.delays = const {}});
+
+  bool fails = false;
+
+  /// walkId → 응답이 늦게 오는 정도. 경합을 만들 때 쓴다.
+  final Map<int, Duration> delays;
+
+  @override
+  Future<WalkSummary> getSummary(int walkId) async {
+    final delay = delays[walkId];
+    if (delay != null) await Future<void>.delayed(delay);
+    if (fails) throw StateError('조회 실패');
+    return WalkSummary(
+      walkId: walkId,
+      durationSeconds: 600,
+      distanceMeters: 900,
+      route: const [],
+    );
+  }
+}
+
 class _TestRouteSource implements WalkRouteSource {
   StreamController<WalkLocationPoint>? _controller;
 
@@ -154,7 +230,7 @@ class _TestRouteSource implements WalkRouteSource {
 class _UnusedWalkRepository implements WalkRepository {
   @override
   Future<Walk> createWalk({
-    required int proposalId,
+    int? proposalId,
     required int petId,
     required int robotId,
   }) =>

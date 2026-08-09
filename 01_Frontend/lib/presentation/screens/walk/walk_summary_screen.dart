@@ -28,7 +28,9 @@ class _WalkSummaryScreenState extends State<WalkSummaryScreen> {
       final walkId = walkVm.currentWalk?.walkId ?? walkVm.summary?.walkId;
       if (walkId == null) return;
 
-      if (walkVm.summary == null) walkVm.loadSummary(walkId);
+      // 다른 산책의 요약이 남아 있을 수 있으므로 walkId 까지 본다. `== null`
+      // 만 보면 남의 요약이 있을 때 이번 산책을 아예 안 불러온다.
+      if (walkVm.summary?.walkId != walkId) walkVm.loadSummary(walkId);
       // 일지는 지금부터 만들어진다. 완성되면 체크리스트가 저절로 바뀐다.
       context.read<WalkDiaryViewModel>().startWatchingDiary(walkId);
 

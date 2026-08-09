@@ -20,7 +20,7 @@ class WakewordNode(Node):
         share_dir = get_package_share_directory('petbot_wakeword')
 
         self.declare_parameter('mic_device_index', -1)
-        self.declare_parameter('mic_device_name', 'Brio')
+        self.declare_parameter('mic_device_name', 'ReSpeaker')
         self.declare_parameter('model_path',
                                 os.path.join(share_dir, 'models', 'masila.onnx'))
         self.declare_parameter('threshold', 0.5)

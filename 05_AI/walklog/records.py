@@ -31,6 +31,7 @@ from __future__ import annotations
 import json
 import random
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -53,10 +54,14 @@ __all__ = [
     "WalkInfo",
     "load_manifest",
     "iter_frames",
+    "adaptive_sample_size",
     "sample_time_quantiles",
     "usable",
+    "outdoor",
     "to_json_lines",
     "walk_duration",
+    "walk_time_range",
+    "top_subjects",
     "dump_records",
     "load_records",
 ]
@@ -143,6 +148,7 @@ class FrameMeta:
     offset_seconds: float | None = None
     shot_datetime: str = UNKNOWN
     location: str = UNKNOWN
+    sharpness: float | None = None
 
     @property
     def name(self) -> str:
@@ -194,6 +200,16 @@ class FrameRecord:
     @property
     def unreadable(self) -> bool:
         return bool(self.observation.get("unreadable"))
+
+    @property
+    def is_indoor(self) -> bool:
+        """실내 프레임인가. 신형 기록은 indoor 필드, 구형 기록은
+        location_type/weather의 '실내' 문자열로 추정한다 (하위 호환)."""
+        obs = self.observation
+        if "indoor" in obs:
+            return bool(obs["indoor"])
+        text = f"{obs.get('location_type', '')} {obs.get('weather', '')}"
+        return "실내" in text
 
     @property
     def confidence_mean(self) -> float:
@@ -284,6 +300,15 @@ def load_manifest(path: str | Path) -> tuple[WalkInfo, dict[str, dict[str, Any]]
         }
     walk와 frames 모두 선택이며, frames의 각 항목에서 file만 필수다.
     나머지는 파일명 파싱 결과를 덮어쓰는 용도다.
+
+    extract_best_frames.py(임베디드 영역)가 실제로 쓰는 frames 항목 스키마는
+    키 이름이 다르다:
+        {"frame_index": 600, "timestamp_sec": 40.0, "score": 812.5,
+         "file": "f_0000600_t000m40.00s.jpg", "wall_time": "2026-08-03T14:20:40"}
+    이 파일이 스키마를 소유하지 않고 추출기 쪽이 소유하므로(추출기는 임베디드
+    영역과 공유된다), 여기서는 두 스키마를 모두 받는다: index는
+    frame_index를 대신 보고, offset_seconds는 timestamp_sec을, shot_datetime은
+    wall_time을, sharpness는 score를 대신 본다(각각 값이 없을 때만).
 
     형식이 다르면 추측하지 않고 예외를 던진다. 분할 전 삽화 스크립트는
     키 이름 후보 7개를 순회하며 추측했는데, 그러면 잘못 맞춰도 조용히 넘어간다.
@@ -381,8 +406,14 @@ def iter_frames(
         override = per_file.get(path.name, {})
         parsed = parse_frame_name(path.name)
 
+        # extract_best_frames.py 스키마(frame_index/timestamp_sec/wall_time/score)와
+        # 이 파일 고유 스키마(index/offset_seconds/shot_datetime)를 모두 받는다.
         index = override.get("index")
+        if index is None:
+            index = override.get("frame_index")
         offset = override.get("offset_seconds")
+        if offset is None:
+            offset = override.get("timestamp_sec")
         if parsed is not None:
             index = index if index is not None else parsed[0]
             offset = offset if offset is not None else parsed[1]
@@ -390,7 +421,11 @@ def iter_frames(
             unparsed.append(path.name)
 
         segment = override.get("segment") or _segment_of(path, frame_dir)
-        shot = override.get("shot_datetime") or walk.shot_datetime(offset)
+        shot = (override.get("shot_datetime") or override.get("wall_time")
+                or walk.shot_datetime(offset))
+        sharpness = override.get("sharpness")
+        if sharpness is None:
+            sharpness = override.get("score")
 
         metas.append(FrameMeta(
             path=path,
@@ -399,6 +434,7 @@ def iter_frames(
             offset_seconds=None if offset is None else float(offset),
             shot_datetime=str(shot),
             location=str(override.get("location") or walk.location),
+            sharpness=None if sharpness is None else float(sharpness),
         ))
 
     if unparsed:
@@ -414,6 +450,22 @@ def iter_frames(
 
 
 # ============================================================ 표본 추출
+
+def adaptive_sample_size(
+    total: int,
+    *,
+    ratio: float = config.SAMPLE_RATIO,
+    lower: int = config.SAMPLE_MIN,
+    upper: int = config.SAMPLE_MAX,
+) -> int:
+    """전체 프레임 수에 비례한 표본 크기. [lower, upper]로 묶는다.
+
+    비율 기반인 이유: 고정 4장은 긴 산책에서 흐름을 놓치고, 무제한 비례는
+    VLM 비용이 프레임 수에 끌려간다. 상한이 있으면 오래된 대용량 프레임
+    폴더를 넣어도 비용이 예측 가능하다.
+    """
+    return max(lower, min(upper, round(total * ratio)))
+
 
 def sample_time_quantiles(
     metas: Sequence[FrameMeta],
@@ -432,9 +484,16 @@ def sample_time_quantiles(
        중앙 밴드로 제한하면 인접 표본 간 최소 (1-band_ratio)*구간폭 의 시간
        간격이 보장된다.
     3. 밴드가 비면 앵커에서 가장 가까운 미선택 프레임으로 폴백한다.
+    4. 밴드 후보 전원이 sharpness(추출 단계의 선명도 점수)를 갖고 있으면
+       무작위 대신 그중 최고점을 뽑는다. 이 경로는 rng를 쓰지 않으므로
+       같은 입력이면 항상 같은 결과가 나온다(재현성). 후보 중 한 장이라도
+       sharpness가 없으면 rng.choice로 폴백한다 - 점수 있는 프레임만
+       편애하면 밴드 안에서의 시간 대표성이 왜곡되기 때문이다.
 
     무작위성을 남긴 이유는 이전과 같다: 앵커 지점을 고정 선택하면 그 순간의
-    프레임이 하필 흐리거나 가려져 있을 때 대안이 없다.
+    프레임이 하필 흐리거나 가려져 있을 때 대안이 없다. sharpness가 전원에게
+    있을 때는 무작위 대신 점수로 고르는 편이 더 낫다고 판단해 그 경우만
+    예외로 뒀다.
 
     경과 시각(offset_seconds)이 없는 프레임이 있으면 시간 등분이 불가능하므로
     경고 후 기존 방식(개수 등분 + 등분 내 무작위)으로 폴백한다.
@@ -478,7 +537,10 @@ def sample_time_quantiles(
                 if id(m) not in chosen_ids
                 and abs(m.offset_seconds - anchor) <= half_band]
         if band:
-            pick = rng.choice(band)
+            if all(m.sharpness is not None for m in band):
+                pick = max(band, key=lambda m: m.sharpness)
+            else:
+                pick = rng.choice(band)
         else:
             remaining = [m for m in timed if id(m) not in chosen_ids]
             if not remaining:
@@ -502,6 +564,17 @@ def usable(records: Iterable[FrameRecord]) -> list[FrameRecord]:
     return [r for r in records if not r.unreadable]
 
 
+def outdoor(records: Iterable[FrameRecord]) -> list[FrameRecord]:
+    """실내 프레임을 뺀 기록만 남긴다.
+
+    frame_records.json에는 실내 기록도 그대로 남아 있다(감사 가능성을 위해
+    삭제하지 않는다). 일지/이미지 재료로는 부적합하므로 이 필터로 다운스트림
+    에서만 뺀다. 호출부는 결과가 비면 원본으로 폴백해야 한다(전부 실내인
+    입력에서 파이프라인이 죽으면 안 된다).
+    """
+    return [r for r in records if not r.is_indoor]
+
+
 def to_json_lines(records: Sequence[FrameRecord]) -> str:
     """관찰 결과를 한 줄씩 직렬화한다. 메타는 넣지 않는다.
 
@@ -519,6 +592,55 @@ def walk_duration(records: Sequence[FrameRecord]) -> str:
         if record.meta.offset_seconds is not None:
             return record.meta.elapsed
     return UNKNOWN
+
+
+def walk_time_range(
+    walk: WalkInfo, records: Sequence[FrameRecord]
+) -> tuple[str, str] | None:
+    """(시작 시각, 종료 시각) HH:MM 문자열. 계산 불가면 None.
+
+    종료 시각 = started_at + 마지막 프레임의 경과 초.
+    LLM에 맡기지 않는 이유: 이 값은 결정적으로 계산 가능하며,
+    프롬프트에 넣으면 형식이 흔들리거나 환각될 수 있다.
+    """
+    if not walk.started_at:
+        return None
+    last = next((r.meta.offset_seconds for r in reversed(records)
+                 if r.meta.offset_seconds is not None), None)
+    if last is None:
+        return None
+    try:
+        base = datetime.fromisoformat(walk.started_at)
+    except ValueError:
+        return None
+    end = base + timedelta(seconds=float(last))
+    return base.strftime("%H:%M"), end.strftime("%H:%M")
+
+
+# 카테고리 우선순위. 낮을수록 우선(동률일 때 이 순서로 이긴다).
+_SUBJECT_CATEGORY_RANK = {"animals": 0, "plants": 1, "objects": 2}
+
+
+def top_subjects(records: Sequence[FrameRecord], limit: int = 5) -> list[str]:
+    """등장 빈도 순 피사체 명사. animals > plants > objects 순으로 동률을 깬다.
+
+    저널의 '오늘 만난 것들' 칩에 쓴다. LLM을 부르지 않는다 - 기록에 이미
+    명사가 들어 있고, 집계는 결정적이어야 한다.
+    """
+    counts: Counter[str] = Counter()
+    best_rank: dict[str, int] = {}
+    for record in records:
+        obs = record.observation
+        for field_name, rank in _SUBJECT_CATEGORY_RANK.items():
+            for item in obs.get(field_name) or []:
+                name = str(item).strip()
+                if not name or name == UNKNOWN:
+                    continue
+                counts[name] += 1
+                if name not in best_rank or rank < best_rank[name]:
+                    best_rank[name] = rank
+    ordered = sorted(counts, key=lambda name: (-counts[name], best_rank[name], name))
+    return ordered[:limit]
 
 
 # ============================================================ 저장 / 불러오기

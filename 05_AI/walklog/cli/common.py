@@ -62,8 +62,9 @@ def add_upload_args(parser: argparse.ArgumentParser) -> None:
     group = parser.add_argument_group("업로드")
     group.add_argument("--upload-s3", dest="upload_s3", action="store_true",
                        default=True,
-                       help=f"일지+감성 이미지({', '.join(config.S3_UPLOAD_FILES)})만 S3에 "
-                            f"업로드한다 (기본값, 버킷: {config.S3_BUCKET})")
+                       help=f"세션 폴더 전체를 S3에 미러링 업로드한다 "
+                            f"({config.PAYLOAD_DIRNAME}/ 제외, 기본값, "
+                            f"버킷: {config.S3_BUCKET})")
     group.add_argument("--no-upload-s3", dest="upload_s3", action="store_false",
                        help="S3 업로드를 건너뛴다 (로컬 저장만)")
     group.add_argument("--s3-bucket", default=config.S3_BUCKET,
@@ -151,7 +152,7 @@ def print_paths(paths: dict[str, Path]) -> None:
 
 
 def upload_if_requested(args: argparse.Namespace, run_dir: Path) -> None:
-    """run_dir 안의 AI 최종 결과물(config.S3_UPLOAD_FILES)만 S3에 올린다.
+    """run_dir 전체(payload/ 제외)를 S3에 미러링 업로드한다.
 
     기본 동작이며 --no-upload-s3로 끌 수 있다. 실패해도 프로세스를 죽이지
     않는다. 로컬 산출물은 이미 완성된 상태이므로, 업로드 실패로 이미 만든
@@ -170,8 +171,11 @@ def upload_if_requested(args: argparse.Namespace, run_dir: Path) -> None:
         return
 
     if not uploaded:
-        step("[S3 업로드] 올릴 파일이 없습니다 (일지/감성 이미지가 아직 없음)")
+        step("[S3 업로드] 올릴 파일이 없습니다")
         return
 
-    step(f"[S3 업로드] {len(uploaded)}개 파일 -> "
+    total_bytes = sum((run_dir / rel).stat().st_size for rel in uploaded
+                      if (run_dir / rel).is_file())
+    size_mb = total_bytes / (1024 * 1024)
+    step(f"[S3 업로드] {len(uploaded)}개 파일 ({size_mb:.1f} MB) -> "
          f"s3://{args.s3_bucket}/{args.s3_prefix}/{run_label(run_dir)}/")

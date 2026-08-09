@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from walklog import config
 from walklog.records import (
     UNKNOWN,
     FrameMeta,
@@ -21,16 +22,20 @@ from walklog.records import (
     ManifestError,
     RecordsError,
     WalkInfo,
+    adaptive_sample_size,
     dump_records,
     format_elapsed,
     iter_frames,
     load_manifest,
     load_records,
+    outdoor,
     parse_frame_name,
     sample_time_quantiles,
     to_json_lines,
+    top_subjects,
     usable,
     walk_duration,
+    walk_time_range,
 )
 
 # data/sample_image 의 실제 파일명들
@@ -159,6 +164,36 @@ def make_timed_metas(offsets) -> list[FrameMeta]:
     ]
 
 
+def make_sharpness_metas(offsets_scores) -> list[FrameMeta]:
+    """(경과 초, sharpness) 쌍 목록으로 더미 메타를 만든다. sharpness는 None 허용."""
+    return [
+        FrameMeta(path=Path(f"f_{i:04d}.jpg"), index=i,
+                  offset_seconds=float(o), sharpness=s)
+        for i, (o, s) in enumerate(offsets_scores)
+    ]
+
+
+@pytest.mark.parametrize("total,expected", [
+    (20, 4),     # 20 * 0.10 = 2 -> 하한 4로 올림
+    (48, 5),     # 48 * 0.10 = 4.8 -> round() = 5
+    (147, 12),   # 147 * 0.10 = 14.7 -> 상한 12로 눌림
+    (3, 4),      # 표본 크기 자체는 4를 반환한다.
+                 # (실제 축소는 sample_time_quantiles의 total<=n 처리가 담당)
+])
+def test_adaptive_sample_size_bounds(total, expected):
+    assert adaptive_sample_size(total) == expected
+
+
+def test_adaptive_sample_size_uses_config_defaults():
+    assert adaptive_sample_size(1000) == config.SAMPLE_MAX
+    assert adaptive_sample_size(0) == config.SAMPLE_MIN
+
+
+def test_adaptive_sample_size_custom_ratio_and_bounds():
+    assert adaptive_sample_size(100, ratio=0.5, lower=1, upper=200) == 50
+    assert adaptive_sample_size(100, ratio=0.5, lower=1, upper=10) == 10
+
+
 def test_sample_time_quantiles_deterministic_with_seed():
     metas = make_metas(20)
     first = sample_time_quantiles(metas, 4, rng=random.Random(42))
@@ -240,6 +275,51 @@ def test_sample_time_quantiles_covers_sparse_tail():
         picks = sample_time_quantiles(metas, 4, rng=random.Random(seed))
         back_count = sum(1 for p in picks if p.offset_seconds >= 60)
         assert back_count >= 2, (seed, [p.offset_seconds for p in picks])
+
+
+def test_sample_time_quantiles_picks_max_sharpness_when_all_present():
+    """밴드 후보 전원이 sharpness를 가지면 무작위 대신 최고점을 뽑는다(결정적).
+
+    band_ratio=0.5, span 0~240, n=4 -> 앵커 30/90/150/210, 밴드폭 ±15.
+    배경(sharpness=1.0)과 각 밴드 안의 피크(sharpness=9.0)를 섞어 두면
+    시드와 무관하게 항상 피크만 뽑혀야 한다.
+    """
+    background = [(o, 1.0) for o in range(0, 241, 20)]
+    peaks = [(25, 9.0), (95, 9.0), (145, 9.0), (205, 9.0)]
+    # sample_time_quantiles는 timed[0]/timed[-1]을 시각 최솟값/최댓값으로 쓰므로
+    # 입력이 시간순 정렬돼 있어야 한다(iter_frames가 항상 보장하는 것과 동일).
+    entries = sorted(background + peaks, key=lambda pair: pair[0])
+    metas = make_sharpness_metas(entries)
+    peak_names = {m.name for m in metas if m.sharpness == 9.0}
+
+    picks_a = sample_time_quantiles(metas, 4, rng=random.Random(1))
+    picks_b = sample_time_quantiles(metas, 4, rng=random.Random(999))
+
+    assert [m.name for m in picks_a] == [m.name for m in picks_b]
+    assert {m.name for m in picks_a} == peak_names
+
+
+def test_sample_time_quantiles_falls_back_to_rng_when_sharpness_partial():
+    """밴드 후보 중 한 장이라도 sharpness가 없으면 기존 rng.choice로 폴백한다.
+
+    (점수 있는 프레임만 편애하면 시간 대표성이 왜곡되기 때문)
+    같은 시드면 여전히 같은 결과가 나오되(결정성 유지), 시드가 바뀌면
+    최고점이 아닌 후보도 뽑힐 수 있어야 한다(고정된 최댓값 선택이 아님).
+    """
+    data = [(o, None) for o in range(0, 241, 20)]
+    data += [(25, 9.0), (95, None), (145, 9.0), (205, None)]
+    data.sort(key=lambda pair: pair[0])
+    metas = make_sharpness_metas(data)
+
+    first = sample_time_quantiles(metas, 4, rng=random.Random(42))
+    second = sample_time_quantiles(metas, 4, rng=random.Random(42))
+    assert [m.name for m in first] == [m.name for m in second]
+
+    band0_picks = set()
+    for seed in range(20):
+        picks = sample_time_quantiles(metas, 4, rng=random.Random(seed))
+        band0_picks.add(next(m.name for m in picks if m.offset_seconds <= 45))
+    assert len(band0_picks) > 1
 
 
 def test_sample_time_quantiles_falls_back_without_offsets(capsys):
@@ -328,6 +408,40 @@ def test_manifest_overrides_filename(tmp_path):
     assert metas[1].segment == UNKNOWN
 
 
+def test_manifest_supports_extract_best_frames_schema(tmp_path):
+    """extract_best_frames.py(임베디드 영역)가 실제로 쓰는 frames 항목 스키마.
+
+    키 이름이 이 파일 고유 스키마(offset_seconds/shot_datetime)와 달리
+    frame_index/timestamp_sec/score/wall_time을 쓴다. 스키마를 소유한 쪽은
+    추출기이므로 이 파일이 그에 맞춰 읽어야 한다.
+    """
+    directory = touch_frames(tmp_path / "f", REAL_NAMES[:1])
+    manifest = write_manifest(tmp_path, {
+        "frames": [{
+            "frame_index": 128,
+            "timestamp_sec": 8.53,
+            "score": 812.5,
+            "clip_high": 0.0,
+            "clip_low": 0.01,
+            "mean_brightness": 128.3,
+            "file": REAL_NAMES[0],
+            "wall_time": "2026-08-03T14:20:40",
+        }],
+    })
+
+    metas = iter_frames(directory, manifest=manifest)
+    assert metas[0].index == 128
+    assert metas[0].offset_seconds == pytest.approx(8.53)
+    assert metas[0].sharpness == pytest.approx(812.5)
+    assert metas[0].shot_datetime == "2026-08-03T14:20:40"
+
+
+def test_manifest_without_score_leaves_sharpness_none(tmp_path):
+    directory = touch_frames(tmp_path / "f", REAL_NAMES[:1])
+    metas = iter_frames(directory)
+    assert metas[0].sharpness is None
+
+
 @pytest.mark.parametrize("data,message", [
     ([1, 2, 3], "최상위는 객체"),
     ({"walk": "text"}, '"walk"는 객체'),
@@ -398,6 +512,74 @@ def test_walk_duration_skips_unknown_tail(tmp_path):
     assert walk_duration(records) == "0분 11초"
 
 
+# ------------------------------------------------------------ 시작~종료 시각
+
+def test_walk_time_range_from_started_at_and_last_offset(tmp_path):
+    """시작 시각 + 마지막 프레임 경과초 = 종료 시각."""
+    records = make_records(tmp_path, 3)   # 8.53s, 10.67s, 64.0s
+    walk = WalkInfo(started_at="2026-08-04T08:12:03")
+    assert walk_time_range(walk, records) == ("08:12", "08:13")   # +64s -> 08:13:07
+
+
+def test_walk_time_range_none_without_started_at(tmp_path):
+    records = make_records(tmp_path, 2)
+    walk = WalkInfo()
+    assert walk_time_range(walk, records) is None
+
+
+def test_walk_time_range_none_without_any_offset(tmp_path):
+    metas = iter_frames(touch_frames(tmp_path / "f", ["IMG_1.jpg", "IMG_2.jpg"]))
+    records = [FrameRecord(observation=observation(), meta=m) for m in metas]
+    walk = WalkInfo(started_at="2026-08-04T08:12:03")
+    assert walk_time_range(walk, records) is None
+
+
+def test_walk_time_range_none_on_bad_started_at(tmp_path):
+    records = make_records(tmp_path, 1)
+    walk = WalkInfo(started_at="2026년 8월 4일")
+    assert walk_time_range(walk, records) is None
+
+
+# ------------------------------------------------------------ 오늘 만난 것들
+
+def make_obs_records(tmp_path, observations):
+    metas = iter_frames(touch_frames(tmp_path / "f", REAL_NAMES[:len(observations)]))
+    return [FrameRecord(observation=o, meta=m) for o, m in zip(observations, metas)]
+
+
+def test_top_subjects_frequency_and_category_tiebreak(tmp_path):
+    """빈도순 정렬. 동률이면 animals > plants > objects 순으로 이긴다."""
+    records = make_obs_records(tmp_path, [
+        observation(animals=["오리"], objects=["벤치"]),
+        observation(plants=["은행나무"], objects=["벤치"]),
+        observation(objects=["벤치", "가로등"]),
+    ])
+    result = top_subjects(records, limit=5)
+
+    assert result[0] == "벤치"                              # 3회로 최다
+    # 오리(동물)와 은행나무(식물)는 둘 다 1회지만 동물이 우선한다
+    assert result.index("오리") < result.index("은행나무")
+
+
+def test_top_subjects_excludes_unknown_and_empty(tmp_path):
+    records = make_obs_records(tmp_path, [
+        observation(animals=["", UNKNOWN, "오리"]),
+    ])
+    assert top_subjects(records) == ["오리"]
+
+
+def test_top_subjects_respects_limit(tmp_path):
+    records = make_obs_records(tmp_path, [
+        observation(objects=[f"사물{i}" for i in range(10)]),
+    ])
+    assert len(top_subjects(records, limit=3)) == 3
+
+
+def test_top_subjects_empty_when_no_subjects(tmp_path):
+    records = make_obs_records(tmp_path, [observation()])
+    assert top_subjects(records) == []
+
+
 # ------------------------------------------------------------ 저장 / 불러오기
 
 def test_dump_load_round_trip(tmp_path):
@@ -460,3 +642,40 @@ def test_load_missing_and_broken(tmp_path):
     broken.write_text("{not json", encoding="utf-8")
     with pytest.raises(RecordsError, match="올바른 JSON"):
         load_records(broken)
+
+
+# ------------------------------------------------------------ 실내 판정 (is_indoor / outdoor)
+
+def test_is_indoor_reads_new_field(tmp_path):
+    """신형 기록은 indoor 필드를 그대로 쓴다."""
+    indoor_record = make_records(tmp_path, 1)[0]
+    indoor_record.observation["indoor"] = True
+    assert indoor_record.is_indoor is True
+
+    outdoor_record = make_records(tmp_path, 1)[0]
+    outdoor_record.observation["indoor"] = False
+    assert outdoor_record.is_indoor is False
+
+
+def test_is_indoor_falls_back_to_text_match_without_field(tmp_path):
+    """구형 기록(indoor 필드 없음)은 location_type/weather의 '실내' 문자열로 추정한다."""
+    record = make_records(tmp_path, 1)[0]
+    assert "indoor" not in record.observation
+    assert record.is_indoor is False   # observation()의 기본 location_type="공원"
+
+    record.observation["location_type"] = "실내"
+    assert record.is_indoor is True
+
+
+def test_outdoor_filters_indoor_records(tmp_path):
+    records = make_records(tmp_path, 3)
+    records[1].observation["indoor"] = True
+    assert [r.observation["scene"] for r in outdoor(records)] == ["장면 1", "장면 3"]
+
+
+def test_outdoor_empty_when_all_indoor(tmp_path):
+    """전부 실내면 outdoor()는 빈 리스트를 반환한다 - 폴백은 호출부(CLI)의 책임이다."""
+    records = make_records(tmp_path, 2)
+    for r in records:
+        r.observation["indoor"] = True
+    assert outdoor(records) == []

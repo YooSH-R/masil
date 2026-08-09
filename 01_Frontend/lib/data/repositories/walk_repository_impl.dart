@@ -40,14 +40,21 @@ class WalkRepositoryImpl implements WalkRepository {
 
   @override
   Future<Walk> createWalk({
-    required int proposalId,
+    int? proposalId,
     required int petId,
     required int robotId,
   }) async {
     final data = await _client.post(
       ApiEndpoints.walks,
-      data: {'proposalId': proposalId, 'petId': petId, 'robotId': robotId},
-      idempotencyKey: 'create-walk-$proposalId',
+      data: {
+        if (proposalId != null) 'proposalId': proposalId,
+        'petId': petId,
+        'robotId': robotId,
+      },
+      // 제안 없는 산책은 멱등키를 붙이지 않는다. 붙일 만한 고유값이 없고, 서버가
+      // 진행 중인 앱 산책을 그대로 돌려주므로 두 번 불러도 세션이 하나다.
+      idempotencyKey:
+          proposalId == null ? null : 'create-walk-$proposalId',
     );
     return WalkModel.fromJson(Json.asMap(data));
   }
@@ -72,7 +79,7 @@ class WalkRepositoryImpl implements WalkRepository {
   @override
   Future<Walk> endWalk(int walkId) async {
     final data = await _client.post(
-      ApiEndpoints.walkEnd(walkId),
+      ApiEndpoints.walkComplete(walkId),
       data: {'endedAt': DateTime.now().toUtc().toIso8601String()},
       // 같은 산책을 두 번 종료해도 한 번만 처리되게 한다(버튼 중복 탭·재시도).
       idempotencyKey: 'walk-end-$walkId',

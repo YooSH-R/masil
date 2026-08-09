@@ -1,0 +1,175 @@
+{
+  "schema": 1,
+  "generated_at": "2026-08-04T18:45:59",
+  "frame_count": 4,
+  "prompt_version": "2026-07-29",
+  "walk": {
+    "date": "불명",
+    "started_at": "2026-08-04T19:00:00",
+    "location": "불명"
+  },
+  "records": [
+    {
+      "file": "f_0000810_t000m54.00s.jpg",
+      "segment": "불명",
+      "index": 810,
+      "offset_seconds": 54.0,
+      "elapsed": "0분 54초",
+      "shot_datetime": "2026-08-04 19:00:54",
+      "location": "불명",
+      "observation": {
+        "scene": "실내 사무실 혹은 교육 공간에서 사람들이 모니터 앞에 앉아 대화를 나누거나 작업을 하고 있다.",
+        "location_type": "실내",
+        "time_of_day": "저녁",
+        "weather": "불명",
+        "people": "6~15",
+        "atmosphere": [
+          "차분함",
+          "실내",
+          "일상적"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 1.0,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "전면에 커다란 컴퓨터 모니터 뒷면이 위치해 있음",
+        "objects": [
+          "모니터",
+          "의자",
+          "사원증",
+          "천장 조명"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "제공된 촬영 일시(19:00:54)에 따름",
+        "weather_evidence": "실내 공간으로 외부 날씨를 관찰할 수 없음"
+      }
+    },
+    {
+      "file": "f_0001440_t001m36.00s.jpg",
+      "segment": "불명",
+      "index": 1440,
+      "offset_seconds": 96.0,
+      "elapsed": "1분 36초",
+      "shot_datetime": "2026-08-04 19:01:36",
+      "location": "불명",
+      "observation": {
+        "scene": "실내 사무실 또는 교육장 공간에서 사람들이 모니터 앞에 앉아 있으며 한 인물이 양손 엄지를 치켜세우고 있다.",
+        "location_type": "실내",
+        "time_of_day": "저녁",
+        "weather": "불명",
+        "people": "6~15",
+        "atmosphere": [
+          "활기찬",
+          "집중하는",
+          "실내"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 1.0,
+          "weather": 0.5
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "카메라를 향해 양손 엄지를 치켜세우고 있는 모습",
+        "objects": [
+          "모니터",
+          "의자",
+          "천장 조명",
+          "스트랩"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "제공된 촬영 일시(19:01:36)에 따름",
+        "weather_evidence": "실내 공간으로 외부 날씨를 관측할 수 없음"
+      }
+    },
+    {
+      "file": "f_0002805_t003m07.00s.jpg",
+      "segment": "불명",
+      "index": 2805,
+      "offset_seconds": 187.0,
+      "elapsed": "3분 7초",
+      "shot_datetime": "2026-08-04 19:03:07",
+      "location": "불명",
+      "observation": {
+        "scene": "실내 사무 공간에서 한 인물이 분홍색 캐릭터 인형을 들고 서 있으며, 배경에서는 다른 사람들이 책상에 앉아 컴퓨터 작업을 하고 있다.",
+        "location_type": "실내",
+        "time_of_day": "저녁",
+        "weather": "불명",
+        "people": "6~15",
+        "atmosphere": [
+          "분주함",
+          "집중함",
+          "차분함"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 1.0,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "전면의 인물이 분홍색 캐릭터 인형을 들고 서 있음",
+        "objects": [
+          "인형",
+          "노트북",
+          "모니터",
+          "책상",
+          "사원증"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "제공된 촬영 일시(19:03:07)에 따름",
+        "weather_evidence": "실내 공간으로 외부 날씨를 관찰할 수 없음"
+      }
+    },
+    {
+      "file": "f_0003465_t003m51.00s.jpg",
+      "segment": "불명",
+      "index": 3465,
+      "offset_seconds": 231.0,
+      "elapsed": "3분 51초",
+      "shot_datetime": "2026-08-04 19:03:51",
+      "location": "불명",
+      "observation": {
+        "scene": "사무실 혹은 강의실 내부에서 사람들이 컴퓨터 작업을 하고 있으며, 앞쪽에는 분홍색 인형을 안고 있는 인물이 서 있다.",
+        "location_type": "실내",
+        "time_of_day": "저녁",
+        "weather": "불명",
+        "people": "2~5",
+        "atmosphere": [
+          "분주함",
+          "차분함",
+          "집중"
+        ],
+        "confidence": {
+          "location_type": 0.9,
+          "time_of_day": 1.0,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "분홍색 캐릭터 인형을 품에 안고 서 있는 인물",
+        "objects": [
+          "노트북",
+          "모니터",
+          "인형",
+          "사원증",
+          "의자"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시에 기록된 시간(19:03:51)",
+        "weather_evidence": "실내 공간으로 외부 날씨를 확인할 수 없음"
+      }
+    }
+  ]
+}
