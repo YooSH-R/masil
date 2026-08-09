@@ -1,0 +1,90 @@
+[
+  {
+    "output": "flow_panels/event_01.png",
+    "tag": "panel_1",
+    "style": "watercolor",
+    "style_text": "soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail",
+    "with_reference": true,
+    "reference_file": "f_0002926_t003m15.07s.jpg",
+    "final_prompt": "Art style (must be strictly followed): soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail, Scene: Towering high-rise buildings, lush green street trees, commercial street, bright daytime, clear sky, summer, modern, urban, vibrant green, low-angle shot looking up, emphasizing towering buildings and trees reaching to the sky, no text, no watermark, full-bleed composition, the artwork fills the entire canvas edge-to-edge\n\nA reference photograph is attached. Use it ONLY for composition, layout, and what is present in the scene. Completely repaint it in the art style described above - do not preserve its photographic look, textures, or level of realism.\n\nDo not include any of the following: text, watermark, signature, logo, brand name, license plate, recognizable faces, portrait, distorted anatomy, extra limbs, oversaturated, cluttered, lowres, jpeg artifacts, white borders, paper edges, frame, margins, matting, photograph, photorealistic, realistic photo, camera photo, DSLR photo, photographic textures, lens blur, bokeh.\n\nOutput the illustration only, with no caption or text in the image.",
+    "model": "gemini-2.5-flash-image",
+    "attempts": [
+      {
+        "tag": "panel_1",
+        "style_check": {
+          "is_photographic": false,
+          "matches_style": true
+        }
+      }
+    ],
+    "created_at": "2026-08-05T10:23:13"
+  },
+  {
+    "output": "flow_panels/event_02.png",
+    "tag": "panel_2",
+    "style": "watercolor",
+    "style_text": "soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail",
+    "with_reference": true,
+    "reference_file": "f_0004900_t005m26.67s.jpg",
+    "final_prompt": "Art style (must be strictly followed): soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail, Scene: Low-angle view of a modern building with vertical stripes, unrecognizable dark silhouette of a face profile in the bottom left foreground, broadleaf tree leaves on the left, urban commercial street, bright daytime, clear sky, strong dazzling sunlight, backlighting, modern and dazzling mood, no text, no watermark, full-bleed composition, the artwork fills the entire canvas edge-to-edge\n\nA reference photograph is attached. Use it ONLY for composition, layout, and what is present in the scene. Completely repaint it in the art style described above - do not preserve its photographic look, textures, or level of realism.\n\nDo not include any of the following: text, watermark, signature, logo, brand name, license plate, recognizable faces, portrait, distorted anatomy, extra limbs, oversaturated, cluttered, lowres, jpeg artifacts, white borders, paper edges, frame, margins, matting, photograph, photorealistic, realistic photo, camera photo, DSLR photo, photographic textures, lens blur, bokeh.\n\nOutput the illustration only, with no caption or text in the image.",
+    "model": "gemini-2.5-flash-image",
+    "attempts": [
+      {
+        "tag": "panel_2",
+        "style_check": {
+          "is_photographic": false,
+          "matches_style": true
+        }
+      }
+    ],
+    "created_at": "2026-08-05T10:23:47"
+  },
+  {
+    "output": "flow_panels/event_03.png",
+    "tag": "panel_3_restyle",
+    "style": "watercolor",
+    "style_text": "soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail",
+    "with_reference": true,
+    "reference_file": "f_0007268_t008m04.53s.jpg",
+    "final_prompt": "Art style (must be strictly followed): soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail, Scene: Clear reflection of blue sky and white clouds on glass windows of a giant modern building, streetlight, shrubs, commercial street, daytime, cloudy, modern, urban, clean, low-angle view looking up, STRICTLY soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail, absolutely not a photograph, no text, no watermark, full-bleed composition, the artwork fills the entire canvas edge-to-edge\n\nA reference photograph is attached. Use it ONLY for composition, layout, and what is present in the scene. Completely repaint it in the art style described above - do not preserve its photographic look, textures, or level of realism.\n\nDo not include any of the following: text, watermark, signature, logo, brand name, license plate, recognizable faces, portrait, distorted anatomy, extra limbs, oversaturated, cluttered, lowres, jpeg artifacts, white borders, paper edges, frame, margins, matting, photograph, photorealistic, realistic photo, camera photo, DSLR photo, photographic textures, lens blur, bokeh.\n\nOutput the illustration only, with no caption or text in the image.",
+    "model": "gemini-2.5-flash-image",
+    "attempts": [
+      {
+        "tag": "panel_3",
+        "style_check": {
+          "is_photographic": true,
+          "matches_style": false
+        }
+      },
+      {
+        "tag": "panel_3_restyle",
+        "style_check": null
+      }
+    ],
+    "created_at": "2026-08-05T10:24:30"
+  },
+  {
+    "output": "flow_panels/event_04.png",
+    "tag": "panel_4_restyle",
+    "style": "watercolor",
+    "style_text": "soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail",
+    "with_reference": true,
+    "reference_file": "f_0013237_t014m42.47s.jpg",
+    "final_prompt": "Art style (must be strictly followed): soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail, Scene: towering high-rise buildings, metal railing, green tree leaves, urban commercial street, daytime, overcast gray sky, cloudy, calm, somber, low-angle view looking up from the ground, STRICTLY soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail, absolutely not a photograph, no text, no watermark, full-bleed composition, the artwork fills the entire canvas edge-to-edge\n\nA reference photograph is attached. Use it ONLY for composition, layout, and what is present in the scene. Completely repaint it in the art style described above - do not preserve its photographic look, textures, or level of realism.\n\nDo not include any of the following: text, watermark, signature, logo, brand name, license plate, recognizable faces, portrait, distorted anatomy, extra limbs, oversaturated, cluttered, lowres, jpeg artifacts, white borders, paper edges, frame, margins, matting, photograph, photorealistic, realistic photo, camera photo, DSLR photo, photographic textures, lens blur, bokeh.\n\nOutput the illustration only, with no caption or text in the image.",
+    "model": "gemini-2.5-flash-image",
+    "attempts": [
+      {
+        "tag": "panel_4",
+        "style_check": {
+          "is_photographic": true,
+          "matches_style": false
+        }
+      },
+      {
+        "tag": "panel_4_restyle",
+        "style_check": null
+      }
+    ],
+    "created_at": "2026-08-05T10:25:07"
+  }
+]

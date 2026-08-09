@@ -24,17 +24,19 @@ class FakeS3Client:
 
 
 def make_outputs(tmp_path, *, with_story_image=True):
-    """세션 폴더 하나를 통째로 흉내낸다 - 허용 목록 밖 파일도 일부러 섞는다."""
+    """세션 폴더 하나를 통째로 흉내낸다 - flow_panels/, payload/까지 섞는다."""
     run_dir = tmp_path / "2026-07-31"
     run_dir.mkdir()
     (run_dir / "frame_records.json").write_text("{}", encoding="utf-8")
     (run_dir / "walk_log.md").write_text("# 일지", encoding="utf-8")
+    (run_dir / "image_manifest.json").write_text("[]", encoding="utf-8")
     if with_story_image:
         (run_dir / "story_image.png").write_bytes(b"\x89PNG")
-    (run_dir / "walk_flow.png").write_bytes(b"\x89PNG")
+    (run_dir / "walk_journal.png").write_bytes(b"\x89PNG")
     panels = run_dir / "flow_panels"
     panels.mkdir()
-    (panels / "panel_01.png").write_bytes(b"\x89PNG")
+    (panels / "event_01.png").write_bytes(b"\x89PNG")
+    (panels / "event_02.png").write_bytes(b"\x89PNG")
     payload = run_dir / "payload"
     payload.mkdir()
     (payload / "001_text.json").write_text("{}", encoding="utf-8")
@@ -66,49 +68,63 @@ def test_upload_file_wraps_client_error(tmp_path, monkeypatch):
         upload_file(path, "bad/key.png", bucket="my-bucket")
 
 
-def test_upload_outputs_only_uploads_allowlisted_files(tmp_path, monkeypatch):
-    """일지 + 감성 이미지만 올리고, 세션 폴더의 나머지는 아무리 많아도 무시한다.
-
-    frame_records.json(원자재), walk_flow.png/flow_panels(스토리보드 부산물),
-    payload/(디버그 덤프)까지 전부 같은 세션에 있어도 새면 안 된다.
-    """
+def test_upload_outputs_mirrors_whole_session_except_payload(tmp_path, monkeypatch):
+    """세션 폴더 전체(하위 디렉토리 포함)가 올라가되 payload/만 빠진다."""
     fake = FakeS3Client()
     monkeypatch.setattr(storage, "_client", lambda: fake)
 
     run_dir = make_outputs(tmp_path)
     uploaded = upload_outputs(run_dir, bucket="my-bucket", prefix="walklog")
 
-    assert set(uploaded) == {"walk_log.md", "story_image.png"}
+    assert set(uploaded) == {
+        "frame_records.json", "walk_log.md", "image_manifest.json",
+        "story_image.png", "walk_journal.png",
+        "flow_panels/event_01.png", "flow_panels/event_02.png",
+    }
     assert uploaded["walk_log.md"] == "s3://my-bucket/walklog/2026-07-31/walk_log.md"
-    assert uploaded["story_image.png"] == (
-        "s3://my-bucket/walklog/2026-07-31/story_image.png"
+    assert uploaded["flow_panels/event_01.png"] == (
+        "s3://my-bucket/walklog/2026-07-31/flow_panels/event_01.png"
     )
     uploaded_keys = {call[2] for call in fake.calls}
-    assert len(uploaded_keys) == 2
-    assert not any("payload" in key or "flow_panels" in key or "walk_flow" in key
-                  or "frame_records" in key for key in uploaded_keys)
+    assert len(uploaded_keys) == 7
+    assert not any("payload" in key for key in uploaded_keys)
 
 
-def test_upload_outputs_skips_missing_files_silently(tmp_path, monkeypatch):
-    """--story-image 없이 일지만 만든 경우: 없는 파일은 조용히 건너뛴다."""
+def test_upload_outputs_relative_path_preserved_for_subdirs(tmp_path, monkeypatch):
+    """flow_panels/ 하위 파일은 S3 키에도 상대 경로가 그대로 유지된다."""
+    fake = FakeS3Client()
+    monkeypatch.setattr(storage, "_client", lambda: fake)
+
+    run_dir = make_outputs(tmp_path)
+    upload_outputs(run_dir, bucket="my-bucket", prefix="robot-images/device-001")
+
+    keys = {call[2] for call in fake.calls}
+    assert "robot-images/device-001/2026-07-31/flow_panels/event_01.png" in keys
+    assert "robot-images/device-001/2026-07-31/flow_panels/event_02.png" in keys
+
+
+def test_upload_outputs_without_story_image_skips_it(tmp_path, monkeypatch):
+    """--story-image 없이 저널만 만든 경우: story_image.png가 없으면 그냥 안 올라간다."""
     fake = FakeS3Client()
     monkeypatch.setattr(storage, "_client", lambda: fake)
 
     run_dir = make_outputs(tmp_path, with_story_image=False)
     uploaded = upload_outputs(run_dir, bucket="my-bucket", prefix="walklog")
 
-    assert set(uploaded) == {"walk_log.md"}
+    assert "story_image.png" not in uploaded
+    assert "walk_journal.png" in uploaded
 
 
-def test_upload_outputs_custom_files_override(tmp_path, monkeypatch):
+def test_upload_outputs_custom_exclude_dirs(tmp_path, monkeypatch):
     fake = FakeS3Client()
     monkeypatch.setattr(storage, "_client", lambda: fake)
 
     run_dir = make_outputs(tmp_path)
     uploaded = upload_outputs(run_dir, bucket="my-bucket", prefix="walklog",
-                              files=("walk_flow.png",))
+                              exclude_dirs=("flow_panels",))
 
-    assert set(uploaded) == {"walk_flow.png"}
+    assert not any(key.startswith("flow_panels/") for key in uploaded)
+    assert "payload/001_text.json" in uploaded   # exclude_dirs를 바꿨으니 payload는 오히려 올라간다
 
 
 def test_upload_outputs_without_prefix(tmp_path, monkeypatch):
@@ -124,6 +140,15 @@ def test_upload_outputs_without_prefix(tmp_path, monkeypatch):
 def test_upload_outputs_missing_dir(tmp_path):
     with pytest.raises(S3UploadError, match="업로드할 폴더가 없습니다"):
         upload_outputs(tmp_path / "nope")
+
+
+def test_upload_outputs_empty_dir_returns_empty(tmp_path, monkeypatch):
+    fake = FakeS3Client()
+    monkeypatch.setattr(storage, "_client", lambda: fake)
+
+    run_dir = tmp_path / "2026-07-31"
+    run_dir.mkdir()
+    assert upload_outputs(run_dir, bucket="my-bucket", prefix="walklog") == {}
 
 
 def test_upload_outputs_includes_session_in_key(tmp_path, monkeypatch):

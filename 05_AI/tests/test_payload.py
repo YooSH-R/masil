@@ -189,6 +189,29 @@ def test_story_image_writer_missing_variable_raises():
         payload_from_spec(P.STORY_IMAGE_WRITER, story="이야기만 있음")
 
 
+def test_story_image_verifier_assembles():
+    """STORY_IMAGE_VERIFIER: json_lines 하나만으로 KeyError 없이 조립된다."""
+    from walklog import prompts as P
+    from walklog.gms import payload_from_spec
+
+    body = payload_from_spec(
+        P.STORY_IMAGE_VERIFIER,
+        json_lines='{"scene":"테스트"}',
+    )
+    user_text = body["contents"][0]["parts"][0]["text"]
+    assert '{"scene":"테스트"}' in user_text
+    assert body["generationConfig"]["responseSchema"] == P.STORY_IMAGE_VERIFIER.response_schema
+    assert "pass" in body["generationConfig"]["responseSchema"]["properties"]
+
+
+def test_story_image_verifier_missing_variable_raises():
+    from walklog import prompts as P
+    from walklog.gms import payload_from_spec
+
+    with pytest.raises(KeyError):
+        payload_from_spec(P.STORY_IMAGE_VERIFIER)
+
+
 def test_panel_caption_writer(legacy):
     from walklog import prompts as P
     assert_same(legacy, P.PANEL_CAPTION_WRITER, record_json='{"scene":"테스트"}')
@@ -228,6 +251,19 @@ def test_bad_system_mode_raises():
     with pytest.raises(ConfigError):
         payload_from_spec(P.PANEL_CAPTION_WRITER, system_mode="sysyem_instruction",
                           record_json="{}")
+
+
+def test_frame_schema_includes_indoor_field():
+    """실내 프레임 배제 기능의 기반 - indoor는 필수 필드여야 한다.
+
+    누락되면 records.FrameRecord.is_indoor가 구형 기록으로 취급해 문자열
+    추정으로 물러나므로, VLM이 매번 이 필드를 채워야 배제/대체 로직이 돈다.
+    """
+    from walklog import prompts as P
+
+    assert "indoor" in P.FRAME_SCHEMA["properties"]
+    assert P.FRAME_SCHEMA["properties"]["indoor"]["type"] == "BOOLEAN"
+    assert "indoor" in P.FRAME_SCHEMA["required"]
 
 
 def test_image_generation_config():

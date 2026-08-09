@@ -26,6 +26,8 @@ _OBSERVATION_RULES="""\
 3. 직접 보이는 사실과 그로부터 추론을 구분하고, 추론에는 confidence를 매긴다.
 4. 개수는 정확히 세지 말고 구간으로 답한다: "없음", "1", "2~5", "6~15", "다수".
 5. 화면 왼쪽/오른쪽 같은 방향 표현은 확실할 때만 쓴다.
+6. indoor: 실내(건물 안, 지하, 차량 내부)인지 판정한다. 확신이 없으면
+   천장 조명, 창문 유무, 하늘 노출을 근거로 판단한다.
 """
 
 _IMAGE_QUALITY = """\
@@ -68,7 +70,8 @@ _FORMAT_EXAMPLE = """\
     "weather": 0.9,
     "location_type": 0.7
     },
-"unreadable": false
+"unreadable": false,
+"indoor": false
 }
 """
 
@@ -117,9 +120,15 @@ FRAME_SCHEMA: dict = {
             "type": "BOOLEAN",
             "description": "너무 흐리거나 어두워 판별 불가할 때만 true",
         },
+        "indoor": {
+            "type": "BOOLEAN",
+            "description": "실내(건물 안, 지하, 차량 내부)면 true. "
+                           "하늘/지평선이 보이거나 야외 지면이면 false",
+        },
     },
 
-    "required": ["scene", "location_type", "time_of_day", "weather", "people", "atmosphere", "confidence", "unreadable"],
+    "required": ["scene", "location_type", "time_of_day", "weather", "people",
+                "atmosphere", "confidence", "unreadable", "indoor"],
 }
 
 

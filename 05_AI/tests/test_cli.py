@@ -320,6 +320,61 @@ def test_walk_log_end_to_end(tmp_path, fake_client):
     assert fake_client.closed
 
 
+def _many_frame_names(count):
+    """10초 간격으로 늘어놓은 합성 프레임 이름 count개. 적응형 표본 크기 테스트용."""
+    return [f"f_{i:07d}_t{(i * 10) // 60:03d}m{(i * 10) % 60:05.2f}s.jpg"
+            for i in range(count)]
+
+
+def test_walk_log_adaptive_sample_size_default(tmp_path, fake_client, capsys):
+    """--quarters 를 생략하면 전체 프레임의 약 10%(4~12장)로 자동 계산된다."""
+    frames = touch_frames(tmp_path / "frames", _many_frame_names(50))
+
+    code = walk_log.main(["--frames", str(frames), "--out-dir", str(tmp_path / "o"),
+                          "--no-diary"])
+
+    assert code == 0
+    json_calls = [c for c in fake_client.calls if c[0] == "json"]
+    assert len(json_calls) == 5   # round(50 * 0.10)
+    assert "5등분 (전체 50장의 약 10%, 4~12 범위)" in capsys.readouterr().err
+
+
+def test_walk_log_quarters_explicit_skips_auto(tmp_path, fake_client, capsys):
+    """--quarters를 직접 주면 자동 계산을 건너뛰고 그 값이 그대로 쓰인다."""
+    frames = touch_frames(tmp_path / "frames", _many_frame_names(50))
+
+    code = walk_log.main(["--frames", str(frames), "--out-dir", str(tmp_path / "o"),
+                          "--no-diary", "--quarters", "3"])
+
+    assert code == 0
+    json_calls = [c for c in fake_client.calls if c[0] == "json"]
+    assert len(json_calls) == 3
+    assert "3등분 (직접 지정)" in capsys.readouterr().err
+
+
+def test_walk_log_diary_footer_has_time_range(tmp_path, fake_client):
+    """일지 푸터에 시작~종료 시각이 코드로 계산되어 붙는지."""
+    frames = touch_frames(tmp_path / "frames")
+
+    code = walk_log.main(["--frames", str(frames), "--out-dir", str(tmp_path / "o"),
+                          "--started-at", "2026-07-28T08:12:03"])
+
+    assert code == 0
+    diary = (tmp_path / "o" / config.DIARY_NAME).read_text(encoding="utf-8")
+    assert "- 시간: 08:12 ~ 08:13" in diary   # 마지막 프레임 64.0s -> 08:13:07
+
+
+def test_walk_log_diary_no_footer_without_started_at(tmp_path, fake_client):
+    """시작 시각을 모르면 '불명 ~ 불명' 대신 줄 자체를 생략한다."""
+    frames = touch_frames(tmp_path / "frames")
+
+    code = walk_log.main(["--frames", str(frames), "--out-dir", str(tmp_path / "o")])
+
+    assert code == 0
+    diary = (tmp_path / "o" / config.DIARY_NAME).read_text(encoding="utf-8")
+    assert "- 시간:" not in diary
+
+
 def test_walk_log_limit_and_no_diary(tmp_path, fake_client):
     frames = touch_frames(tmp_path / "frames")
     out = tmp_path / "out"
@@ -425,6 +480,54 @@ def test_walk_log_check_runs_diagnostics(monkeypatch, capsys):
     assert "프록시 지원 진단" in capsys.readouterr().out
 
 
+# ============================================================ walk_log CLI (실내 배제)
+
+def test_walk_log_allow_indoor_skips_replacement_and_filtering(tmp_path, monkeypatch, capsys):
+    """--allow-indoor면 대체 관찰도, 다운스트림 outdoor() 필터도 건너뛴다.
+
+    (실내 테스트 영상용 - 배제 로직이 개입하면 안 된다)
+    """
+    class IndoorClient(FakeClient):
+        def generate_json(self, spec, **kwargs):
+            self.calls.append(("json", spec, kwargs))
+            return observation(indoor=True)
+
+    client = IndoorClient()
+    monkeypatch.setattr("walklog.cli.common.build_client",
+                        lambda args, run_dir: client)
+    frames = touch_frames(tmp_path / "frames")
+
+    code = walk_log.main(["--frames", str(frames), "--out-dir", str(tmp_path / "o"),
+                          "--allow-indoor"])
+
+    assert code == 0
+    saved = json.loads((tmp_path / "o" / config.RECORDS_NAME).read_text(encoding="utf-8"))
+    assert all(r["observation"]["indoor"] for r in saved["records"])
+    err = capsys.readouterr().err
+    assert "[실내 배제]" not in err
+    assert "실내 기록을 포함해" not in err
+
+
+def test_walk_log_default_replaces_indoor_frames(tmp_path, monkeypatch, capsys):
+    """플래그 없이 실행하면(기본값) 실내 프레임을 대체 관찰하려 시도한다."""
+    class IndoorClient(FakeClient):
+        def generate_json(self, spec, **kwargs):
+            self.calls.append(("json", spec, kwargs))
+            return observation(indoor=True)
+
+    client = IndoorClient()
+    monkeypatch.setattr("walklog.cli.common.build_client",
+                        lambda args, run_dir: client)
+    frames = touch_frames(tmp_path / "frames")
+
+    code = walk_log.main(["--frames", str(frames), "--out-dir", str(tmp_path / "o"),
+                          "--no-diary"])
+
+    assert code == 0
+    err = capsys.readouterr().err
+    assert "실내 기록을 포함해 그대로 진행합니다" in err   # 전부 실내라 폴백 경고가 남는다
+
+
 # ============================================================ flow_image CLI
 
 def prepare_records(tmp_path):
@@ -444,7 +547,7 @@ def test_flow_image_dry_run_makes_no_calls(tmp_path, fake_client, capsys):
     frames, path = prepare_records(tmp_path)
 
     code = flow_image.main(["--records", str(path), "--frames", str(frames),
-                            "--dry-run", "-n", "2"])
+                            "--mode", "storyboard", "--dry-run", "-n", "2"])
 
     assert code == 0
     assert not fake_client.calls
@@ -457,7 +560,7 @@ def test_flow_image_storyboard(tmp_path, fake_client):
     out_dir = tmp_path / "sb"
 
     code = flow_image.main(["--records", str(path), "--frames", str(frames),
-                            "--out-dir", str(out_dir), "-n", "2"])
+                            "--out-dir", str(out_dir), "--mode", "storyboard", "-n", "2"])
 
     assert code == 0
     assert (out_dir / config.FLOW_IMAGE_NAME).is_file()
@@ -483,8 +586,8 @@ def test_flow_image_single_mode(tmp_path, fake_client):
 def test_flow_image_no_caption_llm(tmp_path, fake_client):
     frames, path = prepare_records(tmp_path)
     flow_image.main(["--records", str(path), "--frames", str(frames),
-                     "--out-dir", str(tmp_path / "nc"), "-n", "2",
-                     "--no-caption-llm"])
+                     "--out-dir", str(tmp_path / "nc"), "--mode", "storyboard",
+                     "-n", "2", "--no-caption-llm"])
     from walklog import prompts as P
     assert not any(c[1] is P.PANEL_CAPTION_WRITER for c in fake_client.calls)
 
@@ -492,7 +595,8 @@ def test_flow_image_no_caption_llm(tmp_path, fake_client):
 def test_flow_image_no_ref_skips_reference(tmp_path, fake_client):
     frames, path = prepare_records(tmp_path)
     flow_image.main(["--records", str(path), "--frames", str(frames),
-                     "--out-dir", str(tmp_path / "nr"), "-n", "1", "--no-ref"])
+                     "--out-dir", str(tmp_path / "nr"), "--mode", "storyboard",
+                     "-n", "1", "--no-ref"])
     image_calls = [c for c in fake_client.calls if c[0] == "image"]
     assert image_calls[0][2]["reference"] is None
 
@@ -527,10 +631,111 @@ def test_flow_image_defaults_to_latest_session(tmp_path, fake_client, monkeypatc
     walk_log.main(["--frames", str(frames), "--date", "2026-08-03", "--no-diary"])
     walk_log.main(["--frames", str(frames), "--date", "2026-08-03", "--no-diary"])
 
-    code = flow_image.main(["--frames", str(frames), "--date", "2026-08-03", "-n", "2"])
+    code = flow_image.main(["--frames", str(frames), "--date", "2026-08-03",
+                            "--mode", "storyboard", "-n", "2"])
 
     assert code == 0
     day_dir = tmp_path / "outputs" / "2026-08-03"
     assert (day_dir / "session2" / config.FLOW_IMAGE_NAME).is_file()
     assert not (day_dir / "session1" / config.FLOW_IMAGE_NAME).exists()
     assert not (day_dir / "session3").exists()
+
+
+# ============================================================ flow_image --mode journal
+
+def test_flow_image_journal_dry_run(tmp_path, fake_client, capsys):
+    frames, path = prepare_records(tmp_path)
+
+    code = flow_image.main(["--records", str(path), "--frames", str(frames),
+                            "--mode", "journal", "--dry-run", "--events", "2"])
+
+    assert code == 0
+    assert not fake_client.calls
+    out = capsys.readouterr().out
+    assert "선정된 이벤트" in out and "score=" in out
+
+
+def test_flow_image_journal_creates_expected_file(tmp_path, fake_client):
+    frames, path = prepare_records(tmp_path)
+    out_dir = tmp_path / "journal_out"
+
+    code = flow_image.main(["--records", str(path), "--frames", str(frames),
+                            "--out-dir", str(out_dir), "--mode", "journal",
+                            "--events", "2"])
+
+    assert code == 0
+    assert (out_dir / config.JOURNAL_NAME).is_file()
+    assert not (out_dir / config.FLOW_IMAGE_NAME).exists()
+    assert len([c for c in fake_client.calls if c[0] == "image"]) == 2
+
+
+def test_flow_image_journal_note_parsed_from_diary(tmp_path):
+    """세션 폴더에 walk_log.md가 있으면 '한 줄 요약' 줄을 그대로 note로 쓴다."""
+    from walklog.cli.flow_image import _diary_note
+
+    (tmp_path / config.DIARY_NAME).write_text(
+        "## 2026-07-28 산책 일지\n\n**한 줄 요약**: 비 온 뒤 조용한 하천길\n\n본문.",
+        encoding="utf-8")
+    assert _diary_note(tmp_path) == "비 온 뒤 조용한 하천길"
+
+
+def test_flow_image_journal_note_empty_without_diary(tmp_path):
+    from walklog.cli.flow_image import _diary_note
+    assert _diary_note(tmp_path) == ""
+
+
+# ============================================================ flow_image --mode panels (기본값)
+
+def test_flow_image_panels_dry_run(tmp_path, fake_client, capsys):
+    frames, path = prepare_records(tmp_path)
+
+    code = flow_image.main(["--records", str(path), "--frames", str(frames),
+                            "--dry-run", "--events", "2"])
+
+    assert code == 0
+    assert not fake_client.calls
+    out = capsys.readouterr().out
+    assert "선정된 이벤트" in out and "score=" in out
+
+
+def test_flow_image_panels_is_default_mode(tmp_path, fake_client):
+    """--mode를 생략하면 panels가 기본값이라 flow_panels/ 없이 세션 폴더에 바로
+    패널이 생기고 보드/캡션은 없다."""
+    frames, path = prepare_records(tmp_path)
+    out_dir = tmp_path / "panels_out"
+
+    code = flow_image.main(["--records", str(path), "--frames", str(frames),
+                            "--out-dir", str(out_dir), "--events", "2"])
+
+    assert code == 0
+    assert not (out_dir / config.JOURNAL_NAME).exists()
+    assert not (out_dir / config.FLOW_IMAGE_NAME).exists()
+    assert not (out_dir / config.PANELS_DIRNAME).exists()
+    panels = sorted(p.name for p in out_dir.glob("event_*.png"))
+    assert panels == ["event_01.png", "event_02.png"]
+    image_calls = [c for c in fake_client.calls if c[0] == "image"]
+    assert len(image_calls) == 2
+    from walklog import prompts as P
+    assert not any(c[1] is P.PANEL_CAPTION_WRITER for c in fake_client.calls)
+
+
+def test_flow_image_panels_default_omits_reference(tmp_path, fake_client):
+    """panels 기본값은 참조 없음이다(2026-08-05 실측: 참조 포함 생성 86% 화풍 불합격)."""
+    frames, path = prepare_records(tmp_path)
+
+    flow_image.main(["--records", str(path), "--frames", str(frames),
+                     "--out-dir", str(tmp_path / "nr"), "--events", "1"])
+
+    image_calls = [c for c in fake_client.calls if c[0] == "image"]
+    assert image_calls[0][2]["reference"] is None
+
+
+def test_flow_image_panels_use_reference_flag_passes_reference(tmp_path, fake_client):
+    frames, path = prepare_records(tmp_path)
+
+    flow_image.main(["--records", str(path), "--frames", str(frames),
+                     "--out-dir", str(tmp_path / "wr"), "--events", "1",
+                     "--use-reference"])
+
+    image_calls = [c for c in fake_client.calls if c[0] == "image"]
+    assert image_calls[0][2]["reference"] is not None

@@ -90,7 +90,9 @@ _DIARY_USER_TEMPLATE = """\
 [관찰 기록 (시간순)]
 {json_lines}
 
-위 기록으로 산책 일지를 작성해라.\
+위 기록으로 산책 일지를 작성해라.
+관찰 기록의 개수와 무관하게 [문체]에 명시된 분량을 지켜라.
+모든 기록을 언급할 필요는 없다. 흐름에 중요한 장면만 골라 써라.\
 """
 
 def diary_spec(style: str = DEFAULT_DIARY_STYLE) -> PromptSpec:
