@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/services/sample_walk_diaries.dart';
+import '../../../domain/entities/walk.dart';
 import '../../../domain/entities/walk_photo.dart';
 import '../../viewmodels/walk_diary_view_model.dart';
 import '../../viewmodels/walk_view_model.dart';
@@ -43,18 +44,40 @@ class _WalkPathDetailScreenState extends State<WalkPathDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final walkVm = context.watch<WalkViewModel>();
-    final summary = walkVm.summary;
-
-    // 저장된 경로가 있으면 그걸 쓰고, 없으면(방금 끝낸 산책 등) 메모리의 좌표를 쓴다.
-    final route =
-        (summary?.route.isNotEmpty ?? false) ? summary!.route : walkVm.routePoints;
-
-    final distanceMeters = summary?.distanceMeters ?? walkVm.distanceMeters;
-    final durationSeconds =
-        summary?.durationSeconds ?? walkVm.elapsed.inSeconds;
 
     // 어떤 산책을 보고 있는지. extra 로 안 넘어오면 진행/최근 산책.
     final shownWalkId = widget.walkId ?? walkVm.currentWalk?.walkId;
+
+    // **이 산책의 요약일 때만 쓴다.** 뷰모델은 산책 하나 분량의 요약만 들고
+    // 있어서, 조회가 끝나기 전이나 실패했을 때는 앞서 본 산책의 값이 남아
+    // 있다. 그걸 그대로 그리면 엉뚱한 지도가 뜬다.
+    final loaded = walkVm.summary;
+    final summary =
+        (loaded != null && loaded.walkId == shownWalkId) ? loaded : null;
+
+    // 메모리에 남은 좌표([WalkViewModel.routePoints])는 **지금 보고 있는 산책의
+    // 것일 때만** 폴백으로 쓴다.
+    //
+    // 그 좌표는 산책이 끝나도 다음 산책이 시작될 때까지 남는다. 신원을 안 따지고
+    // 쓰면, 방금 걷고 나서 지난 일지를 열었을 때 조회가 끝나기 전까지 방금 걸은
+    // 경로가 그려지고, 조회가 실패하면 그대로 굳는다.
+    final isCurrentWalk =
+        shownWalkId != null && shownWalkId == walkVm.currentWalk?.walkId;
+    final fallbackRoute = isCurrentWalk
+        ? walkVm.routePoints
+        : const <WalkLocationPoint>[];
+
+    // 저장된 경로가 있으면 그걸 쓰고, 없으면(방금 끝낸 산책 등) 메모리의 좌표를 쓴다.
+    final route =
+        (summary?.route.isNotEmpty ?? false) ? summary!.route : fallbackRoute;
+
+    // 거리·시간도 같은 기준이다. 지난 산책 화면에 진행 중인 산책의 값이 뜨면
+    // 경로만 맞추고 숫자가 어긋나는 더 헷갈리는 상태가 된다. 조회가 끝나기
+    // 전에는 0 으로 두고, 값이 오면 그때 채워진다.
+    final distanceMeters =
+        summary?.distanceMeters ?? (isCurrentWalk ? walkVm.distanceMeters : 0);
+    final durationSeconds = summary?.durationSeconds ??
+        (isCurrentWalk ? walkVm.elapsed.inSeconds : 0);
     final sampleImage = shownWalkId == null
         ? null
         : SampleWalkDiaries.imageAssetOf(shownWalkId);
