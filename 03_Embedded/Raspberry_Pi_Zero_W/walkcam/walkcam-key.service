@@ -1,0 +1,27 @@
+# walkcam-key.service — 부팅 시 하트 대기 + 키 입력 촬영 데몬
+# 설치:
+#   sudo systemctl disable --now walkcam-dock     # 기존 도킹 버전 내리기
+#   sudo cp walkcam-key.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now walkcam-key
+# 제어 (SSH):
+#   cd ~/walkcam && python3 walkcam_ctl.py    # Space/q 토글
+
+[Unit]
+Description=Walkcam key-controlled recorder (heart idle screen)
+# 네트워크 의존 없음 — 도킹 감시가 빠져 NM 대기가 필요 없습니다
+
+[Service]
+Type=simple
+User=piw
+Group=piw
+WorkingDirectory=/home/piw/walkcam
+ExecStart=/usr/bin/python3 /home/piw/walkcam/walkcam_key.py
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=0
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+
