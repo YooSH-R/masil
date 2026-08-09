@@ -34,6 +34,8 @@ session_started()가 호출된 시각을 기준으로 매 초 다시 그립니�
 
 from __future__ import annotations
 
+import math
+import random
 import threading
 import time
 from enum import Enum
@@ -55,22 +57,177 @@ _FONT_CANDIDATES = [
 
 
 def _load_fonts():
-    """(작은 폰트, 큰 폰트, 한글 지원 여부)를 돌려줍니다."""
+    """(작은, 큰, 제목10, 시간20, 한글 지원 여부)를 돌려줍니다.
+
+    제목/시간 폰트는 축하 화면용 — 크기 비율 1:2.
+    """
     for path in _FONT_CANDIDATES:
         if Path(path).exists():
             return (
                 ImageFont.truetype(path, 12),
                 ImageFont.truetype(path, 16),
+                ImageFont.truetype(path, 10),
+                ImageFont.truetype(path, 18),
                 True,
             )
     # 한글 폰트가 없으면 기본 비트맵 폰트 + 영문 문구로 동작합니다.
     f = ImageFont.load_default()
-    return f, f, False
+    return f, f, f, f, False
+
+
+# 러너 1완주 = 1세그먼트에 해당하는 시간(초). walkcam_v3의 세그먼트
+# 길이(5분)와 맞춰 둔 시각적 근사치입니다.
+SEGMENT_SECONDS = 300
+
+
+def _draw_runner(draw, x: int, y: int, frame: int, fill=1) -> None:
+    """(x, y)를 좌상단으로 하는 폭 ~9px, 높이 ~11px의 달리는 사람.
+
+    frame 0/1 두 자세를 번갈아 그리면 달리는 애니메이션이 됩니다.
+    """
+    # 머리
+    draw.ellipse((x + 3, y, x + 6, y + 3), fill=fill)
+    # 몸통 (앞으로 기운 자세)
+    draw.line((x + 4, y + 3, x + 3, y + 7), fill=fill)
+    if frame == 0:
+        # 팔: 앞뒤로 크게, 다리: 앞뒤로 벌림
+        draw.line((x + 4, y + 4, x + 8, y + 3), fill=fill)
+        draw.line((x + 4, y + 5, x + 1, y + 6), fill=fill)
+        draw.line((x + 3, y + 7, x + 7, y + 10), fill=fill)
+        draw.line((x + 3, y + 7, x, y + 9), fill=fill)
+    else:
+        # 반대 위상: 팔 교차, 다리 모임
+        draw.line((x + 4, y + 4, x + 1, y + 3), fill=fill)
+        draw.line((x + 4, y + 5, x + 7, y + 6), fill=fill)
+        draw.line((x + 3, y + 7, x + 5, y + 11), fill=fill)
+        draw.line((x + 3, y + 7, x + 1, y + 11), fill=fill)
+
+
+
+
+
+def _draw_manse(draw, x: int, y: int, up: bool, fill=1) -> None:
+    """(x, y) 좌상단 기준 폭 ~9px, 높이 ~11px의 만세 사람.
+
+    up=True면 두 팔을 V자로 번쩍, False면 팔을 내린 자세.
+    """
+    draw.ellipse((x + 3, y, x + 6, y + 3), fill=fill)          # 머리
+    draw.line((x + 4, y + 3, x + 4, y + 7), fill=fill)          # 몸통
+    if up:                                                       # 만세!
+        draw.line((x + 4, y + 4, x + 1, y), fill=fill)
+        draw.line((x + 4, y + 4, x + 8, y), fill=fill)
+    else:                                                        # 차렷
+        draw.line((x + 4, y + 4, x + 1, y + 7), fill=fill)
+        draw.line((x + 4, y + 4, x + 8, y + 7), fill=fill)
+    draw.line((x + 4, y + 7, x + 1, y + 11), fill=fill)          # 다리
+    draw.line((x + 4, y + 7, x + 7, y + 11), fill=fill)
+
+
+def _draw_popper(draw, cx: int, cy: int, p: float, flip: bool, fill=1) -> None:
+    """🎉 파티 포퍼: 기울어진 원뿔 + 퍼져나가는 콘페티.
+
+    p(0~1)가 커질수록 콘페티가 원뿔 입구에서 멀리 퍼집니다.
+    flip=True면 좌우 반전(오른쪽 배치용) — 원뿔이 안쪽을 향합니다.
+    """
+    s = -1 if flip else 1
+    # 원뿔 (이모지처럼 대각선으로 기울임, 입구가 위-안쪽)
+    draw.polygon([(cx - s * 4, cy + 4), (cx + s * 1, cy - 1),
+                  (cx + s * 3, cy + 1)], fill=fill)
+    # 콘페티: 입구에서 부채꼴로 3갈래 + 점 2개, 반경은 p에 비례
+    r = 2 + p * 6
+    for ang in (25, 55, 85):
+        a = math.radians(ang)
+        px = cx + s * int(math.cos(a) * r) + s * 1
+        py = cy - 1 - int(math.sin(a) * r)
+        if 0 <= px < WIDTH and 0 <= py < HEIGHT:
+            draw.point((px, py), fill=fill)
+            draw.point((px - s, py), fill=fill)          # 종이조각 느낌 2px
+    # 흩날리는 점 (조금 바깥)
+    for ang in (40, 70):
+        a = math.radians(ang)
+        px = cx + s * int(math.cos(a) * (r + 2)) + s * 1
+        py = cy - 1 - int(math.sin(a) * (r + 2))
+        if 0 <= px < WIDTH and 0 <= py < HEIGHT:
+            draw.point((px, py), fill=fill)
 
 
 # ─────────────────────────────────────────────────────────
-# 상태 정의
+# 하트 분출(버스트) — 대기 화면 이벤트 (heart.py에서 이식)
+# 키 입력 한 번에 중앙 하트에서 6방향으로 동시 발사됩니다.
 # ─────────────────────────────────────────────────────────
+
+_SMALL_HEART_ART = [
+    ["X.X",
+     "XXX",
+     ".X."],
+    [".X.X.",
+     "XXXXX",
+     "XXXXX",
+     ".XXX.",
+     "..X.."],
+    [".XX.XX.",
+     "XXXXXXX",
+     "XXXXXXX",
+     "XXXXXXX",
+     ".XXXXX.",
+     "..XXX..",
+     "...X..."],
+]
+
+
+def _art_to_pixels(art):
+    h, w = len(art), len(art[0])
+    return [(x - w // 2, y - h // 2)
+            for y, row in enumerate(art)
+            for x, ch in enumerate(row) if ch == "X"]
+
+
+_SMALL_PIXELS = [_art_to_pixels(a) for a in _SMALL_HEART_ART]
+
+# 좌 / 우 / 좌상 / 우상 / 좌하 / 우하 — 6방향 동시 발사
+_BURST_DIRECTIONS_DEG = [180, 0, 135, 45, 225, 315]
+
+_GROW_STEP = 0.35        # 이 시간(초)마다 하트가 한 단계 커짐
+_WOBBLE_AMP = 1.6        # 위아래 흔들림 진폭(픽셀)
+_BURST_SPEED = (16.0, 24.0)
+_BURST_GRAVITY = 22.0    # px/s^2 — 포물선 낙하
+
+
+class _FlyingHeart:
+    """중앙 하트에서 튀어나와 포물선을 그리는 작은 하트."""
+
+    def __init__(self, cx: float, cy: float, angle_deg: float):
+        rad = math.radians(angle_deg)
+        speed = random.uniform(*_BURST_SPEED)
+        # 중앙 하트 가장자리에서 출발하는 느낌 (가로 12 / 세로 9 오프셋)
+        self.x = cx + math.cos(rad) * 12
+        self.y = cy - math.sin(rad) * 9
+        self.vx = math.cos(rad) * speed
+        self.vy = -math.sin(rad) * speed      # 화면 좌표(y 아래 = +)
+        self.age = 0.0
+        self._wp = random.uniform(0, 2 * math.pi)
+        self._ws = random.uniform(6.0, 9.0)
+
+    def update(self, dt: float) -> None:
+        self.age += dt
+        self.vy += _BURST_GRAVITY * dt
+        self.x += self.vx * dt
+        self.y += self.vy * dt
+
+    @property
+    def alive(self) -> bool:
+        return -8 < self.x < WIDTH + 8 and self.y < HEIGHT + 8
+
+    def size_index(self) -> int:
+        return min(2, int(self.age / _GROW_STEP))
+
+    def draw(self, draw) -> None:
+        wob = _WOBBLE_AMP * math.sin(self._wp + self.age * self._ws)
+        cx, cy = int(self.x), int(self.y + wob)
+        for dx, dy in _SMALL_PIXELS[self.size_index()]:
+            px, py = cx + dx, cy + dy
+            if 0 <= px < WIDTH and 0 <= py < HEIGHT:
+                draw.point((px, py), fill=1)
 
 
 class ScreenState(Enum):
@@ -80,6 +237,10 @@ class ScreenState(Enum):
     RECORDING = "recording"
     STALLED = "stalled"
     STOPPING = "stopping"
+    CELEBRATE = "celebrate"        # 산책 완료 축하 (저장 후 자동 전환)
+    BEGGING = "begging"            # 산책 조르기 (2번 키 토글)
+    CLOCK = "clock"                # 현재 시각 표시 (3번 키 토글)
+    GREETING = "greeting"          # 주인 마중 (4번 키 토글)
     TRANSFERRING = "transferring"  # 도킹 후 영상 전송 중
 
 
@@ -91,6 +252,10 @@ _LABELS = {
     ScreenState.RECORDING:    ("녹화 중",       "RECORDING"),
     ScreenState.STALLED:      ("데이터 정체!",   "STALLED!"),
     ScreenState.STOPPING:     ("저장 중",       "SAVING"),
+    ScreenState.CELEBRATE:    ("산책 완료",     "DONE!"),
+    ScreenState.BEGGING:      ("",             ""),
+    ScreenState.CLOCK:        ("",             ""),
+    ScreenState.GREETING:     ("",             ""),
     ScreenState.TRANSFERRING: ("전송 중",       "SENDING"),
 }
 
@@ -142,15 +307,29 @@ class Screen:
 class DisplayContext:
     """렌더링에 필요한 공유 상태. 스레드 잠금은 디스플레이가 관리합니다."""
 
-    def __init__(self, font_small, font_big, korean: bool):
+    def __init__(self, font_small, font_big, font_title, font_time,
+                 korean: bool):
         self.font_small = font_small
         self.font_big = font_big
+        self.font_title = font_title      # 축하 화면 제목 (비율 1)
+        self.font_time = font_time        # 축하 화면 시간 (비율 2)
         self.korean = korean
 
         self.state = ScreenState.WAITING
         self.session_started_at: float | None = None
         self.segment_count = 0
         self.free_mb: float | None = None
+
+        # 하트 버스트 상태 (IDLE 화면 전용)
+        self.flying_hearts: list[_FlyingHeart] = []
+        self.fly_last_t: float | None = None
+
+        # 산책 완료 축하 화면 상태
+        self.celebrate_started_at: float | None = None
+        self.celebrate_duration: float = 0.0      # 표시할 산책 시간(초)
+
+        # 산책 조르기 화면 상태
+        self.beg_last_walk: float | None = None   # 마지막 산책 epoch(초)
 
     def label(self, state: ScreenState) -> str:
         ko, en = _LABELS[state]
@@ -171,10 +350,153 @@ class StatusScreen(Screen):
         blink = int(time.monotonic() * 2) % 2 == 0  # 0.5초 주기 점멸
 
         if state is ScreenState.IDLE:
-            # 도킹 대기: 화면 가운데 하트가 천천히 박동합니다.
+            # 대기: 가운데 하트 박동 + (버스트 시) 6방향 하트 분출
             beat = int(time.monotonic() / 0.75) % 2 == 0
-            _draw_heart(draw, WIDTH // 2, HEIGHT // 2, 24 if beat else 20)
-            key = ("idle", beat)
+            _draw_heart(draw, WIDTH // 2, HEIGHT // 2 + 4, 24 if beat else 20)
+
+            if ctx.flying_hearts:
+                now = time.monotonic()
+                dt = min(now - (ctx.fly_last_t or now), 0.1)
+                ctx.fly_last_t = now
+                for fh in ctx.flying_hearts:
+                    fh.update(dt)
+                ctx.flying_hearts = [fh for fh in ctx.flying_hearts if fh.alive]
+                for fh in ctx.flying_hearts:
+                    fh.draw(draw)
+                key = ("idle", beat, tuple(
+                    (int(fh.x), int(fh.y), fh.size_index())
+                    for fh in ctx.flying_hearts))
+            else:
+                ctx.fly_last_t = None
+                key = ("idle", beat)
+
+        elif state is ScreenState.GREETING:
+            # 주인 마중: 배(심장 자리)에서 빠르고 크게 쿵쿵 뛰는 하트 +
+            # 박동마다 양옆에서 작은 하트가 퐁 떠올라 사라짐 + 반김 문구.
+            t = time.monotonic()
+
+            # 좌: 쿵쿵 하트(배 = 심장) / 우: 반김 문구 — 32px 세로에
+            # 수직 적층이 안 되므로 좌우 배치. 가림 영역(상단 8px) 회피.
+            # 쿵쿵 하트: 대기(0.75초)보다 3배 빠른 0.25초 박동
+            beat = int(t / 0.25) % 2 == 0
+            _draw_heart(draw, 28, 20, 24 if beat else 18)
+
+            # 반김 문구 — 2초마다 교차, 부드럽게 깜빡(0.75초 표시/0.25초 숨김)
+            msgs = (("어서와!!", "보고싶었어!")
+                    if ctx.korean else ("WELCOME!!", "MISSED YOU!"))
+            mi = int(t / 2) % len(msgs)
+            txt_on = (t % 1.0) < 0.75
+            if txt_on:
+                draw.text((90, 16), msgs[mi],
+                          font=ctx.font_small, fill=1, anchor="mm")
+
+            # 퐁퐁 작은 하트: 한 박동(0.5초)마다 하트 좌우에서 떠올라 소멸
+            p = (t % 0.5) / 0.5
+            if p < 0.9:
+                stage = 0 if p < 0.45 else 1
+                for sx, rise in ((10, 10), (47, 8)):
+                    cx, cy = sx, int(25 - p * rise)
+                    for dx, dy in _SMALL_PIXELS[stage]:
+                        px, py = cx + dx, cy + dy
+                        if 0 <= px < WIDTH and 8 <= py < HEIGHT:
+                            draw.point((px, py), fill=1)
+
+            key = ("greet", mi, txt_on, beat, int(p * 10))
+
+        elif state is ScreenState.CLOCK:
+            # 시계: 시스템 시각(HH:MM:SS)만 중앙에 크게.
+            # 가림 영역(상단 8px)을 피해 가용 영역 세로 중앙에 배치.
+            now_txt = time.strftime("%H:%M:%S")
+            draw.text((WIDTH // 2, 20), now_txt,
+                      font=ctx.font_time, fill=1, anchor="mm")
+            key = ("clock", now_txt)
+
+        elif state is ScreenState.BEGGING:
+            # 산책 조르기: 말풍선(순환) + 마지막 산책 카운트 +
+            # 문 앞을 서성이다 도착하면 콩콩 두드리는 사람
+            t = time.monotonic()
+
+            # 말풍선 — 2초마다 문구 순환
+            msgs = (("산책 가자!", "나가자~", "심심해...")
+                    if ctx.korean else ("WALK ME!", "LET'S GO~", "BORED..."))
+            mi = int(t / 2) % len(msgs)
+            draw.text((4, 13), msgs[mi],
+                      font=ctx.font_small, fill=1, anchor="lm")
+
+            # 마지막 산책 이후 경과 (우상단)
+            count_txt = ""
+            if ctx.beg_last_walk:
+                diff = max(0.0, time.time() - ctx.beg_last_walk)
+                d, rem = int(diff // 86400), diff % 86400
+                h = int(rem // 3600)
+                if d >= 1:
+                    count_txt = f"{d}일째" if ctx.korean else f"{d}d ago"
+                elif h >= 1:
+                    count_txt = f"{h}시간째" if ctx.korean else f"{h}h ago"
+            if count_txt:
+                draw.text((110, 13), count_txt,
+                          font=ctx.font_small, fill=1, anchor="rm")
+
+            # 문 (오른쪽): 테두리 + 손잡이
+            draw.rectangle((113, 16, 126, 31), outline=1)
+            draw.point((116, 25), fill=1)
+
+            # 서성이는 사람: 4초 주기 왕복 (삼각파), 문 앞에서 콩콩
+            P = 4.0
+            ph = (t % P) / P
+            tri = 2 * ph if ph < 0.5 else 2 - 2 * ph        # 0→1→0
+            px = int(18 + tri * (95 - 18))
+            knocking = tri > 0.92                            # 문 앞 도착
+            py = 19 if (knocking and int(t * 6) % 2 == 0) else 20
+            leg = int(t / 0.3) % 2
+            _draw_runner(draw, px, py, leg)
+            if knocking:                                     # 두드림 표시
+                draw.line((108, 20, 110, 18), fill=1)
+                draw.line((108, 24, 110, 26), fill=1)
+
+            key = ("beg", mi, px, py, leg, knocking, count_txt)
+
+        elif state is ScreenState.CELEBRATE:
+            # 산책 완료 축하: 제목+🎉(상단) / 시간(중앙, 2배 글씨) /
+            # 만세 사람(하단 양옆). 만세 3회 — 팔 올릴 때마다 폭죽.
+            INTRO, HALF, CYCLES = 0.6, 0.7, 3
+            t = time.monotonic() - (ctx.celebrate_started_at or time.monotonic())
+            total = INTRO + CYCLES * HALF * 2
+
+            if t >= total:
+                # 재생 종료 → 하트로 자동 복귀
+                ctx.state = ScreenState.IDLE
+                ctx.celebrate_started_at = None
+                key = ("idle-return",)
+            else:
+                if t < INTRO:
+                    up, burst_p = False, None            # 등장: 폭죽 없음
+                    phase_id = -1
+                else:
+                    ph = (t - INTRO) / HALF              # 0.5마다 팔 전환
+                    phase_id = int(ph)
+                    up = phase_id % 2 == 0               # 짝수 구간 = 만세↑
+                    burst_p = (ph - phase_id) if up else None
+
+                # 상단: 제목 + 양옆 🎉 (터질 때만)
+                # 케이스 마감이 물리 화면 위 ~8px을 가리므로 y>=8 영역에 배치
+                draw.text((WIDTH // 2, 12), label,
+                          font=ctx.font_title, fill=1, anchor="mm")
+                if burst_p is not None:
+                    _draw_popper(draw, 26, 15, burst_p, flip=False)
+                    _draw_popper(draw, WIDTH - 27, 15, burst_p, flip=True)
+
+                # 중앙: 산책 시간 (제목의 2배 크기)
+                draw.text((WIDTH // 2, 24),
+                          _fmt_elapsed(ctx.celebrate_duration),
+                          font=ctx.font_time, fill=1, anchor="mm")
+
+                # 하단 양옆: 만세 사람
+                _draw_manse(draw, 3, 20, up)
+                _draw_manse(draw, WIDTH - 13, 20, up)
+
+                key = ("cheer", phase_id, up,
+                       None if burst_p is None else int(burst_p * 8))
 
         elif state is ScreenState.TRANSFERRING:
             # 도킹 후 전송 중: 문구 + 진행 점 + 흐르는 화살표
@@ -205,17 +527,34 @@ class StatusScreen(Screen):
             key = ("start", dots, int(ctx.elapsed()))
 
         elif state is ScreenState.RECORDING:
-            # ● REC 점멸 + 경과 시간 크게
-            if blink:
-                draw.ellipse((2, 4, 10, 12), fill=1)
-            draw.text((14, 2), label, font=ctx.font_small, fill=1)
-            draw.text((2, 15), _fmt_elapsed(ctx.elapsed()),
-                      font=ctx.font_big, fill=1)
+            # 좌측 고정 ● (점멸) + 5분에 한 바퀴 달리는 러너 트랙
+            elapsed = ctx.elapsed()
+
+            # 상단: 세그먼트 수(좌) · 경과 시간(우)
+            # 케이스 마감이 물리 화면 위 ~8px을 가리므로 y>=8 영역에 배치
             if ctx.segment_count:
-                seg = f"{ctx.segment_count}seg"
-                draw.text((WIDTH - 2, 24), seg,
-                          font=ctx.font_small, fill=1, anchor="rm")
-            key = ("rec", blink, int(ctx.elapsed()), ctx.segment_count)
+                draw.text((17, 14), f"{ctx.segment_count}seg",
+                          font=ctx.font_small, fill=1, anchor="lm")
+            draw.text((WIDTH - 2, 14), _fmt_elapsed(elapsed),
+                      font=ctx.font_small, fill=1, anchor="rm")
+
+            # 녹화 점: 왼쪽 고정, 0.5초 점멸 (가용 영역 세로 중앙)
+            if blink:
+                draw.ellipse((3, 14, 13, 24), fill=1)
+
+            # 바닥 점선 트랙 — 화면 맨 아래 줄에 붙임
+            for gx in range(18, WIDTH - 2, 4):
+                draw.point((gx, 31), fill=1)
+
+            # 러너: 1완주 = SEGMENT_SECONDS(5분). 다리는 0.3초마다 교차
+            run_x0, run_x1 = 20, WIDTH - 10          # 출발(●에서 띄움) ~ 오른쪽 끝
+            progress = (elapsed % SEGMENT_SECONDS) / SEGMENT_SECONDS
+            run_x = int(run_x0 + progress * (run_x1 - run_x0))
+            leg = int(time.monotonic() / 0.3) % 2
+            _draw_runner(draw, run_x, 20, leg)
+
+            key = ("rec", blink, leg, run_x,
+                   int(elapsed), ctx.segment_count)
 
         elif state is ScreenState.STALLED:
             # 반전 점멸로 눈에 띄게. 빠른 LED 점멸과 같은 의미입니다.
@@ -257,8 +596,8 @@ class OledStatusDisplay:
 
     def __init__(self, rotate: bool = True):
         """rotate=True면 패널 장착 방향에 맞춰 화면을 180도 뒤집어 출력."""
-        font_small, font_big, korean = _load_fonts()
-        self.ctx = DisplayContext(font_small, font_big, korean)
+        fonts = _load_fonts()
+        self.ctx = DisplayContext(*fonts)
         self.rotate = rotate
 
         self._oled = SSD1309_SPI()
@@ -307,6 +646,33 @@ class OledStatusDisplay:
         with self._lock:
             self.ctx.segment_count = segment_count
             self.ctx.free_mb = free_mb
+
+    def show_begging(self, last_walk_epoch: float | None) -> None:
+        """산책 조르기 화면으로 전환합니다. 다시 호출 주체(키 2)가
+        IDLE로 되돌릴 때까지 유지됩니다."""
+        with self._lock:
+            self.ctx.beg_last_walk = last_walk_epoch
+            self.ctx.state = ScreenState.BEGGING
+
+    def celebrate(self, walked_sec: float) -> None:
+        """산책 완료 축하 화면으로 전환합니다. 재생이 끝나면
+        화면이 스스로 IDLE(하트)로 돌아갑니다."""
+        with self._lock:
+            self.ctx.celebrate_duration = walked_sec
+            self.ctx.celebrate_started_at = time.monotonic()
+            self.ctx.state = ScreenState.CELEBRATE
+
+    def heart_burst(self) -> None:
+        """IDLE 하트에서 6방향으로 작은 하트를 동시 발사합니다.
+
+        어느 스레드에서 불러도 안전합니다. IDLE이 아닐 때 호출되면
+        하트가 생성되긴 하나 그리지 않으므로 수명이 지나 사라집니다.
+        """
+        cx, cy = WIDTH / 2, HEIGHT / 2 + 4      # 중앙 하트 위치와 동일
+        with self._lock:
+            for ang in _BURST_DIRECTIONS_DEG:
+                self.ctx.flying_hearts.append(_FlyingHeart(cx, cy, ang))
+            self.ctx.fly_last_t = time.monotonic()
 
     # ── 향후 확장: 버튼으로 창 전환 ──────────────────────
 
