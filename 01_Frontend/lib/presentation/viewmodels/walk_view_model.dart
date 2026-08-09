@@ -546,9 +546,18 @@ class WalkViewModel extends BaseViewModel {
   }
 
   /// GET /walks/{walkId}/summary
+  ///
+  /// **다른 산책의 요약을 먼저 비운다.** [_summary] 는 산책 하나만 담는 자리라
+  /// 앞서 본 산책의 값이 남아 있다. 그대로 두면 조회가 끝나기 전까지 화면이
+  /// 남의 경로를 그리고, 조회가 실패하면 그 상태로 굳는다. 방금 끝낸 산책의
+  /// 경로를 보려는데 며칠 전 산책 지도가 뜨는 증상이 이것이었다.
   Future<void> loadSummary(int walkId) async {
-    // 기기에 저장한 산책이면 그걸 쓴다. 서버에 산책 API 가 없어서 조회해도
-    // 못 받는다(2026-08-04 기준 dev 에 walk 엔드포인트 0개).
+    if (_summary != null && _summary!.walkId != walkId) {
+      _summary = null;
+      safeNotify();
+    }
+
+    // 기기에 저장한 산책이면 그걸 쓴다. 서버에 못 올린 산책이다.
     if (WalkRecordStore.isLocalId(walkId)) {
       final local = await _recordStore.read(walkId);
       if (local != null) {
@@ -595,6 +604,9 @@ class WalkViewModel extends BaseViewModel {
   }
 
   void _resetPoints() {
+    // 지난 산책의 요약도 함께 버린다. 남겨 두면 이번 산책을 끝냈을 때
+    // 요약 화면이 "이미 있다"고 보고 새로 불러오지 않는다.
+    _summary = null;
     _pendingPoints.clear();
     _track.reset();
     _livePosition = null;

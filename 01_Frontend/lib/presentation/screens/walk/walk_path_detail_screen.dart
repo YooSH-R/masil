@@ -43,7 +43,16 @@ class _WalkPathDetailScreenState extends State<WalkPathDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final walkVm = context.watch<WalkViewModel>();
-    final summary = walkVm.summary;
+
+    // 어떤 산책을 보고 있는지. extra 로 안 넘어오면 진행/최근 산책.
+    final shownWalkId = widget.walkId ?? walkVm.currentWalk?.walkId;
+
+    // **이 산책의 요약일 때만 쓴다.** 뷰모델은 산책 하나 분량의 요약만 들고
+    // 있어서, 조회가 끝나기 전이나 실패했을 때는 앞서 본 산책의 값이 남아
+    // 있다. 그걸 그대로 그리면 엉뚱한 지도가 뜬다.
+    final loaded = walkVm.summary;
+    final summary =
+        (loaded != null && loaded.walkId == shownWalkId) ? loaded : null;
 
     // 저장된 경로가 있으면 그걸 쓰고, 없으면(방금 끝낸 산책 등) 메모리의 좌표를 쓴다.
     final route =
@@ -52,9 +61,6 @@ class _WalkPathDetailScreenState extends State<WalkPathDetailScreen> {
     final distanceMeters = summary?.distanceMeters ?? walkVm.distanceMeters;
     final durationSeconds =
         summary?.durationSeconds ?? walkVm.elapsed.inSeconds;
-
-    // 어떤 산책을 보고 있는지. extra 로 안 넘어오면 진행/최근 산책.
-    final shownWalkId = widget.walkId ?? walkVm.currentWalk?.walkId;
     final sampleImage = shownWalkId == null
         ? null
         : SampleWalkDiaries.imageAssetOf(shownWalkId);

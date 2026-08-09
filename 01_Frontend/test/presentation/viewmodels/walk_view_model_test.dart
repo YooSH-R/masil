@@ -57,6 +57,41 @@ void main() {
     viewModel.dispose();
   });
 
+  // 뷰모델은 산책 하나 분량의 요약만 들고 있다. 앞서 본 산책의 값이 남으면
+  // 방금 끝낸 산책의 경로를 보려는데 며칠 전 지도가 뜬다.
+  test('다른 산책을 조회하면 이전 요약을 먼저 비운다', () async {
+    SharedPreferences.setMockInitialValues({});
+    final repository = _SummaryRepository();
+    final viewModel = WalkViewModel(repository);
+
+    await viewModel.loadSummary(1);
+    expect(viewModel.summary?.walkId, 1);
+
+    // 2번 조회가 실패해도 1번 요약이 남으면 안 된다. 남으면 화면이 남의 경로를
+    // 그린 채 굳는다.
+    repository.fails = true;
+    await viewModel.loadSummary(2);
+    expect(viewModel.summary, isNull);
+
+    viewModel.dispose();
+  });
+
+  test('새 산책을 시작하면 지난 산책의 요약을 버린다', () async {
+    SharedPreferences.setMockInitialValues({});
+    final source = _TestRouteSource();
+    final viewModel = WalkViewModel(_SummaryRepository(), routeSource: source);
+
+    await viewModel.loadSummary(1);
+    expect(viewModel.summary, isNotNull);
+
+    // 남겨 두면 요약 화면이 "이미 있다"고 보고 새 산책을 안 불러온다.
+    viewModel.startRouteTracking();
+    expect(viewModel.summary, isNull);
+
+    await viewModel.endWalk();
+    viewModel.dispose();
+  });
+
   test('서버 업로드 버퍼에는 확정된 경로점만 들어간다', () async {
     SharedPreferences.setMockInitialValues({});
     final source = _TestRouteSource();
@@ -125,6 +160,21 @@ void main() {
 
     viewModel.dispose();
   });
+}
+
+class _SummaryRepository extends _UnusedWalkRepository {
+  bool fails = false;
+
+  @override
+  Future<WalkSummary> getSummary(int walkId) async {
+    if (fails) throw StateError('조회 실패');
+    return WalkSummary(
+      walkId: walkId,
+      durationSeconds: 600,
+      distanceMeters: 900,
+      route: const [],
+    );
+  }
 }
 
 class _TestRouteSource implements WalkRouteSource {
