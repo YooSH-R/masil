@@ -9,8 +9,6 @@ import com.ssafy.backend.auth.application.result.SocialAuthenticationResult;
 import com.ssafy.backend.auth.domain.SignupTicket;
 import com.ssafy.backend.auth.domain.SocialPrincipal;
 import com.ssafy.backend.auth.domain.SocialProvider;
-import com.ssafy.backend.common.error.BusinessException;
-import com.ssafy.backend.common.error.ErrorCode;
 import com.ssafy.backend.user.application.port.out.UserRepository;
 import com.ssafy.backend.user.domain.User;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,10 +20,8 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -77,7 +73,6 @@ class CompleteSocialSignupServiceTest {
         when(tokenCodec.hash("signup-token")).thenReturn("token-hash");
         when(signupTicketRepository.findByTokenHash("token-hash"))
                 .thenReturn(Optional.of(ticket));
-        when(userRepository.existsByNickname("산책좋아")).thenReturn(false);
         when(userRepository.save(any(User.class))).thenReturn(savedUser);
         when(authTokenIssuer.issue(savedUser, DEVICE_ID)).thenReturn(tokens);
 
@@ -91,19 +86,31 @@ class CompleteSocialSignupServiceTest {
     }
 
     @Test
-    void rejectsDuplicatedNicknameBeforeCreatingUser() {
+    void allowsANameAlreadyUsedByAnotherUser() {
+        User savedUser = new User(
+                2L,
+                "another@example.com",
+                "산책좋아",
+                null,
+                NOW
+        );
+        IssuedTokens tokens = new IssuedTokens(
+                "access-2",
+                "refresh-2",
+                NOW.plusSeconds(3600),
+                NOW.plusSeconds(86400)
+        );
         when(tokenCodec.hash("signup-token")).thenReturn("token-hash");
         when(signupTicketRepository.findByTokenHash("token-hash"))
                 .thenReturn(Optional.of(usableTicket()));
-        when(userRepository.existsByNickname("산책좋아")).thenReturn(true);
+        when(userRepository.save(any(User.class))).thenReturn(savedUser);
+        when(authTokenIssuer.issue(savedUser, DEVICE_ID)).thenReturn(tokens);
 
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> service.complete("signup-token", "산책좋아", DEVICE_ID)
-        );
+        SocialAuthenticationResult.Authenticated result =
+                service.complete("signup-token", "산책좋아", DEVICE_ID);
 
-        assertEquals(ErrorCode.NICKNAME_DUPLICATED, exception.errorCode());
-        verify(userRepository, never()).save(any(User.class));
+        assertEquals("산책좋아", result.user().nickname());
+        verify(userRepository).save(any(User.class));
     }
 
     private SignupTicket usableTicket() {

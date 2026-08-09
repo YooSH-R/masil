@@ -13,6 +13,11 @@ pipeline {
             defaultValue: false,
             description: '백엔드 변경이 없어도 이미지 빌드와 배포를 실행한다.'
         )
+        booleanParam(
+            name: 'FORCE_MIGRATION',
+            defaultValue: false,
+            description: '마이그레이션 파일 변경이 없어도 dev DB 마이그레이션을 실행한다.'
+        )
     }
 
     environment {
@@ -21,6 +26,7 @@ pipeline {
         K8S_NAMESPACE = 's15a203-dev'
         MANIFEST_DIR = '06_Infra/dev'
         MIGRATION_DIR = '06_Infra/postgres/init'
+        DEV_MIGRATION_DIR = '06_Infra/postgres/dev'
     }
 
     stages {
@@ -60,19 +66,25 @@ pipeline {
                             returnStdout: true
                         ).trim()
                     } else {
+                        // `-m` 없는 `git show --name-only` 는 머지 커밋에서 파일을
+                        // 하나도 내놓지 않는다. dev 는 MR 머지로만 진행되므로 이
+                        // 경로를 타면 마이그레이션 스테이지가 조용히 스킵됐다.
+                        //
+                        // `-m` 은 부모별 diff 를 출력해 머지 커밋도 잡아낸다.
+                        // 얕은 복제(depth 1)면 부모가 잘려 나가 전체 트리가
+                        // 나오는데, 마이그레이션은 모두 멱등이므로 한 번 더 도는
+                        // 편이 조용히 건너뛰는 것보다 안전하다.
                         changedFiles = sh(
-                            script: 'git show --pretty= --name-only HEAD',
+                            script: 'git show -m --pretty= --name-only HEAD',
                             returnStdout: true
                         ).trim()
                     }
 
-                    def migrationChanged = changedFiles
-                        .readLines()
-                        .any {
-                            it.startsWith(
-                                    '06_Infra/postgres/init/'
-                            )
-                        }
+                    def migrationChanged = params.FORCE_MIGRATION ||
+                            changedFiles.readLines().any {
+                                it.startsWith('06_Infra/postgres/init/') ||
+                                it.startsWith('06_Infra/postgres/dev/')
+                            }
 
                     def deploymentChanged = changedFiles
                         .readLines()
@@ -91,6 +103,7 @@ pipeline {
 
                     echo "Changed files:\n${changedFiles ?: '(none)'}"
                     echo "Force backend build: ${params.FORCE_BACKEND_BUILD}"
+                    echo "Force migration: ${params.FORCE_MIGRATION}"
                     echo "Backend changed: ${env.BACKEND_CHANGED}"
                     echo "Database migration changed: ${env.MIGRATION_CHANGED}"
                 }
@@ -176,7 +189,15 @@ pipeline {
                       "$MIGRATION_DIR/007_walk_diaries.sql" \
                       "$MIGRATION_DIR/008_users_version_compat.sql" \
                       "$MIGRATION_DIR/009_walk_api.sql" \
-                      "$MIGRATION_DIR/010_behavior_requests_open_unique.sql"
+                      "$MIGRATION_DIR/010_behavior_requests_open_unique.sql" \
+                      "$MIGRATION_DIR/016_pet_walk_schedule.sql" \
+                      "$MIGRATION_DIR/017_pet_daily_walk_count_max_six.sql" \
+                      "$DEV_MIGRATION_DIR/011_cleanup_rexsung_demo_pets.sql" \
+                      "$DEV_MIGRATION_DIR/012_allow_duplicate_user_nicknames.sql" \
+                      "$DEV_MIGRATION_DIR/013_pair_device001_with_ssafy.sql" \
+                      "$DEV_MIGRATION_DIR/014_reset_device001_qr_token.sql" \
+                      "$DEV_MIGRATION_DIR/015_sync_demo_device_qr_tokens.sql" \
+                      "$DEV_MIGRATION_DIR/018_set_device001_affinity.sql"
                 '''
             }
         }

@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'package:dio/dio.dart';
+
 import '../../core/network/api_client.dart';
 import '../../core/network/api_endpoints.dart';
 import '../../core/network/api_exception.dart';
@@ -51,6 +55,20 @@ class PetRepositoryImpl implements PetRepository {
 
   @override
   Future<List<Pet>> getPets() async {
+    try {
+      final data = await _client.get(ApiEndpoints.pets);
+      final rawPets = data is List
+          ? Json.asMapList(data)
+          : Json.asMapList(Json.asMap(data)['items']);
+      final pets = rawPets.map(PetModel.fromJson).toList(growable: false);
+      // 목록 조회는 사용자가 선택한 현재 펫을 바꾸면 안 된다. 서버 목록은
+      // 미배포 서버용 fallback에만 쓰는 known 목록으로 따로 기억한다.
+      await _cache.rememberPetIds(pets.map((pet) => pet.id));
+      return pets;
+    } on ApiException {
+      // 아직 GET /pets가 배포되지 않은 서버에서는 기존 로컬 캐시로 호환한다.
+    }
+
     final ids = await _cache.readKnownPetIds();
     if (ids.isEmpty) return const [];
 
@@ -83,22 +101,69 @@ class PetRepositoryImpl implements PetRepository {
     required int petId,
     required String name,
     String? profileImage,
+    int? dailyWalkCount,
   }) async {
     final data = await _client.patch(
       ApiEndpoints.pet(petId),
       // name 은 서버에서 required 다. 조건부로 빼면 사진만 바꿀 때 400 이 난다.
+      // dailyWalkCount 는 부분 수정이라 보내지 않으면 서버가 기존 값을 유지한다.
       data: {
         'name': name,
         if (profileImage != null) 'profileImage': profileImage,
+        if (dailyWalkCount != null) 'dailyWalkCount': dailyWalkCount,
       },
     );
     return PetModel.fromJson(Json.asMap(data));
   }
 
   @override
+  Future<void> deletePet(int petId) async {
+    await _client.delete(ApiEndpoints.pet(petId));
+    await _cache.forgetPetId(petId);
+    await _cache.clearRobotId();
+  }
+
+  @override
   Future<Affinity> getAffinity(int petId) async {
     final data = await _client.get(ApiEndpoints.petAffinity(petId));
     return AffinityModel.fromJson(Json.asMap(data));
+  }
+
+  @override
+  Stream<Affinity> streamAffinity(int petId) async* {
+    // SSE 는 봉투(success/data)를 쓰지 않고 payload 를 그대로 보낸다.
+    final cancelToken = CancelToken();
+    try {
+      final events = await _client.eventStream(
+        ApiEndpoints.petAffinityStream(petId),
+        cancelToken: cancelToken,
+      );
+      await for (final event in events) {
+        if (event.name != _affinitySnapshotEvent &&
+            event.name != _affinityChangedEvent) {
+          continue;
+        }
+        final affinity = _parseAffinityEvent(event.data);
+        if (affinity != null) yield affinity;
+      }
+    } finally {
+      // 구독 취소·정상 종료·오류 어느 쪽으로 끝나도 소켓을 닫는다.
+      cancelToken.cancel();
+    }
+  }
+
+  /// 연결 직후 현재값. 변경 이벤트와 같은 형태라 똑같이 처리한다.
+  static const String _affinitySnapshotEvent = 'affinity-snapshot';
+  static const String _affinityChangedEvent = 'affinity-changed';
+
+  /// 깨진 프레임 하나가 연결 전체를 끊지 않게 한다. SSE 는 오래 유지되는
+  /// 연결이라, 한 번의 파싱 실패로 스트림을 죽이면 실시간 갱신이 멈춘다.
+  Affinity? _parseAffinityEvent(String data) {
+    try {
+      return AffinityModel.fromJson(Json.asMap(jsonDecode(data)));
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
@@ -125,7 +190,13 @@ class PetRepositoryImpl implements PetRepository {
     // 로컬 테스트 로그인은 펫 생성 과정을 거치지 않아 캐시에 id가 없을 수 있다.
     // 운영/개발 서버에는 절대 적용하지 않고 loopback 백엔드에서만 시드 펫을 쓴다.
     petId ??= ApiConfig.isLoopback ? ApiConfig.localTestPetId : null;
-    if (petId == null) return null;
+    if (petId == null) {
+      final pets = await getPets();
+      if (pets.isEmpty) return null;
+      final pet = pets.first;
+      await _cache.savePetId(pet.id);
+      return pet;
+    }
     try {
       final pet = await getPet(petId);
       // 백엔드의 로컬 fallback이 다른 시드 id를 돌려준 경우에도 다음 조회부터는

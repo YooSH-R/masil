@@ -196,7 +196,6 @@ class _IndoorHomeScreenState extends State<IndoorHomeScreen> {
               ],
             ),
           ),
-          Switch(value: true, onChanged: (v) => context.push('/indoor/roaming'), activeThumbColor: const Color(0xFFE8F6F3), activeTrackColor: const Color(0xFFE8F5E9)),
           const Icon(Icons.chevron_right, color: Colors.grey),
         ],
       ),
@@ -248,7 +247,7 @@ class _IndoorHomeScreenState extends State<IndoorHomeScreen> {
       children: [
         _buildIconMenu('이름 호출', Icons.mic_none, const Color(0xFFFFF1F0), () => context.push('/indoor/name-setting')),
         _buildIconMenu('놀이 요청', Icons.sports_tennis, const Color(0xFFE8F6F3), () => context.push('/indoor/play-request')),
-        _buildIconMenu('귀가 마중', Icons.home_outlined, const Color(0xFFF9F3E7), () => context.push('/indoor/welcome-home')),
+        _buildIconMenu('귀가 마중', Icons.home_outlined, const Color(0xFFFFDDB8), () => context.push('/indoor/welcome-home')),
         _buildIconMenu('알림 설정', Icons.notifications_none, const Color(0xFFE8F5E9), () => context.push('/indoor/notifications')),
       ],
     );

@@ -8,9 +8,8 @@ abstract class PetRepository {
 
   /// 이 앱이 아는 펫 전부.
   ///
-  /// 서버에 `GET /pets` 가 없어서, 만들 때 저장해 둔 id 를 하나씩
-  /// `GET /pets/{petId}` 로 조회해 모은다. 이미 삭제된 펫(404)은 목록에서
-  /// 빼고 건너뛴다.
+  /// `GET /pets`로 로그인 사용자의 실제 펫을 조회한다. 구버전 서버에서는
+  /// 만들 때 저장해 둔 id를 하나씩 조회하는 방식으로 호환한다.
   Future<List<Pet>> getPets();
 
   /// GET /pets/{petId} — 펫 프로필 조회
@@ -26,15 +25,27 @@ abstract class PetRepository {
     required int petId,
     required String name,
     String? profileImage,
+    int? dailyWalkCount,
   });
+
+  /// DELETE /pets/{petId} — 페어링을 해제하고 펫 프로필을 삭제한다.
+  Future<void> deletePet(int petId);
 
   /// GET /pets/{petId}/affinity — 친밀도·기분 조회
   Future<Affinity> getAffinity(int petId);
 
-  /// GET /pets/{petId}/affinity/history — 친밀도 변화 이력
-  Future<List<AffinityHistoryEntry>> getAffinityHistory(int petId, {int? limit});
+  /// GET /pets/{petId}/affinity/stream — 친밀도 실시간 구독(SSE).
+  ///
+  /// 연결 직후 현재값이 한 번 오고, 이후 변경이 이어서 온다. **구독을 취소하면
+  /// 연결도 닫힌다.** 서버가 30분마다 정상 종료하므로 스트림이 끝나는 것은
+  /// 오류가 아니며, 다시 붙는 것은 호출하는 쪽 책임이다.
+  Stream<Affinity> streamAffinity(int petId);
 
-  /// 마지막으로 사용한 펫. 목록 조회 API가 없어 로컬 캐시의 petId로 조회한다.
+  /// GET /pets/{petId}/affinity/history — 친밀도 변화 이력
+  Future<List<AffinityHistoryEntry>> getAffinityHistory(int petId,
+      {int? limit});
+
+  /// 마지막으로 사용한 펫. 캐시가 없으면 서버의 내 펫 목록에서 복구한다.
   Future<Pet?> getCurrentPet();
 
   /// 이후 화면에서 쓸 기준 펫 지정.

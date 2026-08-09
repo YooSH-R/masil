@@ -44,15 +44,6 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<NicknameAvailability> checkNicknameAvailability(String nickname) async {
-    final data = await _client.get(
-      ApiEndpoints.nicknameAvailability,
-      query: {'nickname': nickname},
-    );
-    return NicknameAvailability.fromJson(Json.asMap(data));
-  }
-
-  @override
   Future<VerificationConfirmResult> confirmVerification({
     required String verificationId,
     required String code,

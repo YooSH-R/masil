@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.List;
 
 @Service
 public class PetService {
@@ -94,6 +95,31 @@ public class PetService {
         return toProfileResult(pet);
     }
 
+    @Transactional(readOnly = true)
+    public List<PetProfileResult> getProfiles(Long userId) {
+        return petRepository.findAllOwnedWithAffinity(userId).stream()
+                .map(this::toProfileResult)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public PetAffinitySnapshot getAffinity(Long userId, Long petId) {
+        PetJpaEntity pet = findOwnedPet(petId, userId);
+        PetAffinityStateJpaEntity state = pet.getAffinityState();
+        if (state == null) {
+            throw new BusinessException(
+                    ErrorCode.PET_AFFINITY_STATE_NOT_FOUND
+            );
+        }
+        return new PetAffinitySnapshot(
+                pet.getId(),
+                state.getAffinityScore(),
+                state.getAffinityLevel(),
+                state.getMood(),
+                state.getUpdatedAt()
+        );
+    }
+
     private PetJpaEntity findLocalTestPet() {
         if (localTestPetId == null) {
             throw new BusinessException(ErrorCode.PET_NOT_FOUND);
@@ -108,7 +134,8 @@ public class PetService {
     public PetProfileResult update(
             Long userId,
             Long petId,
-            String name
+            String name,
+            Integer dailyWalkCount
     ) {
         PetJpaEntity pet = petRepository
                 .findOwnedWithAffinity(petId, userId)
@@ -116,6 +143,10 @@ public class PetService {
                         ErrorCode.PET_NOT_FOUND
                 ));
         pet.changeName(normalizeName(name));
+        // 보내지 않은 항목은 기존 값을 유지한다(부분 수정).
+        if (dailyWalkCount != null) {
+            pet.changeDailyWalkCount(dailyWalkCount);
+        }
         return toProfileResult(pet);
     }
 
@@ -168,6 +199,7 @@ public class PetService {
                 pet.getId(),
                 pet.getName(),
                 null,
+                pet.getDailyWalkCount(),
                 toAffinityResult(pet.getAffinityState()),
                 robot
         );

@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import '../../core/services/gps/walk_track_processor.dart';
+import '../../core/services/sample_august_routes.dart';
 import '../../core/services/sample_walk_diaries.dart';
 import '../../core/services/walk_record_store.dart';
 import '../../core/services/walk_route_source.dart';
@@ -31,9 +33,20 @@ class WalkViewModel extends BaseViewModel {
 
   // --- 지도에 그릴 경로 ---
 
-  /// 지금까지 받은 좌표 전체. 지도의 폴리라인이 이걸 그린다.
-  /// (_pendingPoints 는 전송 후 비워지므로 그리기용으로 따로 보관한다)
-  final List<WalkLocationPoint> _routePoints = [];
+  /// GPS 원본을 화면용 위치와 저장용 경로점으로 갈라 주는 처리기.
+  ///
+  /// 좌표를 거를지 말지 판단하는 규칙은 전부 여기 있다. 예전에는 뷰모델이
+  /// 직접 `_shouldKeep()` 으로 걸렀는데, 그 하나의 기준이 지도 표시와 서버
+  /// 저장을 동시에 결정해 버려서 둘을 따로 조절할 수 없었다.
+  final WalkTrackProcessor _track = WalkTrackProcessor();
+
+  /// EMA 가 적용된 현재 위치. 마커가 이걸 따라간다. **서버에 보내지 않는다.**
+  WalkLocationPoint? _livePosition;
+
+  /// 좌표가 아직 없을 때 지도 중심으로 쓸 마지막 알려진 위치.
+  /// 경로에도 업로드 버퍼에도 넣지 않는다.
+  WalkLocationPoint? _cameraHint;
+
   final Set<int> _seenSequences = {};
   StreamSubscription<WalkLocationPoint>? _routeSub;
 
@@ -67,41 +80,6 @@ class WalkViewModel extends BaseViewModel {
   /// 겹칠 수 있다. 겹치면 같은 좌표를 두 번 보내게 된다.
   bool _isUploading = false;
 
-  /// 좌표를 저장할지 판단하는 기준. 명세서 2.4 "배치 처리 속도" 개정판이다.
-  ///
-  ///   일반 산책: 측정 3초 간격 / accuracy 기반 최소 이동거리 3~8m
-  ///   accuracy 가 30~50m 보다 큰 부정확한 좌표는 제외
-  ///
-  /// **측정 간격(3초)은 좌표를 만들어 보내는 쪽([WalkRouteSource])이 지킨다.**
-  /// 여기서는 이미 들어온 좌표를 "저장할지" 만 판단한다. 측정 주기와 서버 전송
-  /// 주기는 서로 별개다(3초 측정 / 30초 전송).
-  ///
-  /// GPS가 정확할 때 적용하는 최소 이동거리. 3초 보행 시 약 3~5m 이동하므로
-  /// 경로 반응성을 유지하면서 제자리의 작은 흔들림은 제외한다.
-  static const double _minMoveMeters = 3;
-
-  /// 정확도가 낮다고 임계값을 무한히 키우면 정상 경로까지 끊기므로 상한을 둔다.
-  static const double _maxAdaptiveMoveMeters = 8;
-
-  /// 이보다 부정확한 좌표는 버린다. 명세서의 30~50m 구간에서 느슨한 쪽을 잡았다.
-  /// 시연은 실외 안드로이드 휴대폰이라 보통 5~20m 로 들어오지만, 건물 사이나
-  /// 지하도에서 수백 m 튄 좌표가 한 개라도 섞이면 경로선이 지도를 가로지르고
-  /// 거리·페이스까지 같이 망가진다.
-  static const double _maxAccuracyMeters = 50;
-
-  /// 걷는 중에는 나올 수 없는 속도(m/s). 이보다 빠르면 튀는 좌표로 본다.
-  /// 10m/s = 36km/h — 뛰어도 못 넘는 값이라 정상 보행은 걸리지 않는다.
-  ///
-  /// **왜 "몇 m 이상 이동"이 아니라 속도로 보는가**: 거리만 보면(예: 200m 초과
-  /// 배제) 터널·지하도·백그라운드 제약으로 좌표가 한동안 끊겼다가 멀리서 다시
-  /// 잡히는 정상 상황을 버린다. 그러면 기준점([_lastKeptPoint])이 갱신되지 않아
-  /// 이후 좌표도 계속 멀다고 판정되고 **경로가 영구히 멈춘다.** 시간 간격을 함께
-  /// 보면 200m 를 100초에 걸쳐 온 것은 통과하고, 1초에 온 것만 걸러낸다.
-  static const double _maxSpeedMetersPerSecond = 10;
-
-  /// 시각을 믿을 수 없을 때(같거나 거꾸로) 쓰는 절대 거리 상한.
-  static const double _maxJumpMeters = 200;
-
   /// 끝낸 산책을 기기에 남기는 저장소.
   ///
   /// 서버에 산책 API 가 배포되기 전까지, 산책일지가 날짜별 경로를 보여줄 수 있는
@@ -111,11 +89,6 @@ class WalkViewModel extends BaseViewModel {
   /// 방금 저장한 기록의 walkId. 종료 직후 경로 상세로 바로 갈 때 쓴다.
   int? _lastSavedRecordId;
   int? get lastSavedRecordId => _lastSavedRecordId;
-
-  /// 마지막으로 저장한 좌표. [_minMoveMeters] 비교 기준점이다.
-  /// 버려진 좌표는 기준점을 갱신하지 않는다(그래야 조금씩 흔들리며 누적되는
-  /// 좌표가 5m 를 넘길 때까지 계속 걸러진다).
-  WalkLocationPoint? _lastKeptPoint;
 
   WalkProposal? get proposal => _proposal;
   Walk? get currentWalk => _currentWalk;
@@ -128,12 +101,32 @@ class WalkViewModel extends BaseViewModel {
   /// 지금 서버로 좌표를 보내는 중인지.
   bool get isUploadingLocations => _isUploading;
 
-  List<WalkLocationPoint> get routePoints =>
-      List<WalkLocationPoint>.unmodifiable(_routePoints);
-  WalkLocationPoint? get lastPoint =>
-      _routePoints.isEmpty ? null : _routePoints.last;
-  bool get hasRoute => _routePoints.isNotEmpty;
+  /// 확정된 경로점. 폴리라인과 거리 계산이 이걸 쓴다.
+  List<WalkLocationPoint> get routePoints => _track.anchors;
+  WalkLocationPoint? get lastPoint {
+    final anchors = _track.anchors;
+    return anchors.isEmpty ? null : anchors.last;
+  }
+
+  bool get hasRoute => _track.anchors.isNotEmpty;
   bool get isTracking => _routeSub != null;
+
+  /// EMA 가 적용된 현재 위치. 마커가 이걸 따라간다.
+  ///
+  /// 확정 경로점([routePoints])보다 훨씬 자주 바뀐다. 걸러지지 않은 좌표마다
+  /// 갱신되므로 1초 간격이면 1초마다 움직인다.
+  WalkLocationPoint? get livePosition => _livePosition;
+
+  /// 지도의 첫 중심으로 쓸 좌표.
+  ///
+  /// 현재 위치 → 확정 경로 시작점 → OS 캐시 순으로 고른다. 셋 다 없을 때만
+  /// 화면이 기본 좌표(광화문)를 쓴다.
+  WalkLocationPoint? get mapCenterHint {
+    if (_livePosition != null) return _livePosition;
+    final anchors = _track.anchors;
+    if (anchors.isNotEmpty) return anchors.first;
+    return _cameraHint;
+  }
 
   /// 위치를 못 받는 이유(권한 거부 등). 받을 수 있으면 null.
   /// 사용자가 직접 풀어줘야 하는 상황이라 화면이 그대로 보여준다.
@@ -164,7 +157,7 @@ class WalkViewModel extends BaseViewModel {
   int get distanceMeters {
     final serverMeters = _currentWalk?.distanceMeters;
     if (serverMeters != null) return serverMeters;
-    return Geo.routeDistanceMeters(_routePoints).round();
+    return Geo.routeDistanceMeters(_track.anchors).round();
   }
 
   /// 이동경로 수신 시작. [WalkRouteSource] 가 주입되지 않았으면 아무것도 하지 않는다.
@@ -206,6 +199,15 @@ class WalkViewModel extends BaseViewModel {
       return;
     }
 
+    // 첫 측위는 실외에서도 수 초 걸린다. 그동안 지도가 기본 좌표(광화문)에
+    // 머무르지 않도록, OS 캐시에 남은 위치를 먼저 받아 중심만 옮겨 둔다.
+    // 경로·업로드에는 넣지 않는다.
+    source.lastKnownPosition().then((position) {
+      if (position == null || _livePosition != null) return;
+      _cameraHint = position;
+      safeNotify();
+    });
+
     _routeSub = source.points(id).listen(
       _onPointReceived,
       onError: (_) {},
@@ -227,6 +229,11 @@ class WalkViewModel extends BaseViewModel {
     await _routeSub?.cancel();
     _routeSub = null;
     await _routeSource?.stop();
+
+    // 아직 확정을 기다리던 후보점을 경로에 넣는다. 이게 없으면 마지막 몇 m 가
+    // 지도에서도 잘리고 서버에도 안 올라간다.
+    _enqueueForUpload(_track.finish());
+
     // 남은 좌표를 마지막으로 올린다. 실패해도 버퍼에 남아 다음 기회에 재시도된다.
     await flushLocations();
     safeNotify();
@@ -242,15 +249,33 @@ class WalkViewModel extends BaseViewModel {
   bool _ingest(WalkLocationPoint point) {
     // 중복. 소스가 재연결 후 이미 보낸 좌표를 다시 보내는 경우다.
     if (_seenSequences.contains(point.sequence)) return false;
-    if (!_shouldKeep(point)) return false;
-
     _seenSequences.add(point.sequence);
-    _routePoints.add(point);
-    // 그리기용 목록과 별개로, 서버 업로드 버퍼에도 쌓아둔다.
-    _sequence = point.sequence > _sequence ? point.sequence : _sequence;
-    _pendingPoints.add(point);
-    _lastKeptPoint = point;
+    _receivedCount += 1;
+
+    final update = _track.add(point);
+    _lastRejectReason = update.rejectReason;
+    if (update.isRejected) {
+      safeNotify();
+      return false;
+    }
+
+    // 화면용 위치는 좌표마다 갱신한다. 확정 경로점과 달리 서버에 가지 않는다.
+    _livePosition = update.livePosition;
+    _enqueueForUpload(update.committedAnchors);
     safeNotify();
+    return update.committedAnchors.isNotEmpty;
+  }
+
+  /// 확정된 경로점만 업로드 버퍼에 넣는다.
+  ///
+  /// 마커를 부드럽게 하려고 만든 보간 좌표나 EMA 중간값은 여기 오지 않는다.
+  /// 서버에는 검증이 끝난 기록 좌표만 남아야 한다.
+  void _enqueueForUpload(List<WalkLocationPoint> anchors) {
+    if (anchors.isEmpty) return;
+    for (final anchor in anchors) {
+      _sequence = anchor.sequence > _sequence ? anchor.sequence : _sequence;
+      _pendingPoints.add(anchor);
+    }
 
     // 상한까지 찼으면 30초를 기다리지 않고 바로 보낸다. 오래 걸으면 주기보다
     // 버퍼가 먼저 차는데, 그때까지 쌓아두면 한 요청이 너무 커진다.
@@ -258,7 +283,6 @@ class WalkViewModel extends BaseViewModel {
     if (_pendingPoints.length >= _maxBatchSize) {
       flushLocations();
     }
-    return true;
   }
 
   /// 좌표를 몇 개 받았는지(걸러진 것 포함). 진단용.
@@ -273,75 +297,11 @@ class WalkViewModel extends BaseViewModel {
   /// 아예 안 오는 것인지 / 와도 걸러지는 것인지 구분할 방법이 없어 원인을
   /// 추측만 했다. 이 값이 있으면 화면만 보고 바로 판별된다.
   String? get gpsDiagnostic {
-    if (_routePoints.length >= 2) return null; // 정상 동작 중
+    if (_track.anchors.length >= 2) return null; // 정상 동작 중
     if (_receivedCount == 0) return null; // 아직 아무것도 안 옴 → 별도 안내가 있다
     final reason = _lastRejectReason;
     if (reason == null) return null;
     return 'GPS $_receivedCount개 받음 · $reason';
-  }
-
-  /// 저장할 좌표인지 판단한다. 명세서 2.4 "배치 처리 속도" 참고.
-  ///
-  /// 첫 좌표는 비교 대상이 없으니 무조건 저장한다. 그래야 산책 시작 지점이
-  /// 경로에 남고 지도가 곧바로 그쪽으로 움직인다.
-  bool _shouldKeep(WalkLocationPoint point) {
-    _receivedCount += 1;
-
-    final accuracy = point.accuracy;
-    if (accuracy != null && accuracy > _maxAccuracyMeters) {
-      _lastRejectReason = '정확도 ${accuracy.round()}m 로 낮아 제외';
-      return false;
-    }
-
-    final last = _lastKeptPoint;
-    if (last == null) {
-      _lastRejectReason = null;
-      return true;
-    }
-
-    final moved = Geo.distanceMeters(
-      lat1: last.latitude,
-      lng1: last.longitude,
-      lat2: point.latitude,
-      lng2: point.longitude,
-    );
-    // accuracy는 실제 위치가 포함될 가능성이 높은 오차 반경이다. 현재 좌표나
-    // 직전 좌표의 오차가 크면 최소 이동거리도 함께 키워, 정지 상태의 GPS
-    // Drift가 실제 이동 거리로 누적되는 것을 줄인다.
-    final effectiveAccuracy = <double>[
-      point.accuracy ?? _minMoveMeters,
-      last.accuracy ?? _minMoveMeters,
-    ].reduce((a, b) => a > b ? a : b);
-    final requiredMove = (effectiveAccuracy * 0.5).clamp(
-      _minMoveMeters,
-      _maxAdaptiveMoveMeters,
-    );
-    if (moved < requiredMove) {
-      _lastRejectReason =
-          '이동 ${moved.toStringAsFixed(1)}m (${requiredMove.toStringAsFixed(1)}m 이상 필요)';
-      return false;
-    }
-
-    // 튀는 좌표 걸러내기. 실내·건물 사이에서 수백 m 씩 순간이동한 것처럼
-    // 잡히는 경우가 있는데, 그대로 받으면 경로선이 지도를 가로지르고 거리·
-    // 페이스까지 같이 망가진다.
-    final seconds =
-        point.recordedAt.difference(last.recordedAt).inMilliseconds / 1000;
-    if (seconds <= 0) {
-      // 시각이 같거나 거꾸로 왔다. 속도를 계산할 수 없으니 거리로만 본다.
-      if (moved > _maxJumpMeters) {
-        _lastRejectReason = '${moved.round()}m 순간이동으로 보여 제외';
-        return false;
-      }
-      _lastRejectReason = null;
-      return true;
-    }
-    if (moved / seconds > _maxSpeedMetersPerSecond) {
-      _lastRejectReason = '${(moved / seconds).round()}m/s 로 너무 빨라 제외';
-      return false;
-    }
-    _lastRejectReason = null;
-    return true;
   }
 
   /// GET /walk-proposals/current — 제안이 없으면 proposal은 null로 유지된다.
@@ -394,6 +354,35 @@ class WalkViewModel extends BaseViewModel {
     _proposal = null;
     safeNotify();
     return true;
+  }
+
+  /// POST /walks — 제안 없이 앱에서 바로 시작하는 산책의 서버 세션을 연다.
+  ///
+  /// **이 호출이 성공해야 걸은 경로가 서버에 남는다.** walkId 가 없으면
+  /// [flushLocations] 와 [endWalk] 가 조용히 넘어가서, 산책이 그 휴대폰
+  /// 저장소에만 저장되고 같은 계정의 다른 기기에서는 보이지 않는다.
+  ///
+  /// 실패해도(오프라인·페어링 없음) 산책 자체는 막지 않는다. 화면은 그대로
+  /// 진행되고 기록은 [WalkRecordStore] 에 남으므로 지금까지와 같이 동작한다.
+  Future<Walk?> startWalkSession({
+    required int petId,
+    required int robotId,
+  }) async {
+    // 진행 중인 세션이 있으면 그대로 쓴다. 끝난 산책은 요약 화면이 아직 보고
+    // 있을 수 있어 남겨 두는 값이므로, 그걸 세션으로 착각하면 다음 산책의
+    // 좌표가 이미 완료된 산책으로 올라간다.
+    final current = _currentWalk;
+    if (current != null && !current.status.isFinished) return current;
+
+    final walk = await guard(
+      () => _walkRepository.createWalk(petId: petId, robotId: robotId),
+      silent: true,
+    );
+    if (walk == null) return null;
+
+    _currentWalk = walk;
+    safeNotify();
+    return walk;
   }
 
   /// 산책 중 수집한 좌표를 버퍼에 쌓는다. 저장했으면 true, 걸러졌으면 false.
@@ -462,32 +451,36 @@ class WalkViewModel extends BaseViewModel {
   /// 그 좌표들은 영원히 반영되지 않는다. 서버가 이 호출을 받고서야 감성 사진·
   /// 일지 생성을 시작하므로 순서가 뒤바뀌면 안 된다.
   ///
-  /// 산책 세션이 없으면(walk API 미배포 등) 로컬 정리만 하고 조용히 끝난다.
+  /// 산책 세션이 없거나 종료가 실패하면 기기에만 남기고 조용히 끝난다.
   Future<void> endWalk() async {
     stopWatchingWalk();
     // 내부에서 남은 좌표를 마지막으로 flush 한다.
     await stopRouteTracking();
 
-    // 걸은 경로를 기기에 남긴다. 서버에 산책 API 가 배포되기 전까지 산책일지가
-    // 날짜별로 경로를 다시 보여줄 수 있는 유일한 방법이다.
-    // 서버 기록이 생기면 그쪽이 우선되고 이건 캐시로 남는다.
-    await _saveLocalRecord();
-
     _localWalkActive = false;
     safeNotify();
 
     final walkId = _currentWalk?.walkId;
-    if (walkId == null) return;
+    if (walkId != null) {
+      // 좌표가 아직 남아 있으면(전송 실패) 한 번 더 시도한다.
+      if (_pendingPoints.isNotEmpty) await flushLocations();
 
-    // 좌표가 아직 남아 있으면(전송 실패) 한 번 더 시도한다.
-    if (_pendingPoints.isNotEmpty) await flushLocations();
+      final walk =
+          await guard(() => _walkRepository.endWalk(walkId), silent: true);
+      if (walk != null) {
+        _currentWalk = walk;
+        // 서버가 받았으면 기기에 또 남기지 않는다. 남기면 산책일지에 같은
+        // 산책이 서버 기록과 로컬 기록 두 줄로 보인다.
+        _lastSavedRecordId = walkId;
+        safeNotify();
+        return;
+      }
+    }
 
-    final walk =
-        await guard(() => _walkRepository.endWalk(walkId), silent: true);
-    if (walk == null) return;
-
-    _currentWalk = walk;
-    safeNotify();
+    // 여기까지 왔으면 서버에 산책이 남지 않았다(세션 생성 실패·오프라인·종료
+    // 실패). 걸은 기록을 잃지 않게 기기에라도 남긴다. 이 기록은 이 휴대폰에서만
+    // 보인다.
+    await _saveLocalRecord();
   }
 
   /// 방금 끝낸 산책을 기기에 저장한다.
@@ -496,15 +489,15 @@ class WalkViewModel extends BaseViewModel {
   /// 저장하지 않는다. 저장된 id 는 [lastSavedRecordId] 로 알 수 있어, 종료 직후
   /// 경로 상세로 바로 들어갈 수 있다.
   Future<void> _saveLocalRecord() async {
-    if (_routePoints.length < 2) return;
+    if (_track.anchors.length < 2) return;
 
     final startedAt =
-        _trackingStartedAt ?? _routePoints.first.recordedAt.toLocal();
+        _trackingStartedAt ?? _track.anchors.first.recordedAt.toLocal();
 
     _lastSavedRecordId = await _recordStore.save(
       startedAt: startedAt,
       endedAt: DateTime.now(),
-      route: _routePoints,
+      route: _track.anchors,
       // 서버 값이 있으면 그걸 쓰고, 없으면 좌표로 계산한 거리를 남긴다.
       distanceMeters: _currentWalk?.distanceMeters,
     );
@@ -553,16 +546,45 @@ class WalkViewModel extends BaseViewModel {
   }
 
   /// GET /walks/{walkId}/summary
+  ///
+  /// **다른 산책의 요약을 먼저 비운다.** [_summary] 는 산책 하나만 담는 자리라
+  /// 앞서 본 산책의 값이 남아 있다. 그대로 두면 조회가 끝나기 전까지 화면이
+  /// 남의 경로를 그리고, 조회가 실패하면 그 상태로 굳는다. 방금 끝낸 산책의
+  /// 경로를 보려는데 며칠 전 산책 지도가 뜨는 증상이 이것이었다.
+  /// 마지막으로 요청한 산책. 늦게 도착한 옛 조회를 버리는 기준이다.
+  ///
+  /// 목록에서 여러 산책을 빠르게 눌러 들어가면 조회가 겹친다. 비동기라 먼저
+  /// 시작한 조회가 나중에 끝날 수 있고, 그러면 화면이 최신 산책을 보고 있는데
+  /// 값은 이전 산책의 것으로 덮인다.
+  int? _requestedSummaryId;
+
   Future<void> loadSummary(int walkId) async {
-    // 기기에 저장한 산책이면 그걸 쓴다. 서버에 산책 API 가 없어서 조회해도
-    // 못 받는다(2026-08-04 기준 dev 에 walk 엔드포인트 0개).
+    _requestedSummaryId = walkId;
+
+    if (_summary != null && _summary!.walkId != walkId) {
+      _summary = null;
+      safeNotify();
+    }
+
+    // 기기에 저장한 산책이면 그걸 쓴다. 서버에 못 올린 산책이다.
     if (WalkRecordStore.isLocalId(walkId)) {
       final local = await _recordStore.read(walkId);
-      if (local != null) {
+      if (local != null && _isLatestSummaryRequest(walkId)) {
         _summary = local;
         clearError();
         safeNotify();
       }
+      return;
+    }
+
+    // 8/3~8/7 시연용 일지. S3 에 사진·본문만 있고 GPS 가 없어서, 만들어 넣은
+    // 경로를 쓴다([SampleAugustRoutes]). 그 날짜에 실제로 걸은 산책이 서버에
+    // 생기면 피드가 시연용 값을 채우지 않으므로 여기도 타지 않는다.
+    final demo = SampleAugustRoutes.summaryFor(walkId);
+    if (demo != null) {
+      _summary = demo;
+      clearError();
+      safeNotify();
       return;
     }
 
@@ -579,11 +601,14 @@ class WalkViewModel extends BaseViewModel {
     }
 
     final summary = await guard(() => _walkRepository.getSummary(walkId));
-    if (summary == null) return;
+    if (summary == null || !_isLatestSummaryRequest(walkId)) return;
 
     _summary = summary;
     safeNotify();
   }
+
+  /// 이 조회가 아직 화면이 기다리는 것인지. 그사이 다른 산책을 눌렀으면 false.
+  bool _isLatestSummaryRequest(int walkId) => _requestedSummaryId == walkId;
 
   void attachWalk(Walk walk) {
     _currentWalk = walk;
@@ -591,10 +616,16 @@ class WalkViewModel extends BaseViewModel {
   }
 
   void _resetPoints() {
+    // 지난 산책의 요약도 함께 버린다. 남겨 두면 이번 산책을 끝냈을 때
+    // 요약 화면이 "이미 있다"고 보고 새로 불러오지 않는다.
+    // 진행 중인 조회도 무효로 만든다. 아니면 방금 비운 자리를 그 결과가
+    // 되살린다.
+    _summary = null;
+    _requestedSummaryId = null;
     _pendingPoints.clear();
-    _routePoints.clear();
+    _track.reset();
+    _livePosition = null;
     _seenSequences.clear();
-    _lastKeptPoint = null;
     _sequence = 0;
     _elapsed = Duration.zero;
     _trackingStartedAt = null;

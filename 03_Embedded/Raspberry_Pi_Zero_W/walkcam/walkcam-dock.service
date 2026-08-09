@@ -1,0 +1,28 @@
+# walkcam-dock.service — 부팅 시 하트 대기화면 + 도킹 트리거 자동 시작
+# 설치:
+#   sudo cp walkcam-dock.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now walkcam-dock
+# 로그:
+#   journalctl -u walkcam-dock -f
+
+[Unit]
+Description=Walkcam dock-triggered recorder (heart idle screen)
+# usb0/NetworkManager가 준비된 뒤에 시작해야 dock 판정(ping)이 안정적입니다.
+After=NetworkManager.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=piw
+Group=piw
+WorkingDirectory=/home/piw/walkcam
+ExecStart=/usr/bin/python3 /home/piw/walkcam/walkcam_dock.py
+Restart=on-failure
+RestartSec=5
+# 크래시 반복 시에도 계속 재시도 (산책 장치는 무인 운용)
+StartLimitIntervalSec=0
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,495 @@
+{
+  "schema": 1,
+  "generated_at": "2026-08-04T21:24:13",
+  "frame_count": 12,
+  "prompt_version": "2026-07-29",
+  "walk": {
+    "date": "불명",
+    "started_at": "2026-08-04T12:10:00",
+    "location": "불명"
+  },
+  "records": [
+    {
+      "file": "f_0000645_t000m43.00s.jpg",
+      "segment": "불명",
+      "index": 645,
+      "offset_seconds": 43.0,
+      "elapsed": "0분 43초",
+      "shot_datetime": "2026-08-04 12:10:43",
+      "location": "불명",
+      "observation": {
+        "scene": "회색 카펫이 깔린 실내 바닥 위를 반바지와 운동화 차림의 보행자가 걸어가고 있으며, 문 너머로 다른 사람들의 발이 보입니다.",
+        "location_type": "실내",
+        "time_of_day": "점심",
+        "weather": "불명",
+        "people": "2~5",
+        "atmosphere": [
+          "일상적인",
+          "분주함",
+          "실내"
+        ],
+        "confidence": {
+          "location_type": 0.9,
+          "time_of_day": 1.0,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "실내 카펫 바닥 위를 걸어가는 보행자의 발과 다리가 근접 촬영됨",
+        "objects": [
+          "운동화",
+          "문틀"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시(12:10:43) 기준",
+        "weather_evidence": "실내 공간으로 외부 날씨를 관찰할 수 없음"
+      }
+    },
+    {
+      "file": "f_0002926_t003m15.07s.jpg",
+      "segment": "불명",
+      "index": 2926,
+      "offset_seconds": 195.067,
+      "elapsed": "3분 15초",
+      "shot_datetime": "2026-08-04 12:13:15",
+      "location": "불명",
+      "observation": {
+        "scene": "고층 빌딩들이 늘어선 거리에서 무성한 가로수들이 하늘을 향해 뻗어 있는 모습을 올려다본 장면이다.",
+        "location_type": "상가거리",
+        "time_of_day": "점심",
+        "weather": "맑음",
+        "people": "없음",
+        "atmosphere": [
+          "도시적인",
+          "싱그러움",
+          "화창함"
+        ],
+        "confidence": {
+          "location_type": 0.8,
+          "time_of_day": 1.0,
+          "weather": 0.8
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "카메라가 하늘을 향해 비스듬히 기울어져 있어 빌딩과 나무가 높게 솟아 보인다.",
+        "objects": [
+          "빌딩",
+          "간판",
+          "가로등"
+        ],
+        "plants": [
+          "가로수"
+        ],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시가 12시 13분이며 하늘이 매우 밝음",
+        "weather_evidence": "하늘이 밝고 나뭇잎에 빛이 강하게 반사됨"
+      }
+    },
+    {
+      "file": "f_0004900_t005m26.67s.jpg",
+      "segment": "불명",
+      "index": 4900,
+      "offset_seconds": 326.667,
+      "elapsed": "5분 27초",
+      "shot_datetime": "2026-08-04 12:15:26",
+      "location": "불명",
+      "observation": {
+        "scene": "강한 햇빛이 반사되는 고층 건물의 외벽을 아래에서 위로 올려다보고 있으며, 좌측 상단에 나뭇잎이 보이고 좌측 하단에 사람의 얼굴 일부가 걸쳐 있다.",
+        "location_type": "기타",
+        "time_of_day": "낮",
+        "weather": "맑음",
+        "people": "1",
+        "atmosphere": [
+          "도시적인",
+          "눈부신",
+          "현대적인"
+        ],
+        "confidence": {
+          "location_type": 0.5,
+          "time_of_day": 1.0,
+          "weather": 0.9
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "건물 외벽에 햇빛이 강하게 반사되어 역광과 눈부심이 심함",
+        "objects": [
+          "건물",
+          "간판"
+        ],
+        "plants": [
+          "나뭇잎"
+        ],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시가 12시 15분이며 건물 외벽에 강한 햇빛이 반사됨",
+        "weather_evidence": "하늘이 밝고 건물 표면에 강한 직사광선이 반사되어 눈부심이 발생함"
+      }
+    },
+    {
+      "file": "f_0007268_t008m04.53s.jpg",
+      "segment": "불명",
+      "index": 7268,
+      "offset_seconds": 484.533,
+      "elapsed": "8분 5초",
+      "shot_datetime": "2026-08-04 12:18:04",
+      "location": "불명",
+      "observation": {
+        "scene": "유리창으로 둘러싸인 거대한 현대식 빌딩의 외관을 아래에서 올려다본 모습이다.",
+        "location_type": "상가거리",
+        "time_of_day": "점심",
+        "weather": "구름많음",
+        "people": "없음",
+        "atmosphere": [
+          "현대적임",
+          "웅장함",
+          "깔끔함"
+        ],
+        "confidence": {
+          "location_type": 0.7,
+          "time_of_day": 1.0,
+          "weather": 0.8
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "건물 전면 유리창에 하늘과 구름이 선명하게 반사됨",
+        "objects": [
+          "빌딩",
+          "가로등"
+        ],
+        "plants": [
+          "관목"
+        ],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시가 12시 18분으로 기록되어 있음",
+        "weather_evidence": "건물 유리창에 푸른 하늘과 흰 구름이 반사되어 보임"
+      }
+    },
+    {
+      "file": "f_0009045_t010m03.00s.jpg",
+      "segment": "불명",
+      "index": 9045,
+      "offset_seconds": 603.0,
+      "elapsed": "10분 3초",
+      "shot_datetime": "2026-08-04 12:20:03",
+      "location": "불명",
+      "observation": {
+        "scene": "큰 유리창을 통해 푸른 나무들이 내다보이는 실내 공간에서 두 사람이 창밖을 바라보며 앉아 있다.",
+        "location_type": "실내",
+        "time_of_day": "점심",
+        "weather": "맑음",
+        "people": "2~5",
+        "atmosphere": [
+          "차분함",
+          "여유로운",
+          "아늑함"
+        ],
+        "confidence": {
+          "location_type": 0.95,
+          "time_of_day": 1.0,
+          "weather": 0.85
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "창밖의 풍경이 액자처럼 보이는 넓은 통유리창",
+        "objects": [
+          "테이블",
+          "의자",
+          "소파",
+          "조명",
+          "블라인드"
+        ],
+        "plants": [
+          "나무"
+        ],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시가 12시 20분으로 기록되어 있으며 창밖이 매우 밝음",
+        "weather_evidence": "창밖으로 밝은 햇빛이 비치고 나무들이 선명하게 보임"
+      }
+    },
+    {
+      "file": "f_0010905_t012m07.00s.jpg",
+      "segment": "불명",
+      "index": 10905,
+      "offset_seconds": 727.0,
+      "elapsed": "12분 7초",
+      "shot_datetime": "2026-08-04 12:22:07",
+      "location": "불명",
+      "observation": {
+        "scene": "베이커리 쇼케이스와 에스프레소 머신, 계산용 포스기가 설치된 카페 내부의 모습이다.",
+        "location_type": "실내",
+        "time_of_day": "점심",
+        "weather": "불명",
+        "people": "1",
+        "atmosphere": [
+          "차분함",
+          "깔끔함",
+          "아늑함"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 1.0,
+          "weather": 0.5
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "쇼케이스 내부에 파운드케이크와 도넛 등의 디저트류가 진열되어 있다.",
+        "objects": [
+          "진열장",
+          "에스프레소 머신",
+          "포스기",
+          "액자",
+          "조명"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시가 12시 22분으로 지정되어 있음",
+        "weather_evidence": "실내 공간으로 외부 날씨를 명확히 판별하기 어려움"
+      }
+    },
+    {
+      "file": "f_0013237_t014m42.47s.jpg",
+      "segment": "불명",
+      "index": 13237,
+      "offset_seconds": 882.467,
+      "elapsed": "14분 42초",
+      "shot_datetime": "2026-08-04 12:24:42",
+      "location": "불명",
+      "observation": {
+        "scene": "고층 빌딩들이 둘러싸고 있는 도심에서 하늘을 올려다본 장면으로, 흐린 하늘 아래 금속 난간과 푸른 나뭇잎 일부가 보입니다.",
+        "location_type": "상가거리",
+        "time_of_day": "점심",
+        "weather": "흐림",
+        "people": "없음",
+        "atmosphere": [
+          "도시적",
+          "차분함",
+          "흐림"
+        ],
+        "confidence": {
+          "location_type": 0.7,
+          "time_of_day": 1.0,
+          "weather": 0.8
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "빌딩 숲 사이에서 하늘을 올려다보는 로우 앵글 구도",
+        "objects": [
+          "빌딩",
+          "난간"
+        ],
+        "plants": [
+          "나무"
+        ],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시가 12시 24분으로 점심 시간대에 해당함",
+        "weather_evidence": "하늘 전체가 흐린 구름으로 뒤덮여 있음"
+      }
+    },
+    {
+      "file": "f_0015237_t016m55.80s.jpg",
+      "segment": "불명",
+      "index": 15237,
+      "offset_seconds": 1015.8,
+      "elapsed": "16분 56초",
+      "shot_datetime": "2026-08-04 12:26:55",
+      "location": "불명",
+      "observation": {
+        "scene": "가로수 사이로 고층 빌딩의 현대적인 외벽과 간판 일부가 올려다보이는 풍경이다.",
+        "location_type": "상가거리",
+        "time_of_day": "점심",
+        "weather": "맑음",
+        "people": "없음",
+        "atmosphere": [
+          "도시적인",
+          "싱그러운",
+          "현대적인"
+        ],
+        "confidence": {
+          "location_type": 0.7,
+          "time_of_day": 1.0,
+          "weather": 0.8
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "가로수 나무 기둥의 얼룩덜룩한 껍질과 빌딩의 수직 패턴 외벽이 대비를 이룸",
+        "objects": [
+          "고층건물",
+          "간판"
+        ],
+        "plants": [
+          "가로수"
+        ],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시가 12시 26분이며 나뭇잎 사이로 밝은 빛이 들어옴",
+        "weather_evidence": "하늘이 밝고 건물 외벽과 나뭇잎에 빛이 강하게 반사됨"
+      }
+    },
+    {
+      "file": "f_0017100_t019m00.00s.jpg",
+      "segment": "불명",
+      "index": 17100,
+      "offset_seconds": 1140.0,
+      "elapsed": "19분 0초",
+      "shot_datetime": "2026-08-04 12:29:00",
+      "location": "불명",
+      "observation": {
+        "scene": "고층 빌딩과 푸른 나뭇잎이 우거진 나무들을 아래에서 위로 올려다본 풍경으로 우측 상단에 컵을 쥔 손이 일부 보입니다.",
+        "location_type": "기타",
+        "time_of_day": "낮",
+        "weather": "맑음",
+        "people": "없음",
+        "atmosphere": [
+          "도심속",
+          "싱그러운",
+          "차분함"
+        ],
+        "confidence": {
+          "location_type": 0.5,
+          "time_of_day": 1.0,
+          "weather": 0.7
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "화면 우측 상단에 음료 컵을 든 손이 일부 노출됨",
+        "objects": [
+          "건물",
+          "컵"
+        ],
+        "plants": [
+          "나무"
+        ],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시가 12시 29분이며 하늘이 밝음",
+        "weather_evidence": "나무 사이로 비치는 밝은 하늘"
+      }
+    },
+    {
+      "file": "f_0019571_t021m44.73s.jpg",
+      "segment": "불명",
+      "index": 19571,
+      "offset_seconds": 1304.733,
+      "elapsed": "21분 45초",
+      "shot_datetime": "2026-08-04 12:31:44",
+      "location": "불명",
+      "observation": {
+        "scene": "사람들이 엘리베이터 내부에 탑승하여 서 있는 모습이다.",
+        "location_type": "실내",
+        "time_of_day": "낮",
+        "weather": "불명",
+        "people": "2~5",
+        "atmosphere": [
+          "밀집된",
+          "차분함",
+          "일상적인"
+        ],
+        "confidence": {
+          "location_type": 0.9,
+          "time_of_day": 1.0,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "엘리베이터 1층 표시등이 켜져 있음",
+        "objects": [
+          "엘리베이터 표시기",
+          "음료 컵",
+          "스마트폰"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시가 12시 31분으로 낮 시간대임",
+        "weather_evidence": "실내 엘리베이터 내부로 외부 날씨를 관찰할 수 없음"
+      }
+    },
+    {
+      "file": "f_0021511_t023m54.07s.jpg",
+      "segment": "불명",
+      "index": 21511,
+      "offset_seconds": 1434.067,
+      "elapsed": "23분 54초",
+      "shot_datetime": "2026-08-04 12:33:54",
+      "location": "불명",
+      "observation": {
+        "scene": "실내 테이블 위에 노트북, 음료수 병, 전자기기 부품 등이 어지럽게 놓여 있으며 사람들이 앉아 작업을 하고 있다.",
+        "location_type": "실내",
+        "time_of_day": "점심",
+        "weather": "불명",
+        "people": "2~5",
+        "atmosphere": [
+          "분주함",
+          "학구적인",
+          "실내"
+        ],
+        "confidence": {
+          "location_type": 0.9,
+          "time_of_day": 1.0,
+          "weather": 0.5
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "테이블 위에 개발용 부품들과 전선, 이름표 등이 어지럽게 널려 있음",
+        "objects": [
+          "노트북",
+          "플라스틱 병",
+          "테이크아웃 컵",
+          "종이상자",
+          "이름표"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "촬영 일시 기록(12:33:54) 및 반소매 옷차림",
+        "weather_evidence": "실내 공간으로 외부 날씨 확인 불가"
+      }
+    },
+    {
+      "file": "f_0024815_t027m34.33s.jpg",
+      "segment": "불명",
+      "index": 24815,
+      "offset_seconds": 1654.333,
+      "elapsed": "27분 34초",
+      "shot_datetime": "2026-08-04 12:37:34",
+      "location": "불명",
+      "observation": {
+        "scene": "실내 공간에서 한 인물이 파란색 링을 들고 있고 뒤편에 음료 컵을 든 다른 인물과 가전제품이 보인다.",
+        "location_type": "실내",
+        "time_of_day": "점심",
+        "weather": "불명",
+        "people": "2~5",
+        "atmosphere": [
+          "일상적임",
+          "캐주얼함",
+          "실내"
+        ],
+        "confidence": {
+          "location_type": 1.0,
+          "time_of_day": 1.0,
+          "weather": 0.1
+        },
+        "unreadable": false,
+        "animals": [],
+        "notable": "전경에 파란색 플라스틱 링을 손으로 잡고 있는 모습이 크게 잡힘",
+        "objects": [
+          "음료 컵",
+          "가전제품",
+          "파란색 링"
+        ],
+        "plants": [],
+        "season_hint": "여름",
+        "surface": "불명",
+        "time_evidence": "제공된 촬영 일시가 12시 37분임",
+        "weather_evidence": "실내 공간이어서 외부 날씨를 관찰할 수 없음"
+      }
+    }
+  ]
+}

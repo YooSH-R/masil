@@ -6,8 +6,6 @@ import java.util.Optional;
 
 public interface SpringDataUserRepository extends JpaRepository<UserJpaEntity, Long> {
 
-    boolean existsByNicknameAndDeletedAtIsNull(String nickname);
-
     boolean existsByEmailIgnoreCaseAndDeletedAtIsNull(String email);
 
     boolean existsByPhoneNumberAndDeletedAtIsNull(String phoneNumber);
@@ -17,8 +15,6 @@ public interface SpringDataUserRepository extends JpaRepository<UserJpaEntity, L
     Optional<UserJpaEntity> findByIdAndDeletedAtIsNull(Long id);
 
     Optional<UserJpaEntity> findByPhoneNumberAndDeletedAtIsNull(String phoneNumber);
-
-    boolean existsByNicknameAndDeletedAtIsNullAndIdNot(String nickname, Long id);
 
     boolean existsByPhoneNumberAndDeletedAtIsNullAndIdNot(
             String phoneNumber,

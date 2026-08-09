@@ -51,7 +51,7 @@ class SampleWalkDiaries {
   static final List<WalkDiaryFeedItem> items = _rows
       .map((r) => WalkDiaryFeedItem(
             walkId: r.id,
-            walkedAt: DateTime(year, month, r.day, r.hour, r.minute),
+            walkedAt: DateTime.utc(year, month, r.day, r.hour, r.minute),
             durationSeconds: r.minutes * 60,
             distanceMeters: r.meters,
             summary: r.summary,
@@ -79,7 +79,7 @@ class SampleWalkDiaries {
     final coords = _routes[walkId];
     if (row == null || coords == null) return null;
 
-    final startedAt = DateTime(year, month, row.day, row.hour, row.minute);
+    final startedAt = DateTime.utc(year, month, row.day, row.hour, row.minute);
     final secondsPerStep = coords.length < 2
         ? 0.0
         : (row.minutes * 60) / (coords.length - 1);

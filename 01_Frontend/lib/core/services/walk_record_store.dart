@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/entities/walk.dart';
 import '../../domain/entities/walk_diary.dart';
 import '../utils/geo.dart';
+import '../utils/korea_time.dart';
 
 /// 끝낸 산책을 **이 기기에** 보관한다.
 ///
@@ -114,7 +115,7 @@ class WalkRecordStore {
       for (final r in await readAll())
         WalkDiaryFeedItem(
           walkId: r.walkId,
-          walkedAt: r.startedAt,
+          walkedAt: KoreaTime.fromNullableInstant(r.startedAt),
           durationSeconds: r.durationSeconds,
           distanceMeters: r.distanceMeters,
         ),
@@ -122,6 +123,26 @@ class WalkRecordStore {
   }
 
   Future<void> clear() async => (await _prefs).remove(_key);
+
+  /// 앱 시작 때 한 번만 도는 정리. 지웠으면 true.
+  ///
+  /// 서버에 산책 세션을 만들기 전에 걸은 산책은 이 기기에만 남아 있다. 계정이
+  /// 같아도 다른 기기에서는 안 보이는 기록이라, 시연에서 한 사람 폰에만 뜨는
+  /// 줄이 섞이면 헷갈린다. 그래서 한 번 비운다.
+  ///
+  /// 이 뒤로 쌓이는 기록은 서버 전송이 실패했을 때의 폴백이므로 지우지 않는다.
+  /// 플래그를 남겨서 앱을 다시 켜도 다시 지우지 않는다.
+  Future<bool> purgeUnsyncedRecordsOnce() async {
+    final prefs = await _prefs;
+    if (prefs.getBool(_purgeFlagKey) ?? false) return false;
+
+    await prefs.setBool(_purgeFlagKey, true);
+    final had = (prefs.getStringList(_key) ?? const <String>[]).isNotEmpty;
+    if (had) await prefs.remove(_key);
+    return had;
+  }
+
+  static const String _purgeFlagKey = 'local_walk_records_purged_v1';
 
   /// 형태가 깨진 항목은 조용히 버린다. 하나가 깨졌다고 목록 전체를 잃지 않는다.
   WalkSummary? _parse(String line) {

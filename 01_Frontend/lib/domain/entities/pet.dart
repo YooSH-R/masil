@@ -1,22 +1,20 @@
-/// 명세서 "11. 상태값 - 친밀도 기분 상태".
-enum PetMood { happy, neutral, lonely, sleeping, excited }
+/// 친밀도 점수에 따라 달라지는 마실이와의 관계 상태.
+enum PetMood { wary, calm, friendly, happy }
 
 extension PetMoodX on PetMood {
   String get label => switch (this) {
-        PetMood.happy => '기분 좋음',
-        PetMood.neutral => '보통',
-        PetMood.lonely => '교감 부족',
-        PetMood.sleeping => '충전 중',
-        PetMood.excited => '신남',
+        PetMood.wary => '낯가리는 중',
+        PetMood.calm => '마음 여는 중',
+        PetMood.friendly => '가까운 사이',
+        PetMood.happy => '최고의 단짝',
       };
 
-  /// 홈 화면 상태 배지 문구.
+  /// 친밀도 상세 화면에 표시할 관계 설명.
   String get homeMessage => switch (this) {
-        PetMood.happy => '오늘 기분 최고예요! ✨',
-        PetMood.neutral => '평온한 하루를 보내고 있어요',
-        PetMood.lonely => '조금 외로워하고 있어요',
-        PetMood.sleeping => '충전하며 쉬고 있어요',
-        PetMood.excited => '나갈 준비가 됐어요!',
+        PetMood.wary => '아직 서로 알아가는 중이에요',
+        PetMood.calm => '마실이가 조금씩 마음을 열고 있어요',
+        PetMood.friendly => '마실이와 제법 가까워졌어요',
+        PetMood.happy => '마실이와 최고의 단짝이에요!',
       };
 }
 
@@ -75,14 +73,26 @@ class Pet {
   const Pet({
     required this.id,
     required this.name,
+    this.dailyWalkCount = defaultDailyWalkCount,
     this.profileImageUrl,
     this.affinity,
     this.robot,
     this.createdAt,
   });
 
+  /// 서버 `PetJpaEntity.DEFAULT_DAILY_WALK_COUNT` 와 같은 값이다.
+  static const int defaultDailyWalkCount = 2;
+  static const int minDailyWalkCount = 1;
+
+  /// 산책일지 S3 경로가 `session1~6` 이라 하루 7회 이상은 담을 자리가 없다.
+  /// 서버 `PetJpaEntity.MAX_DAILY_WALK_COUNT` 와 같은 값이어야 한다.
+  static const int maxDailyWalkCount = 6;
+
   final int id;
   final String name;
+
+  /// 하루 산책 횟수. 마실이가 산책을 조르는 간격을 정한다.
+  final int dailyWalkCount;
   final String? profileImageUrl;
   final Affinity? affinity;
   final PairedRobotSummary? robot;

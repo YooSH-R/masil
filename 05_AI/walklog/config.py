@@ -34,7 +34,9 @@ __all__ = [
     "DIARY_NAME",
     "FLOW_IMAGE_NAME",
     "STORY_IMAGE_NAME",
-    "S3_UPLOAD_FILES",
+    "JOURNAL_NAME",
+    "IMAGE_MANIFEST_NAME",
+    "S3_UPLOAD_EXCLUDE_DIRS",
     "PANELS_DIRNAME",
     "PAYLOAD_DIRNAME",
     "SESSION_PREFIX",
@@ -67,6 +69,9 @@ __all__ = [
     "SYSTEM_MODE",
     "USE_RESPONSE_SCHEMA",
     "check_system_mode",
+    "SAMPLE_RATIO",
+    "SAMPLE_MIN",
+    "SAMPLE_MAX",
 ]
 
 
@@ -91,13 +96,22 @@ RECORDS_NAME = "frame_records.json"
 DIARY_NAME = "walk_log.md"
 FLOW_IMAGE_NAME = "walk_flow.png"
 STORY_IMAGE_NAME = "story_image.png"
+JOURNAL_NAME = "walk_journal.png"
 PANELS_DIRNAME = "flow_panels"
 
-# S3에 올릴 "AI 최종 결과물"만 고른 허용 목록. frame_records.json(원자재),
-# walk_flow.png/flow_panels(스토리보드 부산물)는 로컬에만 남긴다.
-# storage.upload_outputs가 이 목록에 없는 파일은 세션 폴더에 있어도 올리지 않는다.
-S3_UPLOAD_FILES = (DIARY_NAME, STORY_IMAGE_NAME)
+# 이미지가 생성될 때마다 최종 프롬프트/스타일/참조/검사 이력을 append하는
+# 진단용 기록. 화풍 드리프트가 재발했을 때 "이 이미지가 정확히 어떤 요청으로
+# 만들어졌는가"를 되짚을 수 있게 한다 (illustrate._log_image_generation).
+IMAGE_MANIFEST_NAME = "image_manifest.json"
+
 PAYLOAD_DIRNAME = "payload"
+
+# 세션 폴더는 통째로 S3에 미러링한다(storage.upload_outputs). 단 payload/
+# (디버그용 요청 덤프)는 base64 인라인 이미지가 포함되어 크고, 진단 목적의
+# 로컬 기록이므로 제외한다. 예전에는 허용 목록(S3_UPLOAD_FILES) 방식이었는데,
+# 새 산출물(예: flow_panels/, image_manifest.json)이 생길 때마다 목록에
+# 추가하지 않으면 조용히 안 올라가는 문제가 있었다.
+S3_UPLOAD_EXCLUDE_DIRS = (PAYLOAD_DIRNAME,)
 
 
 SESSION_PREFIX = "session"
@@ -300,6 +314,15 @@ SYSTEM_MODE = os.environ.get("GMS_SYSTEM_MODE", "system_instruction")
 # responseSchema를 프록시가 거부하면 0으로 내린다.
 # (시스템 프롬프트의 "JSON만 출력" 지시 + 코드펜스 제거로 계속 동작한다)
 USE_RESPONSE_SCHEMA = os.environ.get("GMS_USE_RESPONSE_SCHEMA", "1") not in ("0", "false", "False")
+
+
+# ============================================================ 표본 크기
+
+# Stage 1 표본 크기. 추출된 프레임의 SAMPLE_RATIO 만큼 관찰하되,
+# 흐름 파악 최소치(SAMPLE_MIN)와 VLM 비용 상한(SAMPLE_MAX) 사이로 묶는다.
+SAMPLE_RATIO = 0.10
+SAMPLE_MIN = 4
+SAMPLE_MAX = 12
 
 
 def check_system_mode(mode: str) -> str:

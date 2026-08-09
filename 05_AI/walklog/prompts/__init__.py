@@ -29,6 +29,7 @@ from . import rules, vocab
 from .diary import DEFAULT_DIARY_STYLE, DIARY_STYLES, diary_spec
 from .frame import FRAME_EXTRACT, FRAME_SCHEMA, FRAME_SYSTEM
 from .image import (
+    ANTI_PHOTO_NEGATIVE,
     DEFAULT_IMAGE_STYLE,
     FLOW_IMAGE_WRITER,
     IMAGE_NEGATIVE,
@@ -36,7 +37,11 @@ from .image import (
     IMAGE_STYLES,
     IMAGE_SUFFIX,
     PANEL_CAPTION_WRITER,
+    PANEL_STYLE_CHECKER,
+    PHOTO_STYLES,
+    STORY_IMAGE_VERIFIER,
     STORY_IMAGE_WRITER,
+    STYLE_EMPHASIS,
     build_image_prompt,
     build_image_request,
 )
@@ -45,7 +50,8 @@ from .spec import PromptSpec
 # 프롬프트 세대 표시. 관찰 기록에 함께 저장해 두면, 프롬프트를 손보는 동안
 # 쌓인 기록들이 서로 비교 불가능한 데이터가 되는 것을 막는다.
 # 프롬프트 내용을 바꿀 때 이 값을 올린다.
-PROMPT_VERSION = "2026-07-29"
+# 2026-08-05: FRAME_SCHEMA에 indoor 필드 추가(실내 프레임 배제 기능).
+PROMPT_VERSION = "2026-08-05"
 
 __all__ = [
     "PROMPT_VERSION",
@@ -59,10 +65,15 @@ __all__ = [
     "IMAGE_PROMPT_WRITER",
     "FLOW_IMAGE_WRITER",
     "STORY_IMAGE_WRITER",
+    "STORY_IMAGE_VERIFIER",
     "PANEL_CAPTION_WRITER",
+    "PANEL_STYLE_CHECKER",
+    "STYLE_EMPHASIS",
     "IMAGE_STYLES",
     "DEFAULT_IMAGE_STYLE",
+    "PHOTO_STYLES",
     "IMAGE_NEGATIVE",
+    "ANTI_PHOTO_NEGATIVE",
     "IMAGE_SUFFIX",
     "build_image_prompt",
     "build_image_request",

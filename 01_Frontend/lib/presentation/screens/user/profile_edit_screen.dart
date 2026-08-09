@@ -88,22 +88,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     if (!mounted) return;
 
     _showMessage(
-      verified ? '휴대전화 인증이 완료됐어요.' : (authViewModel.errorMessage ?? '인증번호가 올바르지 않아요.'),
+      verified
+          ? '휴대전화 인증이 완료됐어요.'
+          : (authViewModel.errorMessage ?? '인증번호가 올바르지 않아요.'),
       isError: !verified,
-    );
-  }
-
-  /// 닉네임 중복 확인 — GET /users/nickname-availability
-  Future<void> _checkNickname() async {
-    final authViewModel = context.read<AuthViewModel>();
-    final nickname = _nicknameController.text.trim();
-
-    final available = await authViewModel.checkNickname(nickname);
-    if (!mounted) return;
-
-    _showMessage(
-      available ? '사용할 수 있는 닉네임이에요.' : '이미 사용 중인 닉네임이에요.',
-      isError: !available,
     );
   }
 
@@ -116,8 +104,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     final newPassword = _passwordController.text;
     final wantsPasswordChange = newPassword.isNotEmpty;
 
-    if (wantsPasswordChange &&
-        newPassword != _confirmPasswordController.text) {
+    if (wantsPasswordChange && newPassword != _confirmPasswordController.text) {
       _showMessage('새 비밀번호가 일치하지 않아요.', isError: true);
       return;
     }
@@ -244,7 +231,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           icon: const Icon(Icons.chevron_left, color: Color(0xFF5D4037)),
           onPressed: () => context.pop(),
         ),
-        title: const Text('내 정보 수정', style: TextStyle(color: Color(0xFF5D4037), fontWeight: FontWeight.bold)),
+        title: const Text('내 정보 수정',
+            style: TextStyle(
+                color: Color(0xFF5D4037), fontWeight: FontWeight.bold)),
         centerTitle: true,
         actions: [
           IconButton(
@@ -267,28 +256,16 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               fallbackImageUrl: authViewModel.user?.profileImageUrl,
             ),
             const SizedBox(height: 40),
-            
+
             // Fields
             _buildLabel('이메일'),
             _buildReadOnlyField(controller: _emailController),
             const SizedBox(height: 24),
-            
+
             _buildLabel('닉네임'),
-            Row(
-              children: [
-                Expanded(child: _buildTextField(controller: _nicknameController, hint: '닉네임을 입력하세요')),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: authViewModel.isLoading ? null : _checkNickname,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF0E0D0),
-                    foregroundColor: const Color(0xFF5D4037),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
-                  ),
-                  child: const Text('중복 확인', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                ),
-              ],
+            _buildTextField(
+              controller: _nicknameController,
+              hint: '닉네임을 입력하세요',
             ),
             const SizedBox(height: 24),
 
@@ -330,9 +307,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     elevation: 0,
                   ),
                   child: Text(
-                    phoneVerified
-                        ? '인증됨'
-                        : (codeSent ? '재전송' : '인증번호'),
+                    phoneVerified ? '인증됨' : (codeSent ? '재전송' : '인증번호'),
                     style: const TextStyle(
                         fontSize: 13, fontWeight: FontWeight.bold),
                   ),
@@ -363,10 +338,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
-                    onPressed:
-                        authViewModel.isLoading || !_isCodeValid
-                            ? null
-                            : _confirmPhoneCode,
+                    onPressed: authViewModel.isLoading || !_isCodeValid
+                        ? null
+                        : _confirmPhoneCode,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFC67C4E),
                       foregroundColor: Colors.white,
@@ -394,11 +368,17 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             const SizedBox(height: 24),
 
             _buildLabel('새 비밀번호'),
-            _buildTextField(controller: _passwordController, hint: '변경할 비밀번호 입력', obscureText: true),
+            _buildTextField(
+                controller: _passwordController,
+                hint: '변경할 비밀번호 입력',
+                obscureText: true),
             const SizedBox(height: 12),
             _buildLabel('새 비밀번호 확인'),
-            _buildTextField(controller: _confirmPasswordController, hint: '다시 입력해 주세요', obscureText: true),
-            
+            _buildTextField(
+                controller: _confirmPasswordController,
+                hint: '다시 입력해 주세요',
+                obscureText: true),
+
             const SizedBox(height: 24),
             // Caution Card
             Container(
@@ -414,13 +394,14 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   Expanded(
                     child: Text(
                       '이메일·비밀번호를 바꾸면 다른 기기의 로그인은 모두 해제돼요.',
-                      style: TextStyle(color: Color(0xFF8D6E63), fontSize: 12, height: 1.4),
+                      style: TextStyle(
+                          color: Color(0xFF8D6E63), fontSize: 12, height: 1.4),
                     ),
                   ),
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 40),
             // Save Button
             SizedBox(
@@ -431,7 +412,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFC67C4E),
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20)),
                   elevation: 0,
                 ),
                 child: authViewModel.isLoading
@@ -441,13 +423,18 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                         child: CircularProgressIndicator(
                             color: Colors.white, strokeWidth: 2),
                       )
-                    : const Text('저장하기', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    : const Text('저장하기',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
               ),
             ),
             const SizedBox(height: 20),
             TextButton(
               onPressed: () => context.push('/user/withdrawal'),
-              child: const Text('회원 탈퇴', style: TextStyle(color: Colors.grey, decoration: TextDecoration.underline)),
+              child: const Text('회원 탈퇴',
+                  style: TextStyle(
+                      color: Colors.grey,
+                      decoration: TextDecoration.underline)),
             ),
             const SizedBox(height: 40),
           ],
@@ -461,7 +448,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       alignment: Alignment.centerLeft,
       child: Padding(
         padding: const EdgeInsets.only(left: 4, bottom: 8),
-        child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF5D4037))),
+        child: Text(label,
+            style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: Color(0xFF5D4037))),
       ),
     );
   }
@@ -484,9 +475,16 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         hintText: hint,
         filled: true,
         fillColor: Colors.white,
-        suffixIcon: obscureText ? const Icon(Icons.visibility_off_outlined, color: Colors.grey, size: 20) : null,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Color(0xFFF0E0D0))),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Color(0xFFF0E0D0))),
+        suffixIcon: obscureText
+            ? const Icon(Icons.visibility_off_outlined,
+                color: Colors.grey, size: 20)
+            : null,
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: const BorderSide(color: Color(0xFFF0E0D0))),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: const BorderSide(color: Color(0xFFF0E0D0))),
       ),
     );
   }
@@ -499,8 +497,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       decoration: InputDecoration(
         filled: true,
         fillColor: const Color(0xFFFDFDFD),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Color(0xFFF0E0D0))),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Color(0xFFF0E0D0))),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: const BorderSide(color: Color(0xFFF0E0D0))),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: const BorderSide(color: Color(0xFFF0E0D0))),
       ),
     );
   }

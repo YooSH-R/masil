@@ -2,21 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/utils/korean.dart';
 import '../../../domain/entities/pet.dart';
+import '../../../domain/entities/walk_progress.dart';
 import '../../viewmodels/pet_view_model.dart';
+import '../../viewmodels/walk_diary_view_model.dart';
 
-/// 친밀도 · 기분 화면.
+/// 친밀도 상세 화면.
 ///
-/// **어디서 값이 오는가**: `GET /v1/pets/{petId}` 응답의 `affinity`
-/// (`score`·`level`·`mood`)다. 명세서에 있는 `GET /pets/{petId}/affinity` 는
-/// 아직 배포되지 않았지만(2026-08-03 확인), 펫 프로필 응답에 친밀도가 함께
-/// 들어있어서 **지금 배포된 API 만으로도 실제 값을 보여줄 수 있다.**
+/// **어디서 값이 오는가**: `GET /v1/pets/{petId}/affinity` 다. 펫 프로필 응답의
+/// `affinity` 는 첫 화면을 채우는 대체값으로만 쓴다
+/// ([PetViewModel.affinity] 가 `_affinity ?? _pet?.affinity` 순으로 돌려준다).
 ///
-/// [PetViewModel.affinity] 가 `_affinity ?? _pet?.affinity` 순으로 돌려주므로,
-/// 전용 엔드포인트가 배포되면 이 화면은 손대지 않아도 그 값을 쓰게 된다.
+/// 연결된 동안의 변경은 `GET /pets/{petId}/affinity/stream`(SSE)으로 들어온다.
+/// 그 연결은 화면이 아니라 세션 단위로 관리하므로(`AffinityStreamBinder`) 이
+/// 화면은 `context.watch<PetViewModel>()` 만 하면 자동으로 갱신된다.
 ///
-/// 변화 이력(`/affinity/history`)은 아직 배포되지 않았다. 없는 값을 그럴듯하게
-/// 지어내지 않고 "이력이 없다"고 알린다.
 class IntimacyMoodScreen extends StatefulWidget {
   const IntimacyMoodScreen({super.key});
 
@@ -36,9 +37,15 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
       if (petVm.pet == null) {
         petVm.loadCurrentPet(silent: true);
       }
-      // 아래 둘은 아직 미배포다. 조용히 실패하고, 배포되면 값이 채워진다.
+      // 전용 친밀도 API가 배포되면 최신 값으로 덮어쓴다.
       petVm.refreshAffinity();
-      petVm.loadAffinityHistory();
+
+      // 받은 보상은 산책 기록에서 계산한다. 홈을 거치지 않고 이 화면으로
+      // 바로 들어오는 경우가 있어 여기서도 한 번 불러온다.
+      final diaryVm = context.read<WalkDiaryViewModel>();
+      if (diaryVm.feed.isEmpty) {
+        diaryVm.loadFeed(refresh: true);
+      }
     });
   }
 
@@ -46,7 +53,6 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
   Widget build(BuildContext context) {
     final petVm = context.watch<PetViewModel>();
     final affinity = petVm.affinity;
-    final history = petVm.affinityHistory;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F3E7),
@@ -56,7 +62,7 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
         leading: IconButton(
             icon: const Icon(Icons.chevron_left, color: Color(0xFF5D4037)),
             onPressed: () => context.pop()),
-        title: const Text('친밀도 · 기분',
+        title: const Text('친밀도',
             style: TextStyle(
                 color: Color(0xFF5D4037), fontWeight: FontWeight.bold)),
         centerTitle: true,
@@ -73,7 +79,7 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
                   const SizedBox(height: 24),
                   _buildEvolutionCard(affinity.level),
                   const SizedBox(height: 24),
-                  _buildHistoryCard(history),
+                  _buildRewardCard(petVm.petName),
                   const SizedBox(height: 40),
                 ],
               ),
@@ -181,7 +187,7 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
   }
 
   Widget _buildMoodBanner(PetMood mood) {
-    final isGood = mood == PetMood.happy || mood == PetMood.excited;
+    final isGood = mood == PetMood.happy || mood == PetMood.friendly;
     final bg = isGood ? const Color(0xFFE8F5E9) : const Color(0xFFFDF7F0);
     final fg = isGood ? const Color(0xFF2E7D32) : const Color(0xFF8D6E63);
 
@@ -193,8 +199,8 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(12),
-            decoration:
-                const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+            decoration: const BoxDecoration(
+                color: Colors.white, shape: BoxShape.circle),
             child: Text(_moodEmoji(mood), style: const TextStyle(fontSize: 24)),
           ),
           const SizedBox(width: 16),
@@ -254,6 +260,109 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
     );
   }
 
+  /// 산책 보상으로 받은 리본.
+  ///
+  /// 서버에 보상 API 가 없어서 산책 기록에서 계산한다([WalkProgress]). 홈의
+  /// "산책 미션" 과 같은 계산을 쓰므로 두 화면의 숫자가 어긋나지 않는다.
+  /// 아직 못 받은 리본도 흐리게 함께 보여줘서 무엇을 더 모을 수 있는지 알린다.
+  Widget _buildRewardCard(String nickname) {
+    // 계산은 뷰모델이 피드가 바뀔 때 한 번만 한다. 홈과 같은 값을 읽는다.
+    final progress = context.watch<WalkDiaryViewModel>().progress;
+    final earnedCount = progress.earnedRibbons.length;
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+          color: Colors.white, borderRadius: BorderRadius.circular(25)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('받은 보상',
+                  style:
+                      TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text('$earnedCount / ${progress.ribbons.length}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, color: Color(0xFFC67C4E))),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            earnedCount == 0
+                ? '산책을 다녀오면 $nickname${Korean.subject(nickname)} 리본을 선물해요'
+                : '지금까지 ${progress.totalCount}번 산책했어요 · '
+                    '최장 연속 ${progress.longestStreakDays}일',
+            style: const TextStyle(color: Colors.grey, fontSize: 12),
+          ),
+          const SizedBox(height: 20),
+          for (final ribbon in progress.ribbons) ...[
+            _buildRibbonRow(ribbon),
+            if (ribbon != progress.ribbons.last) const SizedBox(height: 12),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRibbonRow(WalkRibbon ribbon) {
+    final earned = ribbon.isEarned;
+    return Opacity(
+      // 못 받은 리본은 흐리게. 목록에서 빼면 목표가 안 보인다.
+      opacity: earned ? 1 : 0.4,
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: earned
+                  ? const Color(0xFFFDF7F0)
+                  : const Color(0xFFF5F5F5),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: earned ? const Color(0xFFC67C4E) : Colors.grey.shade300,
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Text(ribbon.emoji, style: const TextStyle(fontSize: 20)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(ribbon.name,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Color(0xFF5D4037))),
+                const SizedBox(height: 2),
+                Text(
+                  earned
+                      ? '${_formatDay(ribbon.earnedOn!)} 획득'
+                      : '산책 ${ribbon.requiredWalks}회 달성',
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            earned ? Icons.check_circle : Icons.lock_outline,
+            size: 20,
+            color: earned ? const Color(0xFF558B2F) : Colors.grey,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// [WalkProgress] 가 돌려주는 한국 날짜는 UTC 객체에 담긴 벽시계 값이라
+  /// 그대로 연·월·일만 읽는다.
+  String _formatDay(DateTime day) =>
+      '${day.year}년 ${day.month}월 ${day.day}일';
+
   Widget _buildEvolutionStep({
     required String label,
     required String icon,
@@ -267,13 +376,16 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
         children: [
           Row(
             children: [
-              if (!isFirst)
-                Expanded(
-                    child: Container(
-                        height: 2,
-                        color: isReached
-                            ? const Color(0xFFC67C4E)
-                            : Colors.grey.shade200)),
+              Expanded(
+                child: Container(
+                  height: 2,
+                  color: isFirst
+                      ? Colors.transparent
+                      : isReached
+                          ? const Color(0xFFC67C4E)
+                          : Colors.grey.shade200,
+                ),
+              ),
               Container(
                 width: 44,
                 height: 44,
@@ -287,95 +399,46 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
                 child: Center(
                     child: Text(icon, style: const TextStyle(fontSize: 20))),
               ),
-              if (!isLast)
-                Expanded(
-                    child: Container(
-                        height: 2,
-                        color: isNextReached
-                            ? const Color(0xFFC67C4E)
-                            : Colors.grey.shade200)),
+              Expanded(
+                child: Container(
+                  height: 2,
+                  color: isLast
+                      ? Colors.transparent
+                      : isNextReached
+                          ? const Color(0xFFC67C4E)
+                          : Colors.grey.shade200,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
-          Text(label,
-              style: TextStyle(
+          SizedBox(
+            height: 32,
+            child: Center(
+              child: Text(
+                label,
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                style: TextStyle(
                   fontSize: 12,
+                  height: 1.2,
                   fontWeight: FontWeight.bold,
-                  color: isReached ? const Color(0xFF5D4037) : Colors.grey)),
-        ],
-      ),
-    );
-  }
-
-  /// 변화 이력. `/pets/{petId}/affinity/history` 가 배포되면 채워진다.
-  Widget _buildHistoryCard(List<AffinityHistoryEntry> history) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(25)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('변화 이력',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 20),
-          if (history.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Text('아직 기록된 변화가 없어요',
-                  style: TextStyle(color: Colors.grey, fontSize: 13)),
-            )
-          else
-            for (var i = 0; i < history.length; i++) ...[
-              if (i > 0) const Divider(height: 32),
-              _buildHistoryItem(history[i]),
-            ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHistoryItem(AffinityHistoryEntry entry) {
-    final isUp = entry.change >= 0;
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-              color: const Color(0xFFF9F3E7),
-              borderRadius: BorderRadius.circular(12)),
-          child: Icon(isUp ? Icons.trending_up : Icons.trending_down,
-              color: const Color(0xFFC67C4E), size: 18),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(entry.reason ?? '친밀도 변화',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 15)),
-              Text(_relativeTime(entry.recordedAt),
-                  style: const TextStyle(color: Colors.grey, fontSize: 12)),
-            ],
+                  color: isReached ? const Color(0xFF5D4037) : Colors.grey,
+                ),
+              ),
+            ),
           ),
-        ),
-        Text('${isUp ? '+' : ''}${entry.change}',
-            style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: isUp ? Colors.green : Colors.redAccent)),
-      ],
+        ],
+      ),
     );
   }
 
-  /// 기분에 맞는 이모지. 문구는 엔티티가, 그림은 화면이 정한다.
+  /// 관계 단계에 맞는 이모지.
   static String _moodEmoji(PetMood mood) => switch (mood) {
+        PetMood.wary => '🥺',
+        PetMood.calm => '🙂',
+        PetMood.friendly => '😊',
         PetMood.happy => '🥰',
-        PetMood.excited => '🤩',
-        PetMood.neutral => '🙂',
-        PetMood.lonely => '🥺',
-        PetMood.sleeping => '😴',
       };
 
   /// 레벨 이름. 서버는 숫자만 주므로 표기는 앱이 정한다.
@@ -385,14 +448,4 @@ class _IntimacyMoodScreenState extends State<IntimacyMoodScreen> {
         3 => '단짝 친구',
         _ => '영혼의 단짝',
       };
-
-  static String _relativeTime(DateTime? at) {
-    if (at == null) return '';
-    final diff = DateTime.now().difference(at.toLocal());
-    if (diff.inMinutes < 1) return '방금';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}분 전';
-    if (diff.inHours < 24) return '${diff.inHours}시간 전';
-    if (diff.inDays < 7) return '${diff.inDays}일 전';
-    return '${at.toLocal().month}월 ${at.toLocal().day}일';
-  }
 }

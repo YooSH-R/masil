@@ -76,7 +76,7 @@ class WalkProposalCreationServiceIntegrationTest {
                 PAIRING_ID
         );
         assertEquals("PENDING", proposal.status());
-        assertEquals("오랫동안 산책하지 않았어요. 함께 산책해요.", proposal.message());
+        assertEquals("산책 가고 싶어요! 같이 나가요.", proposal.message());
         assertEquals(NOW, proposal.proposedAt());
         assertEquals(NOW.plus(Duration.ofMinutes(30)), proposal.expiresAt());
     }
@@ -129,9 +129,12 @@ class WalkProposalCreationServiceIntegrationTest {
         assertEquals(0, pendingProposalCount());
     }
 
+    // 제안 간격은 펫의 하루 산책 횟수에서 나온다. 기본 2회면 활동 시간대
+    // 14시간(08:00~22:00)을 나눈 7시간이다.
+
     @Test
-    void skipsPairingWithCompletedWalkInsideSeventyTwoHours() {
-        insertCompletedWalk(NOW.minus(Duration.ofHours(71)));
+    void skipsPairingWithCompletedWalkInsideProposalInterval() {
+        insertCompletedWalk(NOW.minus(Duration.ofHours(6)));
 
         assertEquals(
                 WalkProposalCreationOutcome.RECENT_WALK,
@@ -141,14 +144,54 @@ class WalkProposalCreationServiceIntegrationTest {
     }
 
     @Test
-    void createsProposalWhenLastCompletedWalkIsSeventyTwoHoursOld() {
-        insertCompletedWalk(NOW.minus(Duration.ofHours(72)));
+    void createsProposalWhenLastCompletedWalkIsOlderThanProposalInterval() {
+        insertCompletedWalk(NOW.minus(Duration.ofHours(7)));
 
         assertEquals(
                 WalkProposalCreationOutcome.CREATED,
                 creationService.createIfDueForRobot(ROBOT_ID, NOW)
         );
         assertEquals(1, pendingProposalCount());
+    }
+
+    @Test
+    void higherDailyWalkCountShortensProposalInterval() {
+        // 하루 6회(상한)면 간격은 2시간 20분이라 3시간 전 산책은 더 이상
+        // 최근이 아니다. 상한은 S3 경로의 session1~6 과 맞춰 6 이다.
+        updateDailyWalkCount(6);
+        insertCompletedWalk(NOW.minus(Duration.ofHours(3)));
+
+        assertEquals(
+                WalkProposalCreationOutcome.CREATED,
+                creationService.createIfDueForRobot(ROBOT_ID, NOW)
+        );
+        assertEquals(1, pendingProposalCount());
+    }
+
+    @Test
+    void lowerDailyWalkCountLengthensProposalInterval() {
+        // 하루 1회면 간격은 14시간이라 3시간 전 산책은 아직 최근이다.
+        updateDailyWalkCount(1);
+        insertCompletedWalk(NOW.minus(Duration.ofHours(3)));
+
+        assertEquals(
+                WalkProposalCreationOutcome.RECENT_WALK,
+                creationService.createIfDueForRobot(ROBOT_ID, NOW)
+        );
+        assertEquals(0, pendingProposalCount());
+    }
+
+    @Test
+    void skipsProposalOutsideActiveHours() {
+        // 2026-08-02T17:00Z = 2026-08-03 02:00 KST — 활동 시간대 밖이다.
+        assertEquals(
+                WalkProposalCreationOutcome.OUTSIDE_ACTIVE_HOURS,
+                creationService.createIfDueForRobot(
+                        ROBOT_ID,
+                        Instant.parse("2026-08-02T17:00:00Z")
+                )
+        );
+        assertEquals(0, pendingProposalCount());
     }
 
     @Test
@@ -291,6 +334,14 @@ class WalkProposalCreationServiceIntegrationTest {
                 Timestamp.from(endedAt),
                 Timestamp.from(endedAt.minusSeconds(600)),
                 Timestamp.from(endedAt)
+        );
+    }
+
+    private void updateDailyWalkCount(int dailyWalkCount) {
+        jdbcTemplate.update(
+                "UPDATE pets SET daily_walk_count = ? WHERE id = ?",
+                dailyWalkCount,
+                PET_ID
         );
     }
 

@@ -24,6 +24,8 @@ public interface SpringDataRobotPairingRepository
             Long robotId
     );
 
+    Optional<RobotPairingJpaEntity> findByPetIdAndUnpairedAtIsNull(Long petId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select pairing from RobotPairingJpaEntity pairing where pairing.id = :id")
     Optional<RobotPairingJpaEntity> findByIdForUpdate(@Param("id") Long id);
@@ -37,5 +39,16 @@ public interface SpringDataRobotPairingRepository
             """)
     Optional<RobotPairingJpaEntity> findActiveByRobotIdForUpdate(
             @Param("robotId") Long robotId
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select pairing
+            from RobotPairingJpaEntity pairing
+            where pairing.petId = :petId
+              and pairing.unpairedAt is null
+            """)
+    Optional<RobotPairingJpaEntity> findActiveByPetIdForUpdate(
+            @Param("petId") Long petId
     );
 }

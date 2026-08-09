@@ -5,6 +5,15 @@ import '../entities/robot.dart';
 /// POST /robots/{robotId}/interactions 는 Jetson 보드가 DEVICE_ACCESS_TOKEN으로
 /// 호출하는 엔드포인트라 앱에서는 다루지 않는다(명세서 5.1).
 abstract class RobotRepository {
+  /// QR이 유효하고 아직 등록되지 않은 기기인지 확인한다. 서버 데이터는 변경하지 않는다.
+  Future<void> validateRegistrationQr({required String qrToken});
+
+  /// QR을 다시 검증한 뒤 새 펫 생성과 기기 연결을 서버 트랜잭션 하나로 처리한다.
+  Future<RobotPairing> registerNewPet({
+    required String qrToken,
+    required String petName,
+  });
+
   /// POST /robots/pairings — QR 로봇 등록
   ///
   /// [qrToken] 은 기기 밑면 QR 에 담긴 정적 토큰이다.

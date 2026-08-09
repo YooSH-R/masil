@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../domain/entities/walk.dart';
+import '../../viewmodels/pet_view_model.dart';
+import '../../viewmodels/robot_view_model.dart';
 import '../../viewmodels/walk_view_model.dart';
 import '../../widgets/walk_route_map.dart';
 
@@ -31,13 +33,42 @@ class _WalkInProgressScreenState extends State<WalkInProgressScreen>
     // (= 백엔드 미연동) 아무 일도 일어나지 않고 지도만 뜬다.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final walkVm = context.read<WalkViewModel>();
-      walkVm.startRouteTracking();
-      // 서버의 산책 상태(startedAt·durationSeconds·distanceMeters)를 주기적으로
-      // 받아온다. 이 값이 있으면 화면은 로컬 계산값 대신 서버 값을 쓴다.
-      // 서버에 산책 세션이 없으면 내부에서 알아서 아무것도 하지 않는다.
-      walkVm.startWatchingWalk();
+      _begin();
     });
+  }
+
+  /// 서버 산책 세션을 먼저 열고 경로 수신을 시작한다.
+  ///
+  /// **순서가 중요하다.** 세션(walkId)이 있어야 좌표가 서버로 올라간다. 먼저
+  /// 추적을 시작하면 세션이 열리기 전 몇 초 동안 모인 좌표는 버퍼에만 쌓이는데,
+  /// 그건 다음 30초 주기에 함께 올라가므로 잃지는 않는다. 그래도 세션 생성이
+  /// 실패했는지를 화면이 바로 알 수 있도록 먼저 부른다.
+  ///
+  /// 세션 생성이 실패해도 산책은 그대로 진행한다. 기록은 기기에 남으므로
+  /// 사용자 입장에서는 지금까지와 똑같이 동작한다.
+  Future<void> _begin() async {
+    final walkVm = context.read<WalkViewModel>();
+    final petVm = context.read<PetViewModel>();
+    final robotVm = context.read<RobotViewModel>();
+
+    // 홈에서 바로 들어오면 아직 안 불러왔을 수 있다. 산책 세션은 이 둘이 있어야
+    // 만들 수 있으므로 여기서 채운다.
+    if (petVm.petId == null) await petVm.loadCurrentPet(silent: true);
+    if (robotVm.robot == null) await robotVm.loadStatus(silent: true);
+    if (!mounted) return;
+
+    final petId = petVm.petId;
+    final robotId = robotVm.robot?.id;
+    if (petId != null && robotId != null) {
+      await walkVm.startWalkSession(petId: petId, robotId: robotId);
+      if (!mounted) return;
+    }
+
+    walkVm.startRouteTracking();
+    // 서버의 산책 상태(startedAt·durationSeconds·distanceMeters)를 주기적으로
+    // 받아온다. 이 값이 있으면 화면은 로컬 계산값 대신 서버 값을 쓴다.
+    // 서버에 산책 세션이 없으면 내부에서 알아서 아무것도 하지 않는다.
+    walkVm.startWatchingWalk();
   }
 
   @override
@@ -78,6 +109,7 @@ class _WalkInProgressScreenState extends State<WalkInProgressScreen>
             _buildStatsCard(walkVm),
             Expanded(
                 child: _buildMapCard(
+                    walkVm,
                     points,
                     // 위치가 막힌 이유가 있으면 그걸, 없으면 좌표가 걸러지는
                     // 이유(진단)를 보여준다. 둘 다 없으면 기본 안내가 나온다.
@@ -191,8 +223,8 @@ class _WalkInProgressScreenState extends State<WalkInProgressScreen>
     );
   }
 
-  Widget _buildMapCard(
-      List<WalkLocationPoint> points, String? unavailableMessage) {
+  Widget _buildMapCard(WalkViewModel walkVm, List<WalkLocationPoint> points,
+      String? unavailableMessage) {
     // 주의: 이 컨테이너에 clipBehavior/borderRadius 를 걸지 않는다.
     // KakaoMap 은 WebView(안드로이드 플랫폼 뷰)라서 클리핑을 걸면 렌더링이
     // 비어버린다(지도가 안 보이고 배경색만 나옴).
@@ -201,8 +233,9 @@ class _WalkInProgressScreenState extends State<WalkInProgressScreen>
       decoration: const BoxDecoration(color: Color(0xFFE8F6F3)),
       child: Stack(
         children: [
-          Positioned.fill(child: _buildMap(points)),
-          if (points.isEmpty)
+          Positioned.fill(child: _buildMap(walkVm, points)),
+          // 확정점이 아직 없어도 현재 위치가 잡혔으면 지도는 살아 있는 것이다.
+          if (points.isEmpty && walkVm.livePosition == null)
             Positioned(
               bottom: 16,
               left: 16,
@@ -214,9 +247,17 @@ class _WalkInProgressScreenState extends State<WalkInProgressScreen>
     );
   }
 
-  Widget _buildMap(List<WalkLocationPoint> points) {
+  Widget _buildMap(WalkViewModel walkVm, List<WalkLocationPoint> points) {
     // 지도·경로선은 경로 상세 화면과 공용 위젯을 쓴다.
-    return WalkRouteMap(points: points, followLast: true);
+    //
+    // 확정 경로(points)와 현재 위치(livePosition)를 따로 넘긴다. 마커는 현재
+    // 위치를 1초 단위로 부드럽게 따라가고, 경로선은 확정점이 늘 때만 자란다.
+    return WalkRouteMap(
+      points: points,
+      livePosition: walkVm.livePosition,
+      centerHint: walkVm.mapCenterHint,
+      followLast: true,
+    );
   }
 
   Widget _buildControls(WalkViewModel walkVm) {

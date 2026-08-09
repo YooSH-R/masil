@@ -13,7 +13,6 @@ public enum ErrorCode {
             "디바이스 인증 토큰이 올바르지 않거나 만료되었습니다."
     ),
     AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, "인증이 필요합니다."),
-    NICKNAME_DUPLICATED(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
     SOCIAL_ACCOUNT_ALREADY_LINKED(HttpStatus.CONFLICT, "이미 연결된 소셜 계정입니다."),
     PET_NOT_FOUND(HttpStatus.NOT_FOUND, "반려봇 정보를 찾을 수 없습니다."),
     PET_AFFINITY_STATE_NOT_FOUND(
@@ -24,6 +23,10 @@ public enum ErrorCode {
     QR_TOKEN_EXPIRED(HttpStatus.GONE, "QR 등록 토큰이 만료되었습니다."),
     ROBOT_ALREADY_PAIRED(HttpStatus.CONFLICT, "이미 등록된 로봇입니다."),
     PET_ALREADY_PAIRED(HttpStatus.CONFLICT, "반려봇에 이미 등록된 로봇이 있습니다."),
+    ROBOT_PAIRING_STATE_CONFLICT(
+            HttpStatus.CONFLICT,
+            "기기 연결 상태가 변경되었습니다. 다시 시도해 주세요."
+    ),
     ROBOT_OWNERSHIP_MISMATCH(HttpStatus.FORBIDDEN, "다른 사용자가 소유한 로봇입니다."),
     WALK_PROPOSAL_NOT_FOUND(HttpStatus.NOT_FOUND, "산책 제안을 찾을 수 없습니다."),
     WALK_PROPOSAL_EXPIRED(HttpStatus.CONFLICT, "만료된 산책 제안입니다."),

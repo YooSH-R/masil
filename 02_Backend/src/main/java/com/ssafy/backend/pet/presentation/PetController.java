@@ -4,13 +4,17 @@ import com.ssafy.backend.auth.security.UserPrincipal;
 import com.ssafy.backend.common.ApiResponse;
 import com.ssafy.backend.pet.application.PetAffinityResult;
 import com.ssafy.backend.pet.application.PetCreatedResult;
+import com.ssafy.backend.pet.application.PetDeletionService;
 import com.ssafy.backend.pet.application.PetProfileResult;
 import com.ssafy.backend.pet.application.PetRobotResult;
 import com.ssafy.backend.pet.application.PetService;
+import com.ssafy.backend.pet.infrastructure.persistence.PetJpaEntity;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Null;
 import jakarta.validation.constraints.Pattern;
@@ -21,6 +25,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,6 +35,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
+import java.util.List;
 
 @Validated
 @RestController
@@ -37,9 +43,14 @@ import java.time.Instant;
 public class PetController {
 
     private final PetService petService;
+    private final PetDeletionService petDeletionService;
 
-    public PetController(PetService petService) {
+    public PetController(
+            PetService petService,
+            PetDeletionService petDeletionService
+    ) {
         this.petService = petService;
+        this.petDeletionService = petDeletionService;
     }
 
     @Operation(summary = "펫 생성")
@@ -80,6 +91,19 @@ public class PetController {
         ));
     }
 
+    @Operation(summary = "내 펫 목록 조회")
+    @SecurityRequirement(name = "bearerAuth")
+    @GetMapping
+    public ApiResponse<List<PetProfileResponse>> getProfiles(
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        return ApiResponse.success(
+                petService.getProfiles(principal.userId()).stream()
+                        .map(PetProfileResponse::from)
+                        .toList()
+        );
+    }
+
     @Operation(summary = "펫 정보 수정")
     @SecurityRequirement(name = "bearerAuth")
     @PatchMapping("/{petId}")
@@ -89,8 +113,24 @@ public class PetController {
             @Valid @RequestBody UpdatePetRequest request
     ) {
         return ApiResponse.success(PetProfileResponse.from(
-                petService.update(principal.userId(), petId, request.name())
+                petService.update(
+                        principal.userId(),
+                        petId,
+                        request.name(),
+                        request.dailyWalkCount()
+                )
         ));
+    }
+
+    @Operation(summary = "펫 삭제 및 기기 페어링 해제")
+    @SecurityRequirement(name = "bearerAuth")
+    @DeleteMapping("/{petId}")
+    public ResponseEntity<Void> delete(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable @Positive Long petId
+    ) {
+        petDeletionService.delete(principal.userId(), petId);
+        return ResponseEntity.noContent().build();
     }
 
     public record CreatePetRequest(
@@ -103,7 +143,11 @@ public class PetController {
     public record UpdatePetRequest(
             @NotBlank @Size(max = 100) String name,
             @Null(message = "프로필 이미지 업로드는 현재 지원하지 않습니다.")
-            String profileImage
+            String profileImage,
+            /// 하루 산책 횟수. 보내지 않으면 기존 값을 유지한다.
+            @Min(PetJpaEntity.MIN_DAILY_WALK_COUNT)
+            @Max(PetJpaEntity.MAX_DAILY_WALK_COUNT)
+            Integer dailyWalkCount
     ) {
     }
 
@@ -127,6 +171,7 @@ public class PetController {
             Long petId,
             String name,
             String profileImageUrl,
+            int dailyWalkCount,
             AffinityResponse affinity,
             RobotResponse robot
     ) {
@@ -135,6 +180,7 @@ public class PetController {
                     result.petId(),
                     result.name(),
                     result.profileImageUrl(),
+                    result.dailyWalkCount(),
                     AffinityResponse.from(result.affinity()),
                     RobotResponse.from(result.robot())
             );

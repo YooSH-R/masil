@@ -6,6 +6,7 @@ import 'core/config/map_config.dart';
 import 'core/network/dio_client.dart';
 import 'core/services/place_name_resolver.dart';
 import 'core/services/device_gps_walk_route_source.dart';
+import 'core/services/walk_record_store.dart';
 import 'core/storage/session_cache.dart';
 import 'core/storage/token_storage.dart';
 import 'core/utils/router.dart';
@@ -24,9 +25,14 @@ import 'presentation/viewmodels/robot_view_model.dart';
 import 'presentation/viewmodels/walk_diary_view_model.dart';
 import 'presentation/viewmodels/walk_photo_view_model.dart';
 import 'presentation/viewmodels/walk_view_model.dart';
+import 'presentation/widgets/affinity_stream_binder.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 서버에 못 올린 채 기기에만 남아 있던 옛 산책 기록을 한 번 비운다.
+  // 그 기록은 계정이 같아도 다른 기기에서는 안 보여서 시연 때 혼란만 준다.
+  await const WalkRecordStore().purgeUnsyncedRecordsOnce();
 
   // 카카오맵(JavaScript API) 초기화. 키가 없으면 지도 화면이 안내를 띄운다.
   if (MapConfig.isKakaoMapConfigured) {
@@ -100,6 +106,9 @@ void main() {
         // 백엔드가 장소명을 내려주게 되면 이 인자를 빼면 된다.
         ChangeNotifierProvider(
             create: (_) => WalkDiaryViewModel(diaryRepository,
+                // 앱에서 걸은 산책은 S3 일지가 없어 diaryRepository 로는 안 보인다.
+                // 서버 산책 목록을 같이 읽어야 다른 기기에서도 보인다.
+                walkRepository: walkRepository,
                 placeResolver: PlaceNameResolver())),
         ChangeNotifierProvider(
           create: (_) => NotificationViewModel(notificationRepository),
@@ -108,7 +117,9 @@ void main() {
         // 들고 있어야 한쪽에서 바꾼 사진이 다른 쪽에도 바로 반영된다.
         ChangeNotifierProvider(create: (_) => ProfileImageViewModel()),
       ],
-      child: const MysilApp(),
+      // 친밀도 SSE 는 화면이 아니라 세션 단위로 붙인다. 홈과 친밀도 화면이
+      // 같은 PetViewModel 을 보므로 한 번만 연결하면 둘 다 갱신된다.
+      child: const AffinityStreamBinder(child: MysilApp()),
     ),
   );
 }
