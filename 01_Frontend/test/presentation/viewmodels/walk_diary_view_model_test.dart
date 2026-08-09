@@ -128,6 +128,61 @@ void main() {
     viewModel.dispose();
   });
 
+  // 앞에서부터 순서대로 짝지으면 일지 하나가 누락됐을 때 그 뒤가 한 칸씩
+  // 밀린다. 오전·오후를 걸었는데 오전 일지만 없으면 오후 일지가 오전 산책에
+  // 붙고, 오후 산책은 일지 없이 남는다. 회차 번호로 찾아야 제자리에 붙는다.
+  test('회차가 빠진 날에도 일지가 제 산책에 붙는다', () async {
+    SharedPreferences.setMockInitialValues({});
+    final day = DateTime.utc(2026, 8, 10);
+    final viewModel = WalkDiaryViewModel(
+      _DiaryOnlyRepository([
+        // 2회차 일지만 올라왔다. 1회차 일지는 없다.
+        WalkDiaryFeedItem(
+          walkId: -100005,
+          walkedAt: day,
+          deviceId: 'device-001',
+          session: 2,
+        ),
+      ]),
+      walkRepository: _StubWalkRepository([
+        Walk(
+          walkId: 801,
+          status: WalkStatus.completed,
+          startedAt: DateTime.utc(2026, 8, 10, 0), // 오전 9시(KST)
+          durationSeconds: 1200,
+          distanceMeters: 1500,
+        ),
+        Walk(
+          walkId: 802,
+          status: WalkStatus.completed,
+          startedAt: DateTime.utc(2026, 8, 10, 10), // 저녁 7시(KST)
+          durationSeconds: 1800,
+          distanceMeters: 2300,
+        ),
+      ]),
+    );
+
+    await viewModel.loadFeed(refresh: true);
+
+    final items = viewModel.itemsOn(day);
+    expect(items, hasLength(2));
+
+    final morning = items.firstWhere((item) => item.walkId == 801);
+    final evening = items.firstWhere((item) => item.walkId == 802);
+
+    // 오전 산책은 일지가 없다. 사진·본문 조회에 쓰는 값이 붙으면 안 된다.
+    expect(morning.session, isNull);
+    expect(morning.deviceId, isNull);
+    expect(morning.distanceMeters, 1500);
+
+    // 2회차 일지는 오후 산책에 붙어야 한다.
+    expect(evening.session, 2);
+    expect(evening.deviceId, 'device-001');
+    expect(evening.distanceMeters, 2300);
+
+    viewModel.dispose();
+  });
+
   // 산책 없이 S3에만 올린 8/3~8/7 테스트 일지는 짝지을 산책이 없다. 그래도
   // 시연에서 거리·시간이 비어 보이면 안 되므로 만들어 둔 값을 채운다.
   test('짝지을 산책이 없는 8월 일지는 그대로 남고 시연용 거리·시간이 붙는다', () async {

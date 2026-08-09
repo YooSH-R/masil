@@ -348,8 +348,12 @@ class WalkDiaryViewModel extends BaseViewModel {
   /// 올린다. 둘은 같은 산책이므로 피드에서 한 줄로 합쳐야 한다. 따로 넣으면
   /// 산책 한 번이 두 번 걸은 것처럼 보이고 통계도 두 배가 된다.
   ///
-  /// 짝을 맞추는 기준은 **날짜 + 그날의 순서**다. S3 일지에는 산책 시각이 없고
-  /// 날짜와 회차(session)만 있어서 시각으로는 맞출 수 없다.
+  /// 짝을 맞추는 기준은 **날짜 + 회차(session)** 다. S3 일지에는 산책 시각이
+  /// 없어 시각으로는 맞출 수 없다. 그날 i 번째로 걸은 산책이 i+1 회차다.
+  ///
+  /// 한계: 산책 자체가 서버에 못 올라간 회차가 있으면 그 뒤 산책이 앞 회차의
+  /// 일지에 붙는다. 서버 산책에는 회차 번호가 없어 몇 번째인지 알 방법이
+  /// 순서뿐이기 때문이다. 백엔드가 산책과 일지를 직접 잇기 전까지는 남는다.
   ///
   /// 끝난 산책만 넣는다. 진행 중인 산책은 거리·시간이 아직 확정되지 않아
   /// 일지에 0km 로 박힌다.
@@ -375,26 +379,32 @@ class WalkDiaryViewModel extends BaseViewModel {
     for (final day in byDay.keys) {
       final walks = byDay[day]!..sort((a, b) => a.at.compareTo(b.at));
 
-      // 그날의 S3 일지를 회차 순으로 세운다. n번째 일지가 n번째 산책이다.
-      final diaryIndexes = <int>[];
+      // 그날의 S3 일지를 **회차 번호로 찾을 수 있게** 모은다.
+      //
+      // 앞에서부터 순서대로 짝지으면 안 된다. 일지 하나가 누락되면 그 뒤가 전부
+      // 한 칸씩 밀린다. 오전·오후를 걸었는데 오전 일지만 없는 경우, 오후 일지가
+      // 오전 산책에 붙고 오후 산책은 일지 없이 남는다. 회차 번호로 찾으면
+      // 누락된 자리는 그냥 비고 나머지는 제자리에 붙는다.
+      final diaryBySession = <int, int>{};
       for (var i = 0; i < _feed.length; i++) {
         final item = _feed[i];
         final at = item.walkedAt;
-        if (at == null || !item.isS3Diary || _dayKey(at) != day) continue;
-        diaryIndexes.add(i);
+        final session = item.session;
+        if (at == null || session == null || !item.isS3Diary) continue;
+        if (_dayKey(at) != day) continue;
+        diaryBySession[session] = i;
       }
-      diaryIndexes.sort(
-        (a, b) => (_feed[a].session ?? 0).compareTo(_feed[b].session ?? 0),
-      );
 
       for (var i = 0; i < walks.length; i++) {
         final walk = walks[i].walk;
-        if (i < diaryIndexes.length) {
-          final item = _feed[diaryIndexes[i]];
+        // 그날 i 번째로 걸은 산책이 i+1 회차다. S3 회차는 1 부터 센다.
+        final diaryIndex = diaryBySession.remove(i + 1);
+        if (diaryIndex != null) {
+          final item = _feed[diaryIndex];
           // walkId 를 서버 것으로 바꾼다. 그래야 경로 상세가
           // GET /walks/{walkId}/summary 로 실제 걸은 경로를 그린다.
           // deviceId·session 은 그대로 둬서 사진·본문 조회도 계속 된다.
-          _feed[diaryIndexes[i]] = WalkDiaryFeedItem(
+          _feed[diaryIndex] = WalkDiaryFeedItem(
             walkId: walk.walkId,
             walkedAt: item.walkedAt,
             durationSeconds: walk.durationSeconds ?? item.durationSeconds,
@@ -418,6 +428,10 @@ class WalkDiaryViewModel extends BaseViewModel {
           distanceMeters: walk.distanceMeters,
         ));
       }
+
+      // diaryBySession 에 남은 일지는 짝지을 산책이 없다(그날 걷기 전에 올라온
+      // 테스트 일지이거나, 산책이 서버에 못 올라갔거나). 손대지 않고 그대로 둔다.
+      // 억지로 붙이면 남의 산책 거리가 그 일지에 박힌다.
     }
   }
 
