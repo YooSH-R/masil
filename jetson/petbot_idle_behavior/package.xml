@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>petbot_idle_behavior</name>
+  <version>0.0.0</version>
+  <description>Idle 상태에서 REST/PATROL/CHECK_OWNER/DOCKING을 오가며 배회하는 상태 머신 노드. /person_location을 구독해 사람 위치를 확인하고, MoveInterface로 Nav2 목표를 전송한다.</description>
+  <maintainer email="jetson@todo.todo">jetson</maintainer>
+  <license>TODO: License declaration</license>
+
+  <depend>rclpy</depend>
+  <depend>geometry_msgs</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>petbot_nav_interface</depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
