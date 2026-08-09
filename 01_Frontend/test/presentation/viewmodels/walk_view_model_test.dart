@@ -76,6 +76,25 @@ void main() {
     viewModel.dispose();
   });
 
+  // 목록에서 여러 산책을 빠르게 눌러 들어가면 조회가 겹친다. 먼저 시작한
+  // 조회가 나중에 끝나면, 화면은 최신 산책을 보고 있는데 값만 이전 것으로
+  // 덮인다.
+  test('늦게 도착한 옛 조회가 최신 요약을 덮지 않는다', () async {
+    SharedPreferences.setMockInitialValues({});
+    final viewModel = WalkViewModel(_SummaryRepository(delays: {
+      1: const Duration(milliseconds: 60), // 먼저 요청했지만 늦게 온다
+      2: const Duration(milliseconds: 5),
+    }));
+
+    final stale = viewModel.loadSummary(1);
+    final latest = viewModel.loadSummary(2);
+    await Future.wait([stale, latest]);
+
+    expect(viewModel.summary?.walkId, 2);
+
+    viewModel.dispose();
+  });
+
   test('새 산책을 시작하면 지난 산책의 요약을 버린다', () async {
     SharedPreferences.setMockInitialValues({});
     final source = _TestRouteSource();
@@ -163,10 +182,17 @@ void main() {
 }
 
 class _SummaryRepository extends _UnusedWalkRepository {
+  _SummaryRepository({this.delays = const {}});
+
   bool fails = false;
+
+  /// walkId → 응답이 늦게 오는 정도. 경합을 만들 때 쓴다.
+  final Map<int, Duration> delays;
 
   @override
   Future<WalkSummary> getSummary(int walkId) async {
+    final delay = delays[walkId];
+    if (delay != null) await Future<void>.delayed(delay);
     if (fails) throw StateError('조회 실패');
     return WalkSummary(
       walkId: walkId,

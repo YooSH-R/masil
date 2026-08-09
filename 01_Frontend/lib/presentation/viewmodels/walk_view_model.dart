@@ -551,7 +551,16 @@ class WalkViewModel extends BaseViewModel {
   /// 앞서 본 산책의 값이 남아 있다. 그대로 두면 조회가 끝나기 전까지 화면이
   /// 남의 경로를 그리고, 조회가 실패하면 그 상태로 굳는다. 방금 끝낸 산책의
   /// 경로를 보려는데 며칠 전 산책 지도가 뜨는 증상이 이것이었다.
+  /// 마지막으로 요청한 산책. 늦게 도착한 옛 조회를 버리는 기준이다.
+  ///
+  /// 목록에서 여러 산책을 빠르게 눌러 들어가면 조회가 겹친다. 비동기라 먼저
+  /// 시작한 조회가 나중에 끝날 수 있고, 그러면 화면이 최신 산책을 보고 있는데
+  /// 값은 이전 산책의 것으로 덮인다.
+  int? _requestedSummaryId;
+
   Future<void> loadSummary(int walkId) async {
+    _requestedSummaryId = walkId;
+
     if (_summary != null && _summary!.walkId != walkId) {
       _summary = null;
       safeNotify();
@@ -560,7 +569,7 @@ class WalkViewModel extends BaseViewModel {
     // 기기에 저장한 산책이면 그걸 쓴다. 서버에 못 올린 산책이다.
     if (WalkRecordStore.isLocalId(walkId)) {
       final local = await _recordStore.read(walkId);
-      if (local != null) {
+      if (local != null && _isLatestSummaryRequest(walkId)) {
         _summary = local;
         clearError();
         safeNotify();
@@ -592,11 +601,14 @@ class WalkViewModel extends BaseViewModel {
     }
 
     final summary = await guard(() => _walkRepository.getSummary(walkId));
-    if (summary == null) return;
+    if (summary == null || !_isLatestSummaryRequest(walkId)) return;
 
     _summary = summary;
     safeNotify();
   }
+
+  /// 이 조회가 아직 화면이 기다리는 것인지. 그사이 다른 산책을 눌렀으면 false.
+  bool _isLatestSummaryRequest(int walkId) => _requestedSummaryId == walkId;
 
   void attachWalk(Walk walk) {
     _currentWalk = walk;
@@ -606,7 +618,10 @@ class WalkViewModel extends BaseViewModel {
   void _resetPoints() {
     // 지난 산책의 요약도 함께 버린다. 남겨 두면 이번 산책을 끝냈을 때
     // 요약 화면이 "이미 있다"고 보고 새로 불러오지 않는다.
+    // 진행 중인 조회도 무효로 만든다. 아니면 방금 비운 자리를 그 결과가
+    // 되살린다.
     _summary = null;
+    _requestedSummaryId = null;
     _pendingPoints.clear();
     _track.reset();
     _livePosition = null;
