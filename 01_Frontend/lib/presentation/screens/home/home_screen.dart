@@ -294,17 +294,36 @@ class _HomeScreenState extends State<HomeScreen> {
                             const Text('오늘의 산책',
                                 style: TextStyle(
                                     color: Colors.grey, fontSize: 13)),
-                            Text(
-                              requiresPairing
-                                  ? '연결 필요'
-                                  : '${progress.todayCount} / $dailyWalkGoal회',
-                              style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: goalReached
-                                      ? const Color(0xFF558B2F)
-                                      : const Color(0xFF5D4037)),
-                            ),
+                            // 걸은 횟수와 목표를 한 분수로 붙이지 않는다.
+                            // 목표보다 많이 걸으면 `3 / 2회` 처럼 보여서,
+                            // 잘한 날인데 뭔가 잘못된 것처럼 읽힌다.
+                            if (requiresPairing)
+                              const Text('연결 필요',
+                                  style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF5D4037)))
+                            else ...[
+                              Text(
+                                '${progress.todayCount}회',
+                                style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: goalReached
+                                        ? const Color(0xFF558B2F)
+                                        : const Color(0xFF5D4037)),
+                              ),
+                              Text(
+                                goalReached
+                                    ? '목표 $dailyWalkGoal회 달성'
+                                    : '목표 $dailyWalkGoal회',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: goalReached
+                                        ? const Color(0xFF558B2F)
+                                        : Colors.grey),
+                              ),
+                            ],
                           ],
                         ),
                       ),

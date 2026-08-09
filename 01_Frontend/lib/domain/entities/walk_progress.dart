@@ -104,10 +104,18 @@ class WalkProgress {
 
   /// 산책 시각 목록에서 계산한다.
   ///
-  /// [walkedAt] 은 절대 시각이고, 날짜 경계는 [KoreaTime] 기준으로 본다.
-  /// 기기 시간대가 해외로 맞춰져 있어도 "오늘" 이 밀리지 않게 하려는 것이다.
+  /// **[walkedAt] 은 이미 한국 시각으로 바꾼 값이다**([KoreaTime.fromInstant]).
+  /// 피드가 들고 있는 형태 그대로이고, 달력·통계([WalkDiaryViewModel.byDate],
+  /// [WalkDiaryViewModel.statsForDay])도 같은 규약으로 읽는다.
+  ///
+  /// 예전에는 절대 시각으로 보고 여기서 한 번 더 한국 시각으로 바꿨다. 그러면
+  /// 9시간이 두 번 더해져서 **오후 3시 이후 산책이 전부 다음 날로 밀렸다.**
+  /// 오후에 세 번 걸어도 홈 화면이 "오늘 0회"라고 하던 원인이다.
+  ///
+  /// [now] 만 절대 시각이다. 기기 시간대가 해외로 맞춰져 있어도 "오늘"이
+  /// 밀리지 않게 한국 시각으로 바꿔서 쓴다.
   factory WalkProgress.from(Iterable<DateTime> walkedAt, {DateTime? now}) {
-    final today = _dayOf(now ?? DateTime.now());
+    final today = _dayOf(KoreaTime.fromInstant(now ?? DateTime.now()));
 
     final sortedWalks = walkedAt.toList()..sort();
     if (sortedWalks.isEmpty) return none;
@@ -153,9 +161,8 @@ class WalkProgress {
     return longest;
   }
 
-  /// 절대 시각을 한국 날짜(자정)로 자른다.
-  static DateTime _dayOf(DateTime value) {
-    final korea = KoreaTime.fromInstant(value);
-    return DateTime.utc(korea.year, korea.month, korea.day);
-  }
+  /// 한국 시각을 그 날짜(자정)로 자른다. 시간대 변환은 하지 않는다 —
+  /// 들어오는 값이 이미 한국 시각이다.
+  static DateTime _dayOf(DateTime koreaTime) =>
+      DateTime.utc(koreaTime.year, koreaTime.month, koreaTime.day);
 }
