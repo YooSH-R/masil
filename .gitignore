@@ -368,3 +368,4 @@ log/
 # python venvs
 yolo-env/
 wakeword-env/
+make_sound/

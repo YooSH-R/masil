@@ -1,0 +1,156 @@
+[
+  {
+    "output": "flow_panels/event_01.png",
+    "tag": "panel_1",
+    "adopted_tag": "panel_1",
+    "trimmed": false,
+    "style": "watercolor",
+    "style_text": "soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail",
+    "with_reference": true,
+    "reference_file": "f_0004900_t005m26.67s.jpg",
+    "final_prompt": "Art style (must be strictly followed): soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail, Scene: Modern building facade with vertical stripe patterns, green leaves, commercial street, daytime, sunny, strong dazzling sunlight, backlighting, modern and vertical mood, low-angle shot looking up at the sky between buildings, no text, no watermark, full-bleed composition, the artwork fills the entire canvas edge-to-edge\n\nA reference photograph is attached. Use it ONLY for composition, layout, and what is present in the scene. Completely repaint it in the art style described above - do not preserve its photographic look, textures, or level of realism. If any people or body parts appear in the reference photograph, leave them out of the artwork entirely.\n\nDo not include any of the following: text, watermark, signature, logo, brand name, license plate, recognizable faces, portrait, distorted anatomy, extra limbs, oversaturated, cluttered, lowres, jpeg artifacts, white borders, paper edges, frame, margins, matting, photograph, photorealistic, realistic photo, camera photo, DSLR photo, photographic textures, lens blur, bokeh.\n\nOutput the illustration only, with no caption or text in the image.",
+    "model": "gemini-2.5-flash-image",
+    "attempts": [
+      {
+        "tag": "panel_1",
+        "with_reference": true,
+        "style_check": {
+          "is_photographic": false,
+          "matches_style": true,
+          "face_visible": false
+        },
+        "trimmed": false
+      }
+    ],
+    "created_at": "2026-08-05T12:32:36"
+  },
+  {
+    "output": "flow_panels/event_02.png",
+    "tag": "panel_2_noref",
+    "adopted_tag": "panel_2_noref",
+    "trimmed": true,
+    "style": "watercolor",
+    "style_text": "soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail",
+    "with_reference": false,
+    "reference_file": null,
+    "final_prompt": "Art style (must be strictly followed): soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail, Scene: Giant glass facade of a modern skyscraper, mirror-like reflection of blue sky and white clouds on the glass windows, ventilation vents, landscaping trees, urban commercial street, daytime, clear sunny weather, modern clean urban mood, low-angle shot looking up, STRICTLY follow the art style stated at the top; absolutely not a photograph, no photographic rendering, no text, no watermark, full-bleed composition, the artwork fills the entire canvas edge-to-edge\n\nDo not include any of the following: text, watermark, signature, logo, brand name, license plate, recognizable faces, portrait, distorted anatomy, extra limbs, oversaturated, cluttered, lowres, jpeg artifacts, white borders, paper edges, frame, margins, matting, photograph, photorealistic, realistic photo, camera photo, DSLR photo, photographic textures, lens blur, bokeh.\n\nOutput the illustration only, with no caption or text in the image.",
+    "model": "gemini-2.5-flash-image",
+    "attempts": [
+      {
+        "tag": "panel_2",
+        "with_reference": true,
+        "style_check": {
+          "is_photographic": true,
+          "matches_style": false,
+          "face_visible": false
+        }
+      },
+      {
+        "tag": "panel_2_restyle",
+        "with_reference": true,
+        "style_check": {
+          "is_photographic": true,
+          "matches_style": false,
+          "face_visible": false
+        }
+      },
+      {
+        "tag": "panel_2_noref",
+        "with_reference": false,
+        "style_check": {
+          "is_photographic": false,
+          "matches_style": true,
+          "face_visible": false
+        },
+        "trimmed": true
+      }
+    ],
+    "created_at": "2026-08-05T12:33:33"
+  },
+  {
+    "output": "flow_panels/event_03.png",
+    "tag": "panel_3_noref",
+    "adopted_tag": "panel_3_noref",
+    "trimmed": true,
+    "style": "watercolor",
+    "style_text": "soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail",
+    "with_reference": false,
+    "reference_file": null,
+    "final_prompt": "Art style (must be strictly followed): soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail, Scene: Tall buildings, metal railings, lightning rods, tree branches, cloudy sky, urban commercial street, daytime, overcast, calm, quiet, worm's-eye view looking up, low-angle composition, STRICTLY follow the art style stated at the top; absolutely not a photograph, no photographic rendering, no text, no watermark, full-bleed composition, the artwork fills the entire canvas edge-to-edge\n\nDo not include any of the following: text, watermark, signature, logo, brand name, license plate, recognizable faces, portrait, distorted anatomy, extra limbs, oversaturated, cluttered, lowres, jpeg artifacts, white borders, paper edges, frame, margins, matting, photograph, photorealistic, realistic photo, camera photo, DSLR photo, photographic textures, lens blur, bokeh.\n\nOutput the illustration only, with no caption or text in the image.",
+    "model": "gemini-2.5-flash-image",
+    "attempts": [
+      {
+        "tag": "panel_3",
+        "with_reference": true,
+        "style_check": {
+          "is_photographic": true,
+          "matches_style": false,
+          "face_visible": false
+        }
+      },
+      {
+        "tag": "panel_3_restyle",
+        "with_reference": true,
+        "style_check": {
+          "is_photographic": true,
+          "matches_style": false,
+          "face_visible": false
+        }
+      },
+      {
+        "tag": "panel_3_noref",
+        "with_reference": false,
+        "style_check": {
+          "is_photographic": false,
+          "matches_style": true,
+          "face_visible": false
+        },
+        "trimmed": true
+      }
+    ],
+    "created_at": "2026-08-05T12:34:30"
+  },
+  {
+    "output": "flow_panels/event_04.png",
+    "tag": "panel_4_noref",
+    "adopted_tag": "panel_4_noref",
+    "trimmed": true,
+    "style": "watercolor",
+    "style_text": "soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail",
+    "with_reference": false,
+    "reference_file": null,
+    "final_prompt": "Art style (must be strictly followed): soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail, Scene: modern high-rise building facade with a vertical slat design, lush green sycamore tree leaves, roadside urban shopping street, bright daytime, sunny, clear sky, summer, fresh and modern atmosphere, low-angle view looking up, STRICTLY follow the art style stated at the top; absolutely not a photograph, no photographic rendering, no text, no watermark, full-bleed composition, the artwork fills the entire canvas edge-to-edge\n\nDo not include any of the following: text, watermark, signature, logo, brand name, license plate, recognizable faces, portrait, distorted anatomy, extra limbs, oversaturated, cluttered, lowres, jpeg artifacts, white borders, paper edges, frame, margins, matting, photograph, photorealistic, realistic photo, camera photo, DSLR photo, photographic textures, lens blur, bokeh.\n\nOutput the illustration only, with no caption or text in the image.",
+    "model": "gemini-2.5-flash-image",
+    "attempts": [
+      {
+        "tag": "panel_4",
+        "with_reference": true,
+        "style_check": {
+          "is_photographic": true,
+          "matches_style": false,
+          "face_visible": false
+        }
+      },
+      {
+        "tag": "panel_4_restyle",
+        "with_reference": true,
+        "style_check": {
+          "is_photographic": true,
+          "matches_style": false,
+          "face_visible": false
+        }
+      },
+      {
+        "tag": "panel_4_noref",
+        "with_reference": false,
+        "style_check": {
+          "is_photographic": false,
+          "matches_style": true,
+          "face_visible": false
+        },
+        "trimmed": true
+      }
+    ],
+    "created_at": "2026-08-05T12:35:25"
+  }
+]
