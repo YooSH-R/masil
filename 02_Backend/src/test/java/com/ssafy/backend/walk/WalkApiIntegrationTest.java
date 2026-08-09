@@ -331,6 +331,127 @@ class WalkApiIntegrationTest {
                 .andExpect(jsonPath("$.data.hasNext").value(false));
     }
 
+    /**
+     * 제안 없이 앱에서 바로 시작한 산책도 서버에 남아야 한다. 남지 않으면 그 산책은
+     * 걸은 사람의 휴대폰에만 저장돼 같은 계정의 다른 기기에서 영영 보이지 않는다.
+     */
+    @Test
+    void recordsWalkStartedFromAppWithoutProposal() throws Exception {
+        String createBody = """
+                {
+                  "petId": %d,
+                  "robotId": %d
+                }
+                """.formatted(PET_ID, ROBOT_ID);
+
+        // 시작을 보고할 기기가 없으므로 만들자마자 ACTIVE 여야 한다.
+        // READY 에 머무르면 아래 좌표가 전부 거부된다.
+        mockMvc.perform(post("/v1/walks")
+                        .header("Authorization", bearer(userToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+
+        Long walkId = jdbcTemplate.queryForObject(
+                "SELECT id FROM walks WHERE proposal_id IS NULL",
+                Long.class
+        );
+
+        // 화면을 나갔다 들어오거나 앱이 재시작되면 walkId 를 잃은 채 다시 만든다.
+        // 그때 새 세션이 생기거나 409 가 나면 걷는 도중에 좌표가 갈 곳을 잃는다.
+        mockMvc.perform(post("/v1/walks")
+                        .header("Authorization", bearer(userToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.walkId").value(walkId));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM walks WHERE proposal_id IS NULL",
+                Integer.class
+        ));
+
+        Instant recordedAt = testTime.plusSeconds(1);
+        mockMvc.perform(post("/v1/walks/{id}/locations/batch", walkId)
+                        .header("Authorization", bearer(userToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "points": [
+                                    {
+                                      "latitude": 37.0000000,
+                                      "longitude": 127.0000000,
+                                      "accuracy": 5.0,
+                                      "sequence": 0,
+                                      "recordedAt": "%s"
+                                    },
+                                    {
+                                      "latitude": 37.0010000,
+                                      "longitude": 127.0000000,
+                                      "accuracy": 5.0,
+                                      "sequence": 1,
+                                      "recordedAt": "%s"
+                                    }
+                                  ]
+                                }
+                                """.formatted(recordedAt, recordedAt.plusSeconds(5))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.savedCount").value(2));
+
+        mockMvc.perform(post("/v1/walks/{id}/complete", walkId)
+                        .header("Authorization", bearer(userToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"endedAt": "%s"}
+                                """.formatted(recordedAt.plusSeconds(10))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.data.distanceMeters", greaterThan(100)));
+
+        // 마실이가 함께 걷지 않았어도 산책은 그 펫의 산책이므로 친밀도가 오른다.
+        assertEquals(10, jdbcTemplate.queryForObject(
+                "SELECT affinity_score FROM pet_affinity_states WHERE pet_id = ?",
+                Integer.class,
+                PET_ID
+        ));
+
+        // 목록에 남는다 = 같은 계정의 다른 기기에서도 보인다.
+        mockMvc.perform(get("/v1/walks")
+                        .header("Authorization", bearer(userToken))
+                        .param("limit", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.items[0].walkId").value(walkId));
+
+        mockMvc.perform(get("/v1/walks/{id}/summary", walkId)
+                        .header("Authorization", bearer(userToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.route.length()").value(2));
+    }
+
+    /**
+     * 제안에서 시작한 산책은 마실이 기기가 도킹을 감지해 끝낸다. 앱이 먼저 끝내
+     * 버리면 아직 걷고 있는 기기의 좌표와 종료 보고가 갈 곳을 잃는다.
+     */
+    @Test
+    void rejectsAppCompletionOfProposalWalk() throws Exception {
+        acceptProposalAndCreateWalk();
+        Long walkId = jdbcTemplate.queryForObject(
+                "SELECT id FROM walks WHERE proposal_id = ?",
+                Long.class,
+                PROPOSAL_ID
+        );
+
+        mockMvc.perform(post("/v1/walks/{id}/complete", walkId)
+                        .header("Authorization", bearer(userToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"endedAt": "%s"}
+                                """.formatted(testTime)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("INVALID_WALK_STATE"));
+    }
+
     @Test
     void returnsNoContentWhenCurrentProposalDoesNotExist() throws Exception {
         jdbcTemplate.update("DELETE FROM walk_proposals");

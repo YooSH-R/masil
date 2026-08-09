@@ -167,6 +167,21 @@ public class WalkController {
         ));
     }
 
+    @Operation(summary = "앱에서 시작한 산책 종료")
+    @SecurityRequirement(name = "bearerAuth")
+    @PostMapping("/walks/{walkId}/complete")
+    public ApiResponse<WalkResult> completeWalk(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable @Positive Long walkId,
+            @Valid @RequestBody EndWalkRequest request
+    ) {
+        return ApiResponse.success(completionService.endWalkByUser(
+                principal.userId(),
+                walkId,
+                request.endedAt()
+        ));
+    }
+
     @Operation(summary = "산책 상세 조회")
     @SecurityRequirement(name = "bearerAuth")
     @GetMapping("/walks/{walkId}")
@@ -247,8 +262,12 @@ public class WalkController {
         }
     }
 
+    /**
+     * proposalId는 마실이 제안을 수락해 시작하는 산책에서만 온다. 앱에서 바로
+     * 시작한 산책은 제안 자체가 없으므로 비워 보낸다.
+     */
     public record CreateWalkRequest(
-            @NotNull @Positive Long proposalId,
+            @Positive Long proposalId,
             @NotNull @Positive Long petId,
             @NotNull @Positive Long robotId
     ) {

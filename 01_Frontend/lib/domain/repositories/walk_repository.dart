@@ -17,8 +17,16 @@ abstract class WalkRepository {
   });
 
   /// POST /walks — 산책 세션 생성
+  ///
+  /// [proposalId] 는 마실이 제안을 수락해 시작할 때만 있다. 사용자가 앱에서 바로
+  /// 걷기 시작하면 제안이 없으므로 null 이고, 서버는 그 산책을 만들자마자
+  /// 진행 중(ACTIVE)으로 연다. **세션이 있어야 좌표를 올릴 수 있으므로, 이 호출이
+  /// 없으면 걸은 경로는 그 휴대폰에만 남는다.**
+  ///
+  /// 이미 진행 중인 앱 산책이 있으면 서버가 그 산책을 그대로 돌려준다. 화면을
+  /// 나갔다 들어오거나 앱이 재시작돼도 같은 세션으로 이어진다.
   Future<Walk> createWalk({
-    required int proposalId,
+    int? proposalId,
     required int petId,
     required int robotId,
   });
@@ -30,7 +38,11 @@ abstract class WalkRepository {
     String? idempotencyKey,
   });
 
-  /// POST /walks/{walkId}/end — 산책 종료
+  /// POST /walks/{walkId}/complete — 앱에서 시작한 산책 종료
+  ///
+  /// `/end` 는 기기 토큰 전용이라 앱이 부를 수 없다. 제안에서 시작한 산책은
+  /// 마실이가 도킹을 감지해 `/end` 로 끝내고, 앱이 시작한 산책만 이 호출로
+  /// 끝난다(서버가 제안 있는 산책에는 409를 준다).
   ///
   /// **사용자가 `산책 종료` 버튼을 누르는 것이 유일한 종료 트리거다.**
   /// 서버는 이 호출을 받고서야 산책을 끝난 것으로 보고, 감성 사진·일지 생성을

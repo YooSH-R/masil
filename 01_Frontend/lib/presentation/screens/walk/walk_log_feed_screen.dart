@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/services/sample_august_routes.dart';
 import '../../../core/services/sample_walk_diaries.dart';
 import '../../../core/utils/korea_time.dart';
 import '../../../domain/entities/walk_diary.dart';
@@ -168,7 +169,7 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
 
             // Detailed View for Selected Day
             if (selectedItem != null)
-              _buildLogPost(context, selectedItem, placeName)
+              _buildLogPost(context, selectedItem, placeName, selectedIndex + 1)
             else
               _buildEmptyState(),
 
@@ -608,7 +609,11 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
   }
 
   Widget _buildLogPost(
-      BuildContext context, WalkDiaryFeedItem item, String? placeName) {
+    BuildContext context,
+    WalkDiaryFeedItem item,
+    String? placeName,
+    int ordinal,
+  ) {
     final distance = item.distanceMeters == null
         ? '-'
         : '${(item.distanceMeters! / 1000).toStringAsFixed(1)}km';
@@ -620,13 +625,26 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
       durationLabel: item.durationLabel,
       distanceLabel: distance,
       thumbnailUrl: item.thumbnailUrl,
-      showPathButton: !item.isS3Diary,
+      // 마실이가 올린 일지에는 회차가 붙어 있다. 앱만으로 걸은 산책에는 없어서
+      // 그날의 순서로 센다.
+      session: item.session ?? ordinal,
+      showPathButton: _hasRoute(item),
       // 7월 예시 기록은 서버 사진이 없어 asset 그림을 쓴다.
       imageAsset: SampleWalkDiaries.imageAssetOf(item.walkId),
       markdown: item.markdown,
       imageUrls: item.imageUrls,
     );
   }
+
+  /// 지도에 그릴 좌표가 있는지.
+  ///
+  /// S3 일지는 사진·본문뿐이라 경로 버튼을 감췄었다. 이제 앱 산책과 합쳐지면
+  /// 서버 walkId(양수)가 붙고, 8/3~8/7 시연 일지에는 만들어 둔 경로가 붙는다.
+  /// 둘 다 지도에 그릴 것이 있으므로 버튼이 보여야 한다.
+  static bool _hasRoute(WalkDiaryFeedItem item) =>
+      !item.isS3Diary ||
+      item.walkId > 0 ||
+      SampleAugustRoutes.hasRoute(item.walkId);
 
   Widget _buildLogPostShell({
     required BuildContext context,
@@ -636,6 +654,7 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
     required String durationLabel,
     required String distanceLabel,
     required String? thumbnailUrl,
+    required int session,
     required bool showPathButton,
     String? imageAsset,
     String? markdown,
@@ -706,9 +725,28 @@ class _WalkLogFeedScreenState extends State<WalkLogFeedScreen> {
           ),
           const SizedBox(height: 20),
 
-          Text(
-              "${_selectedDate.year}.${_selectedDate.month.toString().padLeft(2, '0')}.${_selectedDate.day.toString().padLeft(2, '0')}",
-              style: const TextStyle(color: Colors.grey, fontSize: 13)),
+          // 하루에 여러 번 걸으면 어느 산책을 보고 있는지 날짜만으로는 알 수 없다.
+          Row(
+            children: [
+              Text(
+                  "${_selectedDate.year}.${_selectedDate.month.toString().padLeft(2, '0')}.${_selectedDate.day.toString().padLeft(2, '0')}",
+                  style: const TextStyle(color: Colors.grey, fontSize: 13)),
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF9F3E7),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text('$session회차',
+                    style: const TextStyle(
+                        color: Color(0xFFC67C4E),
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
           // 날씨·기분은 서버가 주는 값이 없어 표시하지 않는다.
           Text(
