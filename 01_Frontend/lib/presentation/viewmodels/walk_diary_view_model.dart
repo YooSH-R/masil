@@ -1,12 +1,16 @@
 import 'dart:async';
 
 import '../../core/services/place_name_resolver.dart';
+import '../../core/services/sample_august_routes.dart';
 import '../../core/services/sample_walk_diaries.dart';
 import '../../core/services/walk_record_store.dart';
 import '../../core/utils/walk_log_markdown.dart';
+import '../../core/utils/korea_time.dart';
+import '../../domain/entities/walk.dart';
 import '../../domain/entities/walk_diary.dart';
 import '../../domain/entities/walk_progress.dart';
 import '../../domain/repositories/walk_diary_repository.dart';
+import '../../domain/repositories/walk_repository.dart';
 import 'base_view_model.dart';
 
 /// 기간별 산책 집계. 주간·월간 통계 카드에 쓴다.
@@ -39,15 +43,36 @@ class WalkStats {
   }
 }
 
+/// 서버 산책과 그 시작 시각(KST). 같은 날 산책을 순서대로 세울 때 쓴다.
+class _DatedWalk {
+  const _DatedWalk(this.at, this.walk);
+
+  final DateTime at;
+  final Walk walk;
+}
+
 class WalkDiaryViewModel extends BaseViewModel {
-  WalkDiaryViewModel(this._diaryRepository, {PlaceNameResolver? placeResolver})
-      : _placeResolver = placeResolver ?? PlaceNameResolver();
+  WalkDiaryViewModel(
+    this._diaryRepository, {
+    WalkRepository? walkRepository,
+    PlaceNameResolver? placeResolver,
+  })  : _walkRepository = walkRepository,
+        _placeResolver = placeResolver ?? PlaceNameResolver();
 
   final WalkDiaryRepository _diaryRepository;
+
+  /// 서버에 남은 산책 목록의 출처.
+  ///
+  /// **일지 피드(GET /walk-diaries)만으로는 부족하다.** 그 피드는 마실이 기기가
+  /// S3에 올린 사진·일지만 훑는다. 앱에서 걸은 산책은 S3에 아무것도 올리지
+  /// 않으므로 거기 나오지 않고, 그러면 같은 계정으로 로그인한 다른 기기에서
+  /// 그 산책이 영영 보이지 않는다.
+  final WalkRepository? _walkRepository;
+
   final PlaceNameResolver _placeResolver;
 
-  /// 기기에 저장한 산책 기록. 서버에 산책 API 가 없어서 실제로 걸은 기록은
-  /// 여기서만 온다([WalkRecordStore] 주석 참고).
+  /// 기기에 저장한 산책 기록. 서버에 못 올린 산책의 마지막 보루다
+  /// ([WalkRecordStore] 주석 참고).
   final WalkRecordStore _recordStore = const WalkRecordStore();
 
   final List<WalkDiaryFeedItem> _feed = [];
@@ -276,7 +301,8 @@ class WalkDiaryViewModel extends BaseViewModel {
       summary: WalkLogMarkdown.summaryLine(content.markdown),
       markdown: content.markdown,
     );
-    _placeNames[item.walkId] = null;
+    // 시연용 경로가 붙은 일지는 장소명도 같이 넣어 뒀다. 그게 없을 때만 비운다.
+    _placeNames[item.walkId] = SampleAugustRoutes.placeOf(item.walkId);
     safeNotify();
   }
 
@@ -297,15 +323,144 @@ class WalkDiaryViewModel extends BaseViewModel {
       _hasNext = page.hasNext;
     }
 
-    // 기기에 저장한 산책을 먼저 합친다. 서버에 산책 API 가 없어서(dev 에
-    // walk 엔드포인트 0개) 실제로 걸은 기록은 여기서만 온다.
+    // 서버에 남은 산책을 합친다. 앱에서 걸은 산책은 S3 일지를 만들지 않으므로
+    // 위의 피드에는 없고 여기서만 온다. 이 기록은 계정에 붙어 있어서 같은
+    // 계정으로 로그인한 다른 기기에서도 그대로 보인다.
+    await _mergeServerWalks();
+
+    // 8/3~8/7 시연용 일지에는 GPS 가 없다. 짝지을 산책이 없는 항목에만 채운다.
+    _fillSampleAugustRoutes();
+
+    // 그다음 기기에만 있는 기록을 합친다. 서버에 올리지 못한 산책이다.
     await _mergeLocalRecords();
 
-    // 그다음 7월 예시 데이터를 합친다.
-    // 조회가 실패해도(현재 산책 API 미배포) 예시는 보여야 하므로 page == null
-    // 인 경우에도 실행한다.
+    // 마지막으로 7월 예시 데이터를 합친다.
+    // 조회가 실패해도 예시는 보여야 하므로 page == null 인 경우에도 실행한다.
     _mergeSamples();
+    _sortByRecent();
     safeNotify();
+  }
+
+  /// GET /walks — 서버에 남은 산책을 피드에 넣는다.
+  ///
+  /// **산책 하나는 두 곳에서 만들어진다.** 앱이 GPS로 경로·거리·시간을 만들어
+  /// 서버에 남기고, 마실이를 거치대에 꽂으면 기기가 사진이 들어간 일지를 S3에
+  /// 올린다. 둘은 같은 산책이므로 피드에서 한 줄로 합쳐야 한다. 따로 넣으면
+  /// 산책 한 번이 두 번 걸은 것처럼 보이고 통계도 두 배가 된다.
+  ///
+  /// 짝을 맞추는 기준은 **날짜 + 그날의 순서**다. S3 일지에는 산책 시각이 없고
+  /// 날짜와 회차(session)만 있어서 시각으로는 맞출 수 없다.
+  ///
+  /// 끝난 산책만 넣는다. 진행 중인 산책은 거리·시간이 아직 확정되지 않아
+  /// 일지에 0km 로 박힌다.
+  Future<void> _mergeServerWalks() async {
+    final repository = _walkRepository;
+    if (repository == null) return;
+
+    final page = await guard(
+      () => repository.getWalks(limit: 50),
+      silent: true,
+    );
+    if (page == null) return;
+
+    final byDay = <DateTime, List<_DatedWalk>>{};
+    for (final walk in page.items) {
+      if (!walk.status.isFinished) continue;
+      final at =
+          KoreaTime.fromNullableInstant(walk.startedAt ?? walk.createdAt);
+      if (at == null) continue;
+      byDay.putIfAbsent(_dayKey(at), () => []).add(_DatedWalk(at, walk));
+    }
+
+    for (final day in byDay.keys) {
+      final walks = byDay[day]!..sort((a, b) => a.at.compareTo(b.at));
+
+      // 그날의 S3 일지를 회차 순으로 세운다. n번째 일지가 n번째 산책이다.
+      final diaryIndexes = <int>[];
+      for (var i = 0; i < _feed.length; i++) {
+        final item = _feed[i];
+        final at = item.walkedAt;
+        if (at == null || !item.isS3Diary || _dayKey(at) != day) continue;
+        diaryIndexes.add(i);
+      }
+      diaryIndexes.sort(
+        (a, b) => (_feed[a].session ?? 0).compareTo(_feed[b].session ?? 0),
+      );
+
+      for (var i = 0; i < walks.length; i++) {
+        final walk = walks[i].walk;
+        if (i < diaryIndexes.length) {
+          final item = _feed[diaryIndexes[i]];
+          // walkId 를 서버 것으로 바꾼다. 그래야 경로 상세가
+          // GET /walks/{walkId}/summary 로 실제 걸은 경로를 그린다.
+          // deviceId·session 은 그대로 둬서 사진·본문 조회도 계속 된다.
+          _feed[diaryIndexes[i]] = WalkDiaryFeedItem(
+            walkId: walk.walkId,
+            walkedAt: item.walkedAt,
+            durationSeconds: walk.durationSeconds ?? item.durationSeconds,
+            distanceMeters: walk.distanceMeters ?? item.distanceMeters,
+            thumbnailUrl: item.thumbnailUrl,
+            imageUrls: item.imageUrls,
+            summary: item.summary,
+            markdown: item.markdown,
+            deviceId: item.deviceId,
+            session: item.session,
+          );
+          continue;
+        }
+
+        // 짝이 없는 산책 = 마실이를 아직 안 꽂았거나, 기기 없이 앱만으로 걸었다.
+        // 사진·일지 없이 경로·거리·시간만 있는 한 줄로 들어간다.
+        _feed.add(WalkDiaryFeedItem(
+          walkId: walk.walkId,
+          walkedAt: walks[i].at,
+          durationSeconds: walk.durationSeconds,
+          distanceMeters: walk.distanceMeters,
+        ));
+      }
+    }
+  }
+
+  static DateTime _dayKey(DateTime at) =>
+      DateTime.utc(at.year, at.month, at.day);
+
+  /// 8/3~8/7 시연용 일지에 거리·시간·장소를 채운다([SampleAugustRoutes]).
+  ///
+  /// 그 일지들은 산책 없이 S3 에만 올려 만든 데이터라 GPS 가 없다. 그대로 두면
+  /// 그 날짜만 거리·시간이 비고 경로 지도도 안 그려진다.
+  ///
+  /// **거리가 이미 있는 항목은 건드리지 않는다.** 그건 실제로 걸어서 서버에
+  /// 남은 산책이 짝지어진 것이라 만든 값으로 덮으면 안 된다.
+  void _fillSampleAugustRoutes() {
+    if (!SampleAugustRoutes.enabled) return;
+
+    for (var i = 0; i < _feed.length; i++) {
+      final item = _feed[i];
+      final at = item.walkedAt;
+      final session = item.session;
+      if (at == null || session == null) continue;
+      if (item.distanceMeters != null) continue;
+
+      final row = SampleAugustRoutes.rowFor(at, session);
+      if (row == null) continue;
+
+      // 경로 상세가 walkId 만으로 좌표를 찾을 수 있게 이어 둔다.
+      SampleAugustRoutes.register(item.walkId, at, session);
+
+      _feed[i] = WalkDiaryFeedItem(
+        walkId: item.walkId,
+        walkedAt: item.walkedAt,
+        durationSeconds: row.minutes * 60,
+        distanceMeters: row.meters,
+        thumbnailUrl: item.thumbnailUrl,
+        imageUrls: item.imageUrls,
+        summary: item.summary,
+        markdown: item.markdown,
+        deviceId: item.deviceId,
+        session: item.session,
+      );
+      _placeNames[item.walkId] ??= row.place;
+    }
   }
 
   /// 2026년 7월 예시 데이터를 합친다. 같은 날짜에 서버 기록이 있으면 넣지 않는다.
@@ -314,17 +469,45 @@ class WalkDiaryViewModel extends BaseViewModel {
   /// 이 메서드와 호출부를 지우면 된다.
   /// 기기에 저장한 산책을 피드에 넣는다.
   ///
-  /// 서버 기록과 같은 날이면 서버 것을 우선한다(예시 데이터와 같은 규칙).
-  /// 그래야 나중에 산책 API 가 배포됐을 때 같은 산책이 두 번 보이지 않는다.
+  /// 같은 산책이 서버에도 있으면 넣지 않는다. 로컬 기록은 walkId 를 직접 만들어
+  /// 쓰기 때문에(음수) 서버 id 와 절대 겹치지 않는다. 그래서 **시작 시각이
+  /// 겹치는지**로 판단한다. 종료 요청이 늦게 성공했거나 이 변경 전에 남은
+  /// 기록이면 같은 산책이 서버와 기기 양쪽에 있을 수 있다.
   Future<void> _mergeLocalRecords() async {
     final local = await _recordStore.readFeedItems();
     if (local.isEmpty) return;
 
     final serverIds = _feed.map((e) => e.walkId).toSet();
+    final serverStarts =
+        _feed.map((e) => e.walkedAt).whereType<DateTime>().toList();
+
     for (final item in local) {
       if (serverIds.contains(item.walkId)) continue;
+
+      final at = item.walkedAt;
+      if (at != null &&
+          serverStarts.any((start) =>
+              start.difference(at).abs() < _sameWalkWindow)) {
+        continue;
+      }
       _feed.add(item);
     }
+  }
+
+  /// 시작 시각이 이만큼 가까우면 같은 산책으로 본다.
+  ///
+  /// 서버는 산책 세션을 만든 시각을, 기기는 위치 추적을 시작한 시각을 쓴다.
+  /// 둘은 네트워크 지연·측위 대기만큼 벌어지므로 정확히 같지 않다.
+  static const Duration _sameWalkWindow = Duration(minutes: 5);
+
+  /// 최신순으로 맞춘다(서버 피드도 최신순이다).
+  void _sortByRecent() {
+    _feed.sort((a, b) {
+      final at = a.walkedAt;
+      final bt = b.walkedAt;
+      if (at == null || bt == null) return 0;
+      return bt.compareTo(at);
+    });
   }
 
   void _mergeSamples() {
@@ -348,14 +531,6 @@ class WalkDiaryViewModel extends BaseViewModel {
 
     // 예시 데이터는 좌표가 없어 역지오코딩을 못 하므로 장소명을 미리 채운다.
     _placeNames.addAll(SampleWalkDiaries.placeNames);
-
-    // 최신순으로 맞춘다(서버 피드도 최신순이다).
-    _feed.sort((a, b) {
-      final at = a.walkedAt;
-      final bt = b.walkedAt;
-      if (at == null || bt == null) return 0;
-      return bt.compareTo(at);
-    });
   }
 
   /// 다음 커서 페이지 추가 로드.

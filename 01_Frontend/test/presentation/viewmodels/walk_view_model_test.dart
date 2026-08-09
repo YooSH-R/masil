@@ -154,7 +154,7 @@ class _TestRouteSource implements WalkRouteSource {
 class _UnusedWalkRepository implements WalkRepository {
   @override
   Future<Walk> createWalk({
-    required int proposalId,
+    int? proposalId,
     required int petId,
     required int robotId,
   }) =>

@@ -58,7 +58,11 @@ class ApiEndpoints {
   static String walkStart(int walkId) => '/walks/$walkId/start';
   static String walkLocationsBatch(int walkId) =>
       '/walks/$walkId/locations/batch';
+  /// 마실이 기기가 도킹을 감지해 부르는 종료. 앱은 기기 토큰이 없어 못 부른다.
   static String walkEnd(int walkId) => '/walks/$walkId/end';
+
+  /// 앱에서 바로 시작한 산책의 종료. `산책 종료` 버튼이 이걸 부른다.
+  static String walkComplete(int walkId) => '/walks/$walkId/complete';
   static String walkSummary(int walkId) => '/walks/$walkId/summary';
 
   // 2.5 사진·GPT 처리

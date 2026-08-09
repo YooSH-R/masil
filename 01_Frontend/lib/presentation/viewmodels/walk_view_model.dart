@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../../core/services/gps/walk_track_processor.dart';
+import '../../core/services/sample_august_routes.dart';
 import '../../core/services/sample_walk_diaries.dart';
 import '../../core/services/walk_record_store.dart';
 import '../../core/services/walk_route_source.dart';
@@ -355,6 +356,35 @@ class WalkViewModel extends BaseViewModel {
     return true;
   }
 
+  /// POST /walks — 제안 없이 앱에서 바로 시작하는 산책의 서버 세션을 연다.
+  ///
+  /// **이 호출이 성공해야 걸은 경로가 서버에 남는다.** walkId 가 없으면
+  /// [flushLocations] 와 [endWalk] 가 조용히 넘어가서, 산책이 그 휴대폰
+  /// 저장소에만 저장되고 같은 계정의 다른 기기에서는 보이지 않는다.
+  ///
+  /// 실패해도(오프라인·페어링 없음) 산책 자체는 막지 않는다. 화면은 그대로
+  /// 진행되고 기록은 [WalkRecordStore] 에 남으므로 지금까지와 같이 동작한다.
+  Future<Walk?> startWalkSession({
+    required int petId,
+    required int robotId,
+  }) async {
+    // 진행 중인 세션이 있으면 그대로 쓴다. 끝난 산책은 요약 화면이 아직 보고
+    // 있을 수 있어 남겨 두는 값이므로, 그걸 세션으로 착각하면 다음 산책의
+    // 좌표가 이미 완료된 산책으로 올라간다.
+    final current = _currentWalk;
+    if (current != null && !current.status.isFinished) return current;
+
+    final walk = await guard(
+      () => _walkRepository.createWalk(petId: petId, robotId: robotId),
+      silent: true,
+    );
+    if (walk == null) return null;
+
+    _currentWalk = walk;
+    safeNotify();
+    return walk;
+  }
+
   /// 산책 중 수집한 좌표를 버퍼에 쌓는다. 저장했으면 true, 걸러졌으면 false.
   /// 실제 위치 수집(geolocator 등)은 화면/서비스에서 담당한다.
   ///
@@ -421,32 +451,36 @@ class WalkViewModel extends BaseViewModel {
   /// 그 좌표들은 영원히 반영되지 않는다. 서버가 이 호출을 받고서야 감성 사진·
   /// 일지 생성을 시작하므로 순서가 뒤바뀌면 안 된다.
   ///
-  /// 산책 세션이 없으면(walk API 미배포 등) 로컬 정리만 하고 조용히 끝난다.
+  /// 산책 세션이 없거나 종료가 실패하면 기기에만 남기고 조용히 끝난다.
   Future<void> endWalk() async {
     stopWatchingWalk();
     // 내부에서 남은 좌표를 마지막으로 flush 한다.
     await stopRouteTracking();
 
-    // 걸은 경로를 기기에 남긴다. 서버에 산책 API 가 배포되기 전까지 산책일지가
-    // 날짜별로 경로를 다시 보여줄 수 있는 유일한 방법이다.
-    // 서버 기록이 생기면 그쪽이 우선되고 이건 캐시로 남는다.
-    await _saveLocalRecord();
-
     _localWalkActive = false;
     safeNotify();
 
     final walkId = _currentWalk?.walkId;
-    if (walkId == null) return;
+    if (walkId != null) {
+      // 좌표가 아직 남아 있으면(전송 실패) 한 번 더 시도한다.
+      if (_pendingPoints.isNotEmpty) await flushLocations();
 
-    // 좌표가 아직 남아 있으면(전송 실패) 한 번 더 시도한다.
-    if (_pendingPoints.isNotEmpty) await flushLocations();
+      final walk =
+          await guard(() => _walkRepository.endWalk(walkId), silent: true);
+      if (walk != null) {
+        _currentWalk = walk;
+        // 서버가 받았으면 기기에 또 남기지 않는다. 남기면 산책일지에 같은
+        // 산책이 서버 기록과 로컬 기록 두 줄로 보인다.
+        _lastSavedRecordId = walkId;
+        safeNotify();
+        return;
+      }
+    }
 
-    final walk =
-        await guard(() => _walkRepository.endWalk(walkId), silent: true);
-    if (walk == null) return;
-
-    _currentWalk = walk;
-    safeNotify();
+    // 여기까지 왔으면 서버에 산책이 남지 않았다(세션 생성 실패·오프라인·종료
+    // 실패). 걸은 기록을 잃지 않게 기기에라도 남긴다. 이 기록은 이 휴대폰에서만
+    // 보인다.
+    await _saveLocalRecord();
   }
 
   /// 방금 끝낸 산책을 기기에 저장한다.
@@ -522,6 +556,17 @@ class WalkViewModel extends BaseViewModel {
         clearError();
         safeNotify();
       }
+      return;
+    }
+
+    // 8/3~8/7 시연용 일지. S3 에 사진·본문만 있고 GPS 가 없어서, 만들어 넣은
+    // 경로를 쓴다([SampleAugustRoutes]). 그 날짜에 실제로 걸은 산책이 서버에
+    // 생기면 피드가 시연용 값을 채우지 않으므로 여기도 타지 않는다.
+    final demo = SampleAugustRoutes.summaryFor(walkId);
+    if (demo != null) {
+      _summary = demo;
+      clearError();
+      safeNotify();
       return;
     }
 
