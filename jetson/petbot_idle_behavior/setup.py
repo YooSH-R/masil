@@ -25,6 +25,8 @@ setup(
     entry_points={
         'console_scripts': [
             'idle_wander = petbot_idle_behavior.idle_wander:main',
+            'idle_wander2 = petbot_idle_behavior.idle_wander2:main',
+            'demo_square_path = petbot_idle_behavior.demo_square_path:main',
         ],
     },
 )
