@@ -1,0 +1,9 @@
+waypoints:
+  - name: home
+    x: 0.330
+    y: -0.058
+    yaw: 0.203
+  - name: entrance
+    x: 3.305
+    y: 0.146
+    yaw: -1.401
