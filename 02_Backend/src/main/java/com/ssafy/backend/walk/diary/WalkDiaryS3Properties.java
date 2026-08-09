@@ -14,6 +14,7 @@ public record WalkDiaryS3Properties(
         @NotBlank String bucket,
         @NotBlank String region,
         @Positive long presignDurationSeconds,
+        @Positive @Max(10_485_760) long maxFileSizeBytes,
         @Positive @Max(10_485_760) long maxMarkdownBytes,
         @Positive @Max(30) long apiCallAttemptTimeoutSeconds,
         @Positive @Max(60) long apiCallTimeoutSeconds

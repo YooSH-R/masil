@@ -162,7 +162,7 @@ class RobotPairingPostgreSqlIntegrationTest {
         jdbcTemplate.update(
                 """
                 UPDATE robot_pairings
-                SET unpaired_at = CURRENT_TIMESTAMP
+                SET unpaired_at = GREATEST(CURRENT_TIMESTAMP, paired_at)
                 WHERE id = ?
                 """,
                 pairing.pairingId()

@@ -6,7 +6,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -35,22 +34,15 @@ class RobotMqttApplicationServiceTest {
     }
 
     @Test
-    void storesEventUpdatesAffinityAndPublishesChangedScore()
-            throws Exception {
+    void storesEventUpdatesAffinityAndPublishesChangedScore() {
         UUID messageId = UUID.randomUUID();
         RobotEventMessage event = new RobotEventMessage(
                 messageId,
                 "1.0",
                 "device-001",
                 Instant.parse("2026-08-03T05:00:00Z"),
-                RobotEventType.WALK_COMPLETED,
-                new ObjectMapper().readTree("""
-                        {
-                          "startedAt": "2026-08-03T04:30:00Z",
-                          "walkDate": "2026-08-03",
-                          "session": 1
-                        }
-                        """)
+                RobotEventType.CARE_ACTION,
+                null
         );
         when(store.findEventResult(messageId)).thenReturn(Optional.empty());
         when(store.lockAffinity("device-001")).thenReturn(
@@ -59,13 +51,13 @@ class RobotMqttApplicationServiceTest {
         AffectionChangedMessage response = service.processEvent(event);
 
         assertEquals(95, response.previousScore());
-        assertEquals(5, response.scoreChange());
-        assertEquals(100, response.currentScore());
+        assertEquals(3, response.scoreChange());
+        assertEquals(98, response.currentScore());
         assertEquals(5, response.affinityLevel());
         assertEquals("HAPPY", response.mood());
         verify(store).updateAffinity(
                 2L,
-                100,
+                98,
                 5,
                 "HAPPY",
                 event.occurredAt()
@@ -73,19 +65,10 @@ class RobotMqttApplicationServiceTest {
         verify(store).insertEvent(
                 event,
                 1L,
-                "{\"startedAt\":\"2026-08-03T04:30:00Z\","
-                        + "\"walkDate\":\"2026-08-03\",\"session\":1}",
+                "{}",
                 95,
-                5,
-                100
-        );
-        verify(store).insertCompletedWalk(
-                10L,
-                Instant.parse("2026-08-03T04:30:00Z"),
-                Instant.parse("2026-08-03T05:00:00Z"),
-                LocalDate.parse("2026-08-03"),
-                1,
-                "robot-images/device-001/2026-08-03/session1/"
+                3,
+                98
         );
         verify(eventPublisher).publishEvent(
                 new AffectionPublishEvent(response)
@@ -114,6 +97,49 @@ class RobotMqttApplicationServiceTest {
     }
 
     @Test
+    void appliesWalkCompletedEventToWalkPairingPet() throws Exception {
+        UUID messageId = UUID.randomUUID();
+        RobotEventMessage event = new RobotEventMessage(
+                messageId,
+                "1.0",
+                "device-001",
+                Instant.parse("2026-08-03T03:00:00Z"),
+                RobotEventType.WALK_COMPLETED,
+                new ObjectMapper().readTree("{\"walkId\":101}")
+        );
+        when(store.findEventResult(messageId, 2L))
+                .thenReturn(Optional.empty());
+        when(store.lockAffinity(1L, 2L, "device-001")).thenReturn(
+                new RobotMqttStore.AffinityContext(1L, 2L, 50)
+        );
+
+        AffectionChangedMessage response = service.processWalkCompletedEvent(
+                event,
+                1L,
+                2L
+        );
+
+        assertEquals(50, response.previousScore());
+        assertEquals(10, response.scoreChange());
+        assertEquals(60, response.currentScore());
+        verify(store).updateAffinity(
+                2L,
+                60,
+                4,
+                "FRIENDLY",
+                event.occurredAt()
+        );
+        verify(store).insertEvent(
+                event,
+                1L,
+                "{\"walkId\":101}",
+                50,
+                10,
+                60
+        );
+    }
+
+    @Test
     void rejectsInvalidHeartbeatBatteryLevel() {
         RobotHeartbeatMessage heartbeat = new RobotHeartbeatMessage(
                 UUID.randomUUID(),
@@ -132,19 +158,14 @@ class RobotMqttApplicationServiceTest {
     }
 
     @Test
-    void rejectsWalkCompletedWithoutDiaryLocationData() {
+    void rejectsWalkCompletedFromInboundDeviceChannel() throws Exception {
         RobotEventMessage event = new RobotEventMessage(
                 UUID.randomUUID(),
                 "1.0",
                 "device-001",
                 Instant.parse("2026-08-03T05:00:00Z"),
                 RobotEventType.WALK_COMPLETED,
-                null
-        );
-        when(store.findEventResult(event.messageId()))
-                .thenReturn(Optional.empty());
-        when(store.lockAffinity("device-001")).thenReturn(
-                new RobotMqttStore.AffinityContext(1L, 10L, 2L, 50)
+                new ObjectMapper().readTree("{\"walkId\":101}")
         );
 
         assertThrows(
@@ -154,30 +175,28 @@ class RobotMqttApplicationServiceTest {
     }
 
     @Test
-    void rejectsWalkCompletedWithStringSession() throws Exception {
+    void acceptsInternalWalkCompletedWithoutDiaryMetadata() {
         RobotEventMessage event = new RobotEventMessage(
                 UUID.randomUUID(),
                 "1.0",
                 "device-001",
                 Instant.parse("2026-08-03T05:00:00Z"),
                 RobotEventType.WALK_COMPLETED,
-                new ObjectMapper().readTree("""
-                        {
-                          "startedAt": "2026-08-03T04:30:00Z",
-                          "walkDate": "2026-08-03",
-                          "session": "1"
-                        }
-                        """)
+                null
         );
-        when(store.findEventResult(event.messageId()))
+        when(store.findEventResult(event.messageId(), 2L))
                 .thenReturn(Optional.empty());
-        when(store.lockAffinity("device-001")).thenReturn(
-                new RobotMqttStore.AffinityContext(1L, 10L, 2L, 50)
+        when(store.lockAffinity(1L, 2L, "device-001")).thenReturn(
+                new RobotMqttStore.AffinityContext(1L, 2L, 50)
         );
 
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> service.processEvent(event)
+        AffectionChangedMessage response = service.processWalkCompletedEvent(
+                event,
+                1L,
+                2L
         );
+
+        assertEquals(60, response.currentScore());
+        verify(store).insertEvent(event, 1L, "{}", 50, 10, 60);
     }
 }

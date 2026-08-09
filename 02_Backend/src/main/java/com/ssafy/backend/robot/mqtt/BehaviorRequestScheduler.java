@@ -1,10 +1,10 @@
 package com.ssafy.backend.robot.mqtt;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.ApplicationEventPublisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -18,19 +18,16 @@ import java.util.List;
 )
 public class BehaviorRequestScheduler {
 
-    private static final Duration REQUEST_TTL = Duration.ofMinutes(30);
-    private static final Duration WALK_INTERVAL = Duration.ofHours(72);
-    private static final Duration PLAY_INTERVAL = Duration.ofHours(24);
+    private static final Logger log = LoggerFactory.getLogger(
+            BehaviorRequestScheduler.class
+    );
 
-    private final RobotMqttStore store;
-    private final ApplicationEventPublisher eventPublisher;
+    private final BehaviorRequestTransactionWorker transactionWorker;
 
     public BehaviorRequestScheduler(
-            RobotMqttStore store,
-            ApplicationEventPublisher eventPublisher
+            BehaviorRequestTransactionWorker transactionWorker
     ) {
-        this.store = store;
-        this.eventPublisher = eventPublisher;
+        this.transactionWorker = transactionWorker;
     }
 
     @Scheduled(
@@ -38,110 +35,48 @@ public class BehaviorRequestScheduler {
             initialDelayString =
                     "${mqtt.request-scheduler.initial-delay-ms:60000}"
     )
-    @Transactional
     public void publishDueRequests() {
         publishDueRequests(Instant.now());
     }
 
     List<BehaviorRequestMessage> publishDueRequests(Instant now) {
-        store.expireRequests(now);
-        List<BehaviorRequestMessage> queued = new ArrayList<>(
-                store.findPendingRequests(now)
-        );
+        List<BehaviorRequestMessage> pending;
+        try {
+            pending = transactionWorker.prepareCycle(now);
+        } catch (RuntimeException exception) {
+            log.error("행동 요청 스케줄 준비에 실패했습니다.", exception);
+            return List.of();
+        }
+
+        List<BehaviorRequestMessage> queued = new ArrayList<>(pending);
+        List<RobotMqttStore.RequestCandidate> candidates;
+        try {
+            candidates = transactionWorker.findRequestCandidates();
+        } catch (RuntimeException exception) {
+            log.error("행동 요청 후보 조회에 실패했습니다.", exception);
+            return List.copyOf(queued);
+        }
         for (RobotMqttStore.RequestCandidate candidate
-                : store.findRequestCandidates()) {
-            if (isSleeping(candidate.mode())) {
-                continue;
+                : candidates) {
+            try {
+                queued.addAll(transactionWorker.processCandidate(candidate, now));
+            } catch (RuntimeException exception) {
+                log.error(
+                        "로봇 행동 요청 생성에 실패해 이번 주기에서 건너뜁니다. robotId={}, deviceId={}",
+                        candidate.robotId(),
+                        candidate.deviceId(),
+                        exception
+                );
             }
-            addIfDue(
-                    queued, candidate, BehaviorRequestType.CARE_REQUEST,
-                    candidate.batteryLevel() != null
-                            && candidate.batteryLevel() <= 20,
-                    "배터리가 부족해요. 충전과 관리가 필요해요.", now
-            );
-            addIfDue(
-                    queued, candidate, BehaviorRequestType.WALK_REQUEST,
-                    isOlderThan(candidate.lastWalkAt(), WALK_INTERVAL, now),
-                    "오랫동안 산책하지 않았어요. 함께 산책해요.", now
-            );
-            addIfDue(
-                    queued, candidate, BehaviorRequestType.PLAY_REQUEST,
-                    isOlderThan(candidate.lastPlayAt(), PLAY_INTERVAL, now),
-                    "오랫동안 놀지 않았어요. 함께 놀아 주세요.", now
-            );
-            addIfDue(
-                    queued,
-                    candidate,
-                    BehaviorRequestType.INTERACTION_REQUEST,
-                    isOlderThan(
-                            candidate.lastInteractionAt(),
-                            interactionInterval(candidate.affinityScore()),
-                            now
-                    ),
-                    "보고 싶어요. 저와 상호작용해 주세요.",
-                    now
-            );
         }
-        for (BehaviorRequestMessage request : queued) {
-            eventPublisher.publishEvent(
-                    new BehaviorRequestPublishEvent(request, now)
-            );
-        }
-        return queued;
+        return List.copyOf(queued);
     }
 
     Duration interactionInterval(int affinityScore) {
-        if (affinityScore >= 81) {
-            return Duration.ofHours(3);
-        }
-        if (affinityScore >= 61) {
-            return Duration.ofHours(4);
-        }
-        if (affinityScore >= 41) {
-            return Duration.ofHours(6);
-        }
-        if (affinityScore >= 21) {
-            return Duration.ofHours(12);
-        }
-        return Duration.ofHours(24);
+        return transactionWorker.interactionInterval(affinityScore);
     }
 
     boolean isSleeping(String mode) {
-        if (mode == null) {
-            return false;
-        }
-        return switch (mode.trim().toUpperCase()) {
-            case "SLEEP", "SLEEPING", "ASLEEP" -> true;
-            default -> false;
-        };
-    }
-
-    private void addIfDue(
-            List<BehaviorRequestMessage> queued,
-            RobotMqttStore.RequestCandidate candidate,
-            BehaviorRequestType type,
-            boolean due,
-            String message,
-            Instant now
-    ) {
-        if (!due || store.hasOpenRequest(candidate.robotId(), type)) {
-            return;
-        }
-        BehaviorRequestMessage request = store.createRequest(
-                candidate,
-                type,
-                message,
-                now,
-                now.plus(REQUEST_TTL)
-        );
-        queued.add(request);
-    }
-
-    private boolean isOlderThan(
-            Instant lastAt,
-            Duration interval,
-            Instant now
-    ) {
-        return lastAt == null || !lastAt.plus(interval).isAfter(now);
+        return transactionWorker.isSleeping(mode);
     }
 }

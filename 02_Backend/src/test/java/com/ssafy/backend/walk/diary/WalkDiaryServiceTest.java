@@ -4,30 +4,43 @@ import com.ssafy.backend.common.error.BusinessException;
 import com.ssafy.backend.common.error.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.http.AbortableInputStream;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 
 import java.io.ByteArrayInputStream;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class WalkDiaryServiceTest {
+
+    private static final Instant PAIRED_AT =
+            Instant.parse("2026-08-01T00:00:00Z");
+    private static final Instant UPLOADED_AT =
+            Instant.parse("2026-08-04T00:00:00Z");
 
     private WalkDiaryStore store;
     private S3Client s3Client;
@@ -48,33 +61,41 @@ class WalkDiaryServiceTest {
                         "test-bucket",
                         "ap-northeast-2",
                         300,
+                        10_485_760,
                         1024,
                         2,
                         5
                 )
         );
 
-        byte[] markdown = "# 오늘의 산책".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] markdown = "# 오늘의 산책".getBytes(StandardCharsets.UTF_8);
         when(s3Client.getObject(any(GetObjectRequest.class)))
                 .thenAnswer(ignored -> responseStream(markdown));
         PresignedGetObjectRequest signed =
                 mock(PresignedGetObjectRequest.class);
         when(signed.url()).thenReturn(new URL("https://example.com/story.png"));
-        when(presigner.presignGetObject(any(
-                software.amazon.awssdk.services.s3.presigner.model
-                        .GetObjectPresignRequest.class
-        ))).thenReturn(signed);
+        when(presigner.presignGetObject(any(GetObjectPresignRequest.class)))
+                .thenReturn(signed);
+        stubObjects(
+                key("2026-08-03", 1, "story_image.png"),
+                key("2026-08-03", 1, "walk_log.md")
+        );
     }
 
     @Test
-    void returnsOwnedDiaryFromS3() {
-        when(store.findOwnedDiary(10L, 20L)).thenReturn(Optional.of(
-                diary(20L, LocalDate.parse("2026-08-03"), 1)
-        ));
+    void returnsOwnedDiaryDirectlyFromFixedS3Path() {
+        when(store.findActiveOwnedDevice(10L, "device-001"))
+                .thenReturn(java.util.Optional.of(ownedDevice(PAIRED_AT)));
 
-        WalkDiaryService.DiaryDetail result = service.getDiary(10L, 20L);
+        WalkDiaryService.DiaryDetail result = service.getDiary(
+                10L,
+                "device-001",
+                LocalDate.parse("2026-08-03"),
+                1
+        );
 
-        assertEquals(20L, result.walkId());
+        assertEquals("device-001", result.deviceId());
+        assertEquals(LocalDate.parse("2026-08-03"), result.walkDate());
         assertEquals(1, result.session());
         assertEquals("# 오늘의 산책", result.markdown());
         assertEquals("https://example.com/story.png", result.imageUrl());
@@ -82,74 +103,243 @@ class WalkDiaryServiceTest {
     }
 
     @Test
-    void groupsFeedByDateAndKeepsSessionOrder() {
-        when(store.findOwnedDiaryFeed(10L, null, 3)).thenReturn(List.of(
-                feedRow(21L, LocalDate.parse("2026-08-03"), 1),
-                feedRow(22L, LocalDate.parse("2026-08-03"), 2),
-                feedRow(19L, LocalDate.parse("2026-08-02"), 1),
-                feedRow(18L, LocalDate.parse("2026-08-01"), 1)
-        ));
+    void buildsDateFeedFromCompleteS3Sessions() {
+        when(store.findActiveOwnedDevices(10L))
+                .thenReturn(List.of(ownedDevice(PAIRED_AT)));
+        stubObjects(
+                key("2026-08-03", 2, "story_image.png"),
+                key("2026-08-03", 2, "walk_log.md"),
+                key("2026-08-03", 1, "story_image.png"),
+                key("2026-08-03", 1, "walk_log.md"),
+                key("2026-08-02", 1, "story_image.png"),
+                key("2026-08-02", 1, "walk_log.md"),
+                key("2026-08-01", 1, "story_image.png"),
+                key("2026-08-01", 1, "walk_log.md"),
+                key("2026-07-31", 1, "story_image.png")
+        );
 
         WalkDiaryService.DiaryFeed feed = service.getFeed(10L, null, 2);
 
         assertEquals(2, feed.items().size());
-        assertEquals(
-                LocalDate.parse("2026-08-03"),
-                feed.items().get(0).walkDate()
-        );
+        assertEquals(LocalDate.parse("2026-08-03"),
+                feed.items().get(0).walkDate());
         assertEquals(2, feed.items().get(0).walkCount());
-        assertEquals(22L, feed.items().get(0).walks().get(1).walkId());
+        assertEquals(1, feed.items().get(0).diaries().get(0).session());
+        assertEquals(2, feed.items().get(0).diaries().get(1).session());
         assertEquals(LocalDate.parse("2026-08-02"), feed.nextCursor());
         assertTrue(feed.hasNext());
+        ArgumentCaptor<ListObjectsV2Request> request =
+                ArgumentCaptor.forClass(ListObjectsV2Request.class);
+        verify(s3Client).listObjectsV2(request.capture());
+        assertEquals("robot-images/device-001/", request.getValue().prefix());
     }
 
     @Test
-    void rejectsDiaryOwnedByAnotherUser() {
-        when(store.findOwnedDiary(10L, 20L)).thenReturn(Optional.empty());
+    void appliesExclusiveDateCursorToS3Feed() {
+        when(store.findActiveOwnedDevices(10L))
+                .thenReturn(List.of(ownedDevice(PAIRED_AT)));
+        stubObjects(
+                key("2026-08-03", 1, "story_image.png"),
+                key("2026-08-03", 1, "walk_log.md"),
+                key("2026-08-02", 1, "story_image.png"),
+                key("2026-08-02", 1, "walk_log.md")
+        );
+
+        WalkDiaryService.DiaryFeed feed = service.getFeed(
+                10L,
+                LocalDate.parse("2026-08-03"),
+                30
+        );
+
+        assertEquals(1, feed.items().size());
+        assertEquals(LocalDate.parse("2026-08-02"),
+                feed.items().get(0).walkDate());
+        assertFalse(feed.hasNext());
+    }
+
+    @Test
+    void rejectsDiaryOfDeviceNotOwnedByUser() {
+        when(store.findActiveOwnedDevice(10L, "device-001"))
+                .thenReturn(java.util.Optional.empty());
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> service.getDiary(10L, 20L)
+                () -> service.getDiary(
+                        10L,
+                        "device-001",
+                        LocalDate.parse("2026-08-03"),
+                        1
+                )
         );
+
         assertEquals(ErrorCode.WALK_DIARY_NOT_FOUND, exception.errorCode());
     }
 
     @Test
     void rejectsOversizedMarkdownFromGetMetadata() {
-        when(store.findOwnedDiary(10L, 20L)).thenReturn(Optional.of(
-                diary(20L, LocalDate.parse("2026-08-03"), 1)
-        ));
+        when(store.findActiveOwnedDevice(10L, "device-001"))
+                .thenReturn(java.util.Optional.of(ownedDevice(PAIRED_AT)));
         when(s3Client.getObject(any(GetObjectRequest.class)))
                 .thenAnswer(ignored -> responseStream(new byte[0], 1025L));
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> service.getDiary(10L, 20L)
+                () -> service.getDiary(
+                        10L,
+                        "device-001",
+                        LocalDate.parse("2026-08-03"),
+                        1
+                )
         );
 
-        assertEquals(
-                ErrorCode.WALK_DIARY_CONTENT_INVALID,
-                exception.errorCode()
-        );
+        assertEquals(ErrorCode.WALK_DIARY_CONTENT_INVALID,
+                exception.errorCode());
     }
 
     @Test
     void rejectsMalformedUtf8Markdown() {
-        when(store.findOwnedDiary(10L, 20L)).thenReturn(Optional.of(
-                diary(20L, LocalDate.parse("2026-08-03"), 1)
-        ));
+        when(store.findActiveOwnedDevice(10L, "device-001"))
+                .thenReturn(java.util.Optional.of(ownedDevice(PAIRED_AT)));
         when(s3Client.getObject(any(GetObjectRequest.class)))
                 .thenAnswer(ignored -> responseStream(new byte[]{(byte) 0x80}));
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> service.getDiary(10L, 20L)
+                () -> service.getDiary(
+                        10L,
+                        "device-001",
+                        LocalDate.parse("2026-08-03"),
+                        1
+                )
         );
 
-        assertEquals(
-                ErrorCode.WALK_DIARY_CONTENT_INVALID,
-                exception.errorCode()
+        assertEquals(ErrorCode.WALK_DIARY_CONTENT_INVALID,
+                exception.errorCode());
+    }
+
+    @Test
+    void hidesObjectsUploadedBeforeCurrentPairing() {
+        when(store.findActiveOwnedDevices(10L)).thenReturn(List.of(
+                ownedDevice(Instant.parse("2026-08-05T00:00:00Z"))
+        ));
+        stubObjectsAt(
+                UPLOADED_AT,
+                key("2026-08-03", 1, "story_image.png"),
+                key("2026-08-03", 1, "walk_log.md")
         );
+
+        WalkDiaryService.DiaryFeed feed = service.getFeed(10L, null, 30);
+
+        assertTrue(feed.items().isEmpty());
+    }
+
+    @Test
+    void rejectsDetailWhenImageIsMissing() {
+        when(store.findActiveOwnedDevice(10L, "device-001"))
+                .thenReturn(java.util.Optional.of(ownedDevice(PAIRED_AT)));
+        stubObjects(key("2026-08-03", 1, "walk_log.md"));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.getDiary(
+                        10L,
+                        "device-001",
+                        LocalDate.parse("2026-08-03"),
+                        1
+                )
+        );
+
+        assertEquals(ErrorCode.WALK_DIARY_NOT_FOUND, exception.errorCode());
+        verify(s3Client, never()).getObject(any(GetObjectRequest.class));
+    }
+
+    @Test
+    void readsEveryS3ListingPage() {
+        when(store.findActiveOwnedDevices(10L))
+                .thenReturn(List.of(ownedDevice(PAIRED_AT)));
+        when(s3Client.listObjectsV2(any(ListObjectsV2Request.class)))
+                .thenReturn(
+                        page(true, "next", object(
+                                key("2026-08-03", 1, "story_image.png"),
+                                UPLOADED_AT
+                        )),
+                        page(false, null, object(
+                                key("2026-08-03", 1, "walk_log.md"),
+                                UPLOADED_AT
+                        ))
+                );
+
+        WalkDiaryService.DiaryFeed feed = service.getFeed(10L, null, 30);
+
+        assertEquals(1, feed.items().size());
+        verify(s3Client, times(2)).listObjectsV2(
+                any(ListObjectsV2Request.class)
+        );
+    }
+
+    @Test
+    void mapsS3ListFailureToStorageUnavailable() {
+        when(store.findActiveOwnedDevices(10L))
+                .thenReturn(List.of(ownedDevice(PAIRED_AT)));
+        when(s3Client.listObjectsV2(any(ListObjectsV2Request.class)))
+                .thenThrow(S3Exception.builder()
+                        .statusCode(403)
+                        .message("Access denied")
+                        .build());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.getFeed(10L, null, 30)
+        );
+
+        assertEquals(ErrorCode.WALK_DIARY_STORAGE_UNAVAILABLE,
+                exception.errorCode());
+    }
+
+    private void stubObjects(String... keys) {
+        stubObjectsAt(UPLOADED_AT, keys);
+    }
+
+    private void stubObjectsAt(Instant uploadedAt, String... keys) {
+        List<software.amazon.awssdk.services.s3.model.S3Object> objects =
+                java.util.Arrays.stream(keys)
+                        .map(key -> object(key, uploadedAt))
+                        .toList();
+        when(s3Client.listObjectsV2(any(ListObjectsV2Request.class)))
+                .thenReturn(page(false, null, objects.toArray(
+                        software.amazon.awssdk.services.s3.model.S3Object[]::new
+                )));
+    }
+
+    private ListObjectsV2Response page(
+            boolean truncated,
+            String nextToken,
+            software.amazon.awssdk.services.s3.model.S3Object... objects
+    ) {
+        return ListObjectsV2Response.builder()
+                .contents(objects)
+                .isTruncated(truncated)
+                .nextContinuationToken(nextToken)
+                .build();
+    }
+
+    private software.amazon.awssdk.services.s3.model.S3Object object(
+            String key,
+            Instant uploadedAt
+    ) {
+        return software.amazon.awssdk.services.s3.model.S3Object.builder()
+                .key(key)
+                .lastModified(uploadedAt)
+                .build();
+    }
+
+    private WalkDiaryStore.OwnedDevice ownedDevice(Instant pairedAt) {
+        return new WalkDiaryStore.OwnedDevice("device-001", pairedAt);
+    }
+
+    private String key(String date, int session, String file) {
+        return "robot-images/device-001/" + date + "/session"
+                + session + "/" + file;
     }
 
     private ResponseInputStream<GetObjectResponse> responseStream(
@@ -167,37 +357,6 @@ class WalkDiaryServiceTest {
                         .contentLength(declaredLength)
                         .build(),
                 AbortableInputStream.create(new ByteArrayInputStream(content))
-        );
-    }
-
-    private WalkDiaryStore.StoredDiary diary(
-            long walkId,
-            LocalDate date,
-            int session
-    ) {
-        return new WalkDiaryStore.StoredDiary(
-                walkId,
-                "device-001",
-                date,
-                session,
-                "robot-images/device-001/" + date + "/session"
-                        + session + "/",
-                Instant.parse(date + "T04:30:00Z"),
-                Instant.parse(date + "T05:00:00Z")
-        );
-    }
-
-    private WalkDiaryStore.FeedRow feedRow(
-            long walkId,
-            LocalDate date,
-            int session
-    ) {
-        return new WalkDiaryStore.FeedRow(
-                walkId,
-                date,
-                session,
-                Instant.parse(date + "T04:30:00Z"),
-                Instant.parse(date + "T05:00:00Z")
         );
     }
 }

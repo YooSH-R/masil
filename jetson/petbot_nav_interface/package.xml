@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>petbot_nav_interface</name>
+  <version>0.0.0</version>
+  <description>Nav2 SimpleCommander를 감싼 공용 이동 인터페이스(MoveInterface). 좌표를 넘기면 이동/취소/피드백 조회가 가능한 액션을 제공한다.</description>
+  <maintainer email="jetson@todo.todo">jetson</maintainer>
+  <license>TODO: License declaration</license>
+
+  <depend>rclpy</depend>
+  <depend>nav2_simple_commander</depend>
+  <depend>geometry_msgs</depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

@@ -1,6 +1,8 @@
 package com.ssafy.backend.robot.mqtt;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -8,7 +10,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -121,26 +122,35 @@ class RobotMqttStoreIntegrationTest {
         ));
     }
 
-    @Test
-    void storesCompletedWalkAndDiaryMappingTogether() {
-        RobotMqttStore.AffinityContext context =
-                store.lockAffinity("device-001");
-
-        store.insertCompletedWalk(
-                context.pairingId(),
-                Instant.parse("2026-08-03T04:30:00Z"),
-                Instant.parse("2026-08-03T05:00:00Z"),
-                LocalDate.parse("2026-08-03"),
-                1,
-                "robot-images/device-001/2026-08-03/session1/"
+    @ParameterizedTest
+    @ValueSource(strings = {"REJECTED", "EXPIRED"})
+    void recentWalkRequestCooldownIncludesTerminalStatuses(String status) {
+        RobotMqttStore.RequestCandidate candidate =
+                store.findRequestCandidates().get(0);
+        Instant now = Instant.parse("2026-07-30T00:00:00Z");
+        BehaviorRequestMessage request = store.createRequest(
+                candidate,
+                BehaviorRequestType.WALK_REQUEST,
+                "walk",
+                now,
+                now.plusSeconds(1800)
+        );
+        jdbcTemplate.update(
+                "UPDATE behavior_requests SET status = ? WHERE request_id = ?",
+                status,
+                request.requestId()
         );
 
-        assertEquals(
-                1,
-                jdbcTemplate.queryForObject(
-                        "SELECT COUNT(*) FROM walk_diaries",
-                        Integer.class
-                )
-        );
+        assertTrue(store.hasRecentRequest(
+                candidate.robotId(),
+                BehaviorRequestType.WALK_REQUEST,
+                now.minusSeconds(10_800)
+        ));
+        assertFalse(store.hasRecentRequest(
+                candidate.robotId(),
+                BehaviorRequestType.WALK_REQUEST,
+                now
+        ));
     }
+
 }

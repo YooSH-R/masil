@@ -4,7 +4,7 @@
 
 1. `.env.example`을 `.env`로 복사하고 비밀번호를 변경합니다.
 2. 이 디렉터리에서 `docker compose up -d`를 실행합니다.
-3. 최초 볼륨 생성 시 `init/001_schema.sql`이 자동 실행됩니다.
+3. 최초 볼륨 생성 시 `init/`의 SQL 파일이 이름 순서대로 자동 실행됩니다.
 
 백엔드의 `02_Backend/.env`에는 다음 값을 설정합니다.
 
@@ -48,8 +48,20 @@ kubectl -n NAMESPACE create secret generic postgres-secret `
 ```powershell
 kubectl -n NAMESPACE create configmap postgres-init `
   --from-file=001_schema.sql=06_Infra/postgres/init/001_schema.sql `
+  --from-file=002_robot_events.sql=06_Infra/postgres/init/002_robot_events.sql `
+  --from-file=003_robot_photos.sql=06_Infra/postgres/init/003_robot_photos.sql `
+  --from-file=004_robot_mqtt_runtime.sql=06_Infra/postgres/init/004_robot_mqtt_runtime.sql `
+  --from-file=006_robot_qr_compat.sql=06_Infra/postgres/init/006_robot_qr_compat.sql `
+  --from-file=007_pet_creation_requests_compat.sql=06_Infra/postgres/init/007_pet_creation_requests_compat.sql `
+  --from-file=008_users_version_compat.sql=06_Infra/postgres/init/008_users_version_compat.sql `
+  --from-file=009_walk_api.sql=06_Infra/postgres/init/009_walk_api.sql `
+  --from-file=010_behavior_requests_open_unique.sql=06_Infra/postgres/init/010_behavior_requests_open_unique.sql `
   --dry-run=client -o yaml | kubectl apply -f -
 ```
+
+`--from-file=키=경로` 형식으로 원본 파일명을 유지해야 PostgreSQL이
+`001`부터 `010`까지 올바른 순서로 실행합니다. ConfigMap 전체 크기가 Kubernetes
+제한을 넘지 않는지도 새 SQL을 추가할 때 확인합니다.
 
 ### 3. PostgreSQL 배포
 
@@ -104,16 +116,36 @@ chmod +x scripts/provision-robot-qr.sh
   0.0.1
 ```
 
-스크립트는 32바이트 보안 난수로 QR 원문을 생성하고, SHA-256 해시만
-DB에 저장합니다. 기존 소유 로봇도 QR이 아직 없다면 최초 프로비저닝할 수
-있지만, 이미 QR이 발급된 소유 로봇의 QR은 변경하지 않습니다.
+스크립트는 32바이트 보안 난수로 QR 토큰과 Device HTTP 토큰을 생성하고,
+SHA-256 해시만 DB에 저장합니다. 출력된 `qr_token`은 QR 이미지로 만들고,
+`device_token`은 로봇 보안 저장소에 한 번만 설치합니다. 기본 Device 토큰
+유효기간은 365일이며 `DEVICE_TOKEN_EXPIRES_DAYS`로 조절합니다. 기존 소유
+로봇도 QR이 아직 없다면 최초 프로비저닝할 수 있지만, 이미 QR이 발급된
+소유 로봇의 토큰은 변경하지 않습니다.
 출력되는 `qr_token`은 다시 조회할 수 없으므로 QR 이미지로 만들기 전까지
 안전하게 보관합니다.
+
+이미 등록되었거나 소유자가 있는 로봇에 Device HTTP 토큰만 최초 설정하거나
+교체할 때는 다음 명령을 사용합니다.
+
+```bash
+./scripts/provision-robot-qr.sh \
+  --device-token-only \
+  PETBOT-LOCAL-0001
+```
+
+이 모드는 기존 `serial_number`의 `robot_credentials` 행만 찾아
+`device_token_hash`, 만료 시각, 교체 시각을 갱신합니다. 로봇 소유권과 기존
+QR 토큰·QR 만료 시각은 변경하지 않으며 QR 토큰을 새로 생성하거나 출력하지도
+않습니다. 기존 Device 토큰은 즉시 무효화됩니다. 새 `device_token` 원문은
+성공 출력에서 단 한 번만 확인할 수 있으므로 바로 로봇의 보안 저장소에
+교체하고 터미널 기록도 안전하게 관리합니다.
 
 QR 유효 기간은 기본 30일이며 필요하면 실행 전에 변경할 수 있습니다.
 
 ```bash
 export QR_EXPIRES_DAYS=7
+export DEVICE_TOKEN_EXPIRES_DAYS=365
 ```
 
 ### 주의

@@ -19,6 +19,12 @@ rules:
       - update
       - patch
   - apiGroups:
+      - ""
+    resources:
+      - pods/exec
+    verbs:
+      - create
+  - apiGroups:
       - apps
     resources:
       - deployments
@@ -45,6 +51,17 @@ rules:
       - traefik.io
     resources:
       - middlewares
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+  - apiGroups:
+      - monitoring.coreos.com
+    resources:
+      - servicemonitors
     verbs:
       - get
       - list
