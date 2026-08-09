@@ -21,7 +21,9 @@ CREATE TABLE IF NOT EXISTS dev_maintenance_runs (
 
 DO $$
 DECLARE
-    maintenance_key CONSTANT VARCHAR(150) := '018_set_device001_affinity';
+    -- 컬럼명과 겹치지 않는 이름을 쓴다. dev_maintenance_runs.maintenance_key 와
+    -- 같은 이름이면 PL/pgSQL 이 어느 쪽인지 몰라 실행 시점에 ambiguous 오류를 낸다.
+    run_key CONSTANT VARCHAR(150) := '018_set_device001_affinity';
     target_score CONSTANT INTEGER := 57;
     target_pet_id BIGINT;
     target_level INTEGER;
@@ -30,7 +32,7 @@ BEGIN
     IF EXISTS (
         SELECT 1
         FROM dev_maintenance_runs
-        WHERE dev_maintenance_runs.maintenance_key = maintenance_key
+        WHERE dev_maintenance_runs.maintenance_key = run_key
     ) THEN
         RETURN;
     END IF;
@@ -44,9 +46,16 @@ BEGIN
       AND pairing.unpaired_at IS NULL
       AND pet.deleted_at IS NULL;
 
+    -- 페어링이 없어도 배포를 막지 않는다(014·015 와 같은 방침). 시연 준비 중에
+    -- 펫을 지웠다 다시 만드는 일이 잦은데, 그때마다 마이그레이션 단계가 실패하면
+    -- 백엔드 배포까지 함께 멈춘다. 친밀도가 안 맞는 건 화면에서 바로 보이는
+    -- 문제라 조용히 틀어질 위험도 없다.
+    --
+    -- 완료 표시를 남기기 전에 빠져나가므로 다음 배포에서 다시 시도한다.
     IF target_pet_id IS NULL THEN
-        RAISE EXCEPTION
-            'device-001 에 연결된 활성 페어링이 없어 친밀도를 설정할 수 없습니다';
+        RAISE NOTICE
+            'device-001 has no active pairing; retrying on the next deployment';
+        RETURN;
     END IF;
 
     target_level := LEAST(5, target_score / 20 + 1);
@@ -70,7 +79,7 @@ BEGIN
         mood = EXCLUDED.mood,
         updated_at = CURRENT_TIMESTAMP;
 
-    INSERT INTO dev_maintenance_runs (maintenance_key) VALUES (maintenance_key);
+    INSERT INTO dev_maintenance_runs (maintenance_key) VALUES (run_key);
 END
 $$;
 
