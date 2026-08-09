@@ -3,6 +3,10 @@
 """
 make_sounds2.py — walkcam 이벤트 사운드 생성기 (2차분)
 
+원본(최신)은 03_Embedded/Raspberry_Pi_Zero_W/Sound_Play/sounds/make_sound.py
+입니다. 이 사본은 사운드 생성 당시 작업 폴더로 남은 것으로 보이며, wav 생성
+로직을 고칠 때는 원본을 기준으로 삼으세요.
+
 기존 docked.wav / warning.wav와 동일한 규격으로 만듭니다:
     44100 Hz · 16-bit · 스테레오 · 피크 50% (MAX98357A 왜곡 방지 레벨)
 

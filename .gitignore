@@ -369,3 +369,6 @@ log/
 yolo-env/
 wakeword-env/
 make_sound/
+
+# backup files
+*.bak
