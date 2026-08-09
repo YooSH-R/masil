@@ -66,6 +66,10 @@ class SampleAugustRoutes {
   /// [register] 로 이어 둔 산책의 장소명. 좌표를 역지오코딩하는 대신 직접 넣는다.
   static String? placeOf(int walkId) => _rowOf(walkId)?.place;
 
+  /// 이 산책에 그릴 경로가 있는지. 화면이 `경로 보기` 버튼을 띄울지 정할 때
+  /// 쓴다. [summaryFor] 는 좌표 목록을 새로 만들어서 build 안에서 부르기엔 무겁다.
+  static bool hasRoute(int walkId) => _keyByWalkId.containsKey(walkId);
+
   /// 경로 상세 화면이 지도에 선을 그릴 때 쓰는 요약.
   ///
   /// [register] 를 거치지 않은 walkId 면 null 이다. 피드를 한 번도 안 읽고
