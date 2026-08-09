@@ -1,0 +1,31 @@
+spec:
+  template:
+    spec:
+      containers:
+        - name: backend
+          image: __BACKEND_IMAGE__
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 8081
+          startupProbe:
+            tcpSocket: null
+            httpGet:
+              path: /actuator/health/readiness
+              port: management
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            tcpSocket: null
+            httpGet:
+              path: /actuator/health/readiness
+              port: management
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: null
+            httpGet:
+              path: /actuator/health/liveness
+              port: management
+            initialDelaySeconds: 30
+            periodSeconds: 10

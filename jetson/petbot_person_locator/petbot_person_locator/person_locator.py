@@ -61,6 +61,14 @@ class PersonLocator(Node):
             history=HistoryPolicy.KEEP_LAST,
             depth=10
         )
+        # YOLO 추론이 카메라 프레임 속도보다 느려지면 큐에 밀린 프레임이 쌓여서
+        # 사람 위치 추정이 점점 과거 위치를 쫓아가게 된다. depth=1로 항상
+        # 최신 프레임만 유지한다 (밀린 프레임은 버림).
+        image_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1
+        )
 
         # 이미지 콜백(YOLO 추론, 무거움)과 스캔 콜백(가벼움)을 서로 다른 콜백
         # 그룹으로 분리하고 MultiThreadedExecutor로 실행해, YOLO 추론 중에도
@@ -70,7 +78,7 @@ class PersonLocator(Node):
         scan_cb_group = MutuallyExclusiveCallbackGroup()
 
         self.image_sub = self.create_subscription(
-            Image, '/image_raw', self.image_callback, 10,
+            Image, '/image_raw', self.image_callback, image_qos,
             callback_group=image_cb_group)
         self.scan_sub = self.create_subscription(
             LaserScan, '/scan', self.scan_callback, lidar_qos,

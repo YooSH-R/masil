@@ -28,7 +28,17 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+            - name: management
+              containerPort: 8081
           env:
+            - name: SERVER_FORWARD_HEADERS_STRATEGY
+              value: framework
+            - name: SPRINGDOC_SWAGGER_UI_CONFIG_URL
+              value: /api/v3/api-docs/swagger-config
+            - name: SPRINGDOC_SWAGGER_UI_URL
+              value: /api/v3/api-docs
+            - name: SPRINGDOC_SWAGGER_UI_OAUTH2_REDIRECT_URL
+              value: https://i15a203.p.ssafy.io/api/swagger-ui/oauth2-redirect.html
             - name: DB_URL
               value: jdbc:postgresql://postgres:5432/mysil
             - name: DB_USERNAME
@@ -41,24 +51,98 @@ spec:
                 secretKeyRef:
                   name: postgres-secret
                   key: POSTGRES_PASSWORD
+            - name: MQTT_ENABLED
+              value: "true"
+            - name: MQTT_URL
+              value: tcp://mosquitto:1883
+            - name: MQTT_CLIENT_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: MQTT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: backend-mqtt-secret
+                  key: MQTT_USERNAME
+            - name: MQTT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backend-mqtt-secret
+                  key: MQTT_PASSWORD
+            - name: S3_ENABLED
+              value: "true"
+            - name: AWS_REGION
+              value: ap-northeast-2
+            - name: S3_BUCKET
+              value: walk-picture-s3-483461801092-ap-northeast-2-an
+            - name: S3_MAX_MARKDOWN_BYTES
+              value: "1048576"
+            - name: S3_MAX_FILE_SIZE_BYTES
+              value: "10485760"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: backend-s3-secret
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backend-s3-secret
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: GOOGLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: backend-auth-secret
+                  key: GOOGLE_CLIENT_ID
+            - name: KAKAO_NATIVE_APP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backend-auth-secret
+                  key: KAKAO_NATIVE_APP_KEY
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: backend-auth-secret
+                  key: JWT_SECRET
+            - name: SOLAPI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backend-sms-secret
+                  key: SOLAPI_API_KEY
+            - name: SOLAPI_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backend-sms-secret
+                  key: SOLAPI_SECRET_KEY
+            - name: SOLAPI_SENDER
+              valueFrom:
+                secretKeyRef:
+                  name: backend-sms-secret
+                  key: SOLAPI_SENDER
           resources:
             requests:
               cpu: 200m
-              memory: 256Mi
+              memory: 512Mi
             limits:
               cpu: "1"
-              memory: 512Mi
+              memory: 1Gi
           startupProbe:
-            tcpSocket:
-              port: http
+            tcpSocket: null
+            httpGet:
+              path: /actuator/health/readiness
+              port: management
             failureThreshold: 30
             periodSeconds: 5
           readinessProbe:
-            tcpSocket:
-              port: http
+            tcpSocket: null
+            httpGet:
+              path: /actuator/health/readiness
+              port: management
             periodSeconds: 5
           livenessProbe:
-            tcpSocket:
-              port: http
+            tcpSocket: null
+            httpGet:
+              path: /actuator/health/liveness
+              port: management
             initialDelaySeconds: 30
             periodSeconds: 10

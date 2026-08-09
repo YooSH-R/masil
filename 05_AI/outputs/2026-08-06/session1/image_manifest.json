@@ -1,0 +1,102 @@
+[
+  {
+    "output": "flow_panels/event_01.png",
+    "tag": "panel_1",
+    "adopted_tag": "panel_1",
+    "trimmed": false,
+    "style": "watercolor",
+    "style_text": "soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail",
+    "with_reference": false,
+    "reference_file": null,
+    "final_prompt": "Art style (must be strictly followed): soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail, Scene: Exterior wall of a modern high-rise skyscraper, sculptural element on the building facade, green tree leaves, urban environment, daytime, bright sunny weather, clear sky, strong sunlight reflecting off the building surface, dazzling and modern mood, low-angle shot looking up from below, no text, no watermark, full-bleed composition, the artwork fills the entire canvas edge-to-edge\n\nDo not include any of the following: text, watermark, signature, logo, brand name, license plate, recognizable faces, portrait, distorted anatomy, extra limbs, oversaturated, cluttered, lowres, jpeg artifacts, white borders, paper edges, frame, margins, matting, photograph, photorealistic, realistic photo, camera photo, DSLR photo, photographic textures, lens blur, bokeh.\n\nOutput the illustration only, with no caption or text in the image.",
+    "model": "gemini-2.5-flash-image",
+    "attempts": [
+      {
+        "tag": "panel_1",
+        "with_reference": false,
+        "style_check": {
+          "is_photographic": false,
+          "matches_style": true,
+          "face_visible": false
+        },
+        "trimmed": false
+      }
+    ],
+    "created_at": "2026-08-06T20:37:55"
+  },
+  {
+    "output": "flow_panels/event_02.png",
+    "tag": "panel_2",
+    "adopted_tag": "panel_2",
+    "trimmed": true,
+    "style": "watercolor",
+    "style_text": "soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail",
+    "with_reference": false,
+    "reference_file": null,
+    "final_prompt": "Art style (must be strictly followed): soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail, Scene: Blue sky and white clouds reflected in glass windows of a giant modern high-rise building, ventilation openings, shrubs, urban shopping street, daytime, clear weather, modern, grand, low-angle shot looking up, no text, no watermark, full-bleed composition, the artwork fills the entire canvas edge-to-edge\n\nDo not include any of the following: text, watermark, signature, logo, brand name, license plate, recognizable faces, portrait, distorted anatomy, extra limbs, oversaturated, cluttered, lowres, jpeg artifacts, white borders, paper edges, frame, margins, matting, photograph, photorealistic, realistic photo, camera photo, DSLR photo, photographic textures, lens blur, bokeh.\n\nOutput the illustration only, with no caption or text in the image.",
+    "model": "gemini-2.5-flash-image",
+    "attempts": [
+      {
+        "tag": "panel_2",
+        "with_reference": false,
+        "style_check": {
+          "is_photographic": false,
+          "matches_style": true,
+          "face_visible": false
+        },
+        "trimmed": true
+      }
+    ],
+    "created_at": "2026-08-06T20:38:17"
+  },
+  {
+    "output": "flow_panels/event_03.png",
+    "tag": "panel_3",
+    "adopted_tag": "panel_3",
+    "trimmed": true,
+    "style": "watercolor",
+    "style_text": "soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail",
+    "with_reference": false,
+    "reference_file": null,
+    "final_prompt": "Art style (must be strictly followed): soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail, Scene: large mottled sycamore tree trunk in the right foreground, lush green street trees, modern high-rise building, commercial street, daytime, bright natural sunlight, clear sky, summer, fresh and grand mood, low-angle shot looking up through the canopy, no text, no watermark, full-bleed composition, the artwork fills the entire canvas edge-to-edge\n\nDo not include any of the following: text, watermark, signature, logo, brand name, license plate, recognizable faces, portrait, distorted anatomy, extra limbs, oversaturated, cluttered, lowres, jpeg artifacts, white borders, paper edges, frame, margins, matting, photograph, photorealistic, realistic photo, camera photo, DSLR photo, photographic textures, lens blur, bokeh.\n\nOutput the illustration only, with no caption or text in the image.",
+    "model": "gemini-2.5-flash-image",
+    "attempts": [
+      {
+        "tag": "panel_3",
+        "with_reference": false,
+        "style_check": {
+          "is_photographic": false,
+          "matches_style": true,
+          "face_visible": false
+        },
+        "trimmed": true
+      }
+    ],
+    "created_at": "2026-08-06T20:38:40"
+  },
+  {
+    "output": "flow_panels/event_04.png",
+    "tag": "panel_4",
+    "adopted_tag": "panel_4",
+    "trimmed": true,
+    "style": "watercolor",
+    "style_text": "soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail",
+    "with_reference": false,
+    "reference_file": null,
+    "final_prompt": "Art style (must be strictly followed): soft watercolor illustration, gentle washes, subtle paper grain across the whole image, muted palette, hand-painted feel, flat illustrated look, no photographic detail, Scene: a beverage cup in the upper right, towering high-rise buildings, lush green trees, urban shopping street, bright daytime, sunny, clear sky, sunlight filtering through leaves, summer, fresh and light atmosphere, low-angle perspective looking up, no text, no watermark, full-bleed composition, the artwork fills the entire canvas edge-to-edge\n\nDo not include any of the following: text, watermark, signature, logo, brand name, license plate, recognizable faces, portrait, distorted anatomy, extra limbs, oversaturated, cluttered, lowres, jpeg artifacts, white borders, paper edges, frame, margins, matting, photograph, photorealistic, realistic photo, camera photo, DSLR photo, photographic textures, lens blur, bokeh.\n\nOutput the illustration only, with no caption or text in the image.",
+    "model": "gemini-2.5-flash-image",
+    "attempts": [
+      {
+        "tag": "panel_4",
+        "with_reference": false,
+        "style_check": {
+          "is_photographic": false,
+          "matches_style": true,
+          "face_visible": false
+        },
+        "trimmed": true
+      }
+    ],
+    "created_at": "2026-08-06T20:39:03"
+  }
+]

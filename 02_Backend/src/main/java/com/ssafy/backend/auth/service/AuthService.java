@@ -1,5 +1,7 @@
 package com.ssafy.backend.auth.service;
 
+import com.ssafy.backend.auth.application.port.out.AuthTokenIssuer;
+import com.ssafy.backend.auth.application.result.IssuedTokens;
 import com.ssafy.backend.auth.infrastructure.persistence.AuthSessionJpaEntity;
 import com.ssafy.backend.auth.infrastructure.persistence.SpringDataAuthSessionRepository;
 import com.ssafy.backend.auth.dto.AuthResponse;
@@ -26,6 +28,7 @@ public class AuthService {
     private final TokenService tokenService;
     private final TokenHashService tokenHashService;
     private final VerificationService verificationService;
+    private final AuthTokenIssuer authTokenIssuer;
 
     public AuthService(
             UserRepository userRepository,
@@ -33,7 +36,8 @@ public class AuthService {
             PasswordEncoder passwordEncoder,
             TokenService tokenService,
             TokenHashService tokenHashService,
-            VerificationService verificationService
+            VerificationService verificationService,
+            AuthTokenIssuer authTokenIssuer
     ) {
         this.userRepository = userRepository;
         this.authSessionRepository = authSessionRepository;
@@ -41,6 +45,7 @@ public class AuthService {
         this.tokenService = tokenService;
         this.tokenHashService = tokenHashService;
         this.verificationService = verificationService;
+        this.authTokenIssuer = authTokenIssuer;
     }
 
     @Transactional
@@ -50,14 +55,6 @@ public class AuthService {
                     HttpStatus.CONFLICT,
                     "EMAIL_ALREADY_IN_USE",
                     "이미 사용 중인 이메일입니다."
-            );
-        }
-
-        if (userRepository.existsByNickname(request.nickname())) {
-            throw new ApiException(
-                    HttpStatus.CONFLICT,
-                    "NICKNAME_ALREADY_IN_USE",
-                    "이미 사용 중인 닉네임입니다."
             );
         }
 
@@ -118,7 +115,11 @@ public class AuthService {
                 ));
 
         TokenService.AccessToken accessToken =
-                tokenService.createAccessToken(session.getUserId());
+                tokenService.createAccessToken(
+                        session.getUserId(),
+                        session.getDeviceId(),
+                        session.getId()
+                );
         TokenService.RefreshToken refreshToken =
                 tokenService.createRefreshToken();
 
@@ -158,32 +159,13 @@ public class AuthService {
     }
 
     private AuthResponse issueTokens(User user, String deviceId) {
-        authSessionRepository
-                .findFirstByUserIdAndDeviceIdAndRevokedAtIsNullOrderByCreatedAtDesc(
-                        user.id(),
-                        deviceId
-                )
-                .ifPresent(AuthSessionJpaEntity::revoke);
-
-        TokenService.AccessToken accessToken =
-                tokenService.createAccessToken(user.id());
-        TokenService.RefreshToken refreshToken =
-                tokenService.createRefreshToken();
-
-        authSessionRepository.save(
-                new AuthSessionJpaEntity(
-                        user.id(),
-                        deviceId,
-                        tokenHashService.hash(refreshToken.value()),
-                        refreshToken.expiresAt()
-                )
-        );
+        IssuedTokens tokens = authTokenIssuer.issue(user, deviceId);
 
         return AuthResponse.of(
-                accessToken.value(),
-                refreshToken.value(),
-                accessToken.expiresAt(),
-                refreshToken.expiresAt(),
+                tokens.accessToken(),
+                tokens.refreshToken(),
+                tokens.accessTokenExpiresAt(),
+                tokens.refreshTokenExpiresAt(),
                 user
         );
     }

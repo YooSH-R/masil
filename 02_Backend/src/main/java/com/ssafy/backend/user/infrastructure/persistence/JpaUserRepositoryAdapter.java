@@ -2,9 +2,6 @@ package com.ssafy.backend.user.infrastructure.persistence;
 
 import com.ssafy.backend.user.application.port.out.UserRepository;
 import com.ssafy.backend.user.domain.User;
-import com.ssafy.backend.common.error.BusinessException;
-import com.ssafy.backend.common.error.ErrorCode;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -16,11 +13,6 @@ public class JpaUserRepositoryAdapter implements UserRepository {
 
     public JpaUserRepositoryAdapter(SpringDataUserRepository repository) {
         this.repository = repository;
-    }
-
-    @Override
-    public boolean existsByNickname(String nickname) {
-        return repository.existsByNicknameAndDeletedAtIsNull(nickname);
     }
 
     @Override
@@ -46,18 +38,14 @@ public class JpaUserRepositoryAdapter implements UserRepository {
 
     @Override
     public User save(User user) {
-        try {
-            UserJpaEntity saved = repository.saveAndFlush(new UserJpaEntity(
-                    user.email(),
-                    user.passwordHash(),
-                    user.nickname(),
-                    user.phoneNumber(),
-                    user.phoneVerifiedAt()
-            ));
-            return toDomain(saved);
-        } catch (DataIntegrityViolationException exception) {
-            throw new BusinessException(ErrorCode.NICKNAME_DUPLICATED);
-        }
+        UserJpaEntity saved = repository.saveAndFlush(new UserJpaEntity(
+                user.email(),
+                user.passwordHash(),
+                user.nickname(),
+                user.phoneNumber(),
+                user.phoneVerifiedAt()
+        ));
+        return toDomain(saved);
     }
 
     public static User toDomain(UserJpaEntity entity) {
