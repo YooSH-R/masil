@@ -1,13 +1,18 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mysil_project_new/domain/entities/walk_progress.dart';
 
-/// 한국 시각(KST)을 절대 시각으로. 산책 기록은 UTC 로 들어온다.
+/// 산책 기록의 시각. 피드가 들고 있는 형태 그대로 **한국 벽시계 값**이다
+/// (KoreaTime.fromInstant 가 만든 값과 같은 모양).
 DateTime kst(int year, int month, int day, [int hour = 12]) =>
+    DateTime.utc(year, month, day, hour);
+
+/// '지금'은 절대 시각으로 들어온다. 한국 시각을 그 절대 시각으로 되돌린다.
+DateTime nowAt(int year, int month, int day, [int hour = 12]) =>
     DateTime.utc(year, month, day, hour).subtract(const Duration(hours: 9));
 
 void main() {
   // 기준 '오늘' — 2026-08-10 12:00 KST
-  final now = kst(2026, 8, 10);
+  final now = nowAt(2026, 8, 10);
 
   group('WalkProgress.from', () {
     test('기록이 없으면 전부 0이고 리본도 없다', () {
@@ -44,11 +49,26 @@ void main() {
     });
 
     test('날짜 경계는 한국 시간 기준이다', () {
-      // 2026-08-10 00:30 KST = 2026-08-09 15:30 UTC.
-      // UTC 로 자르면 어제가 되어 오늘 산책이 0회로 보인다.
-      final progress = WalkProgress.from([kst(2026, 8, 10, 0)], now: now);
+      // 지금은 2026-08-10 00:30 KST = 2026-08-09 15:30 UTC.
+      // '지금'을 UTC 로 자르면 어제가 되어 오늘 산책이 0회로 보인다.
+      final progress = WalkProgress.from(
+        [kst(2026, 8, 10, 0)],
+        now: nowAt(2026, 8, 10, 0).add(const Duration(minutes: 30)),
+      );
 
       expect(progress.todayCount, 1);
+    });
+
+    // 산책 시각은 이미 한국 시각이다. 여기서 또 9시간을 더하면 오후 3시 이후
+    // 산책이 전부 다음 날로 밀려서, 오후에 세 번 걸어도 홈이 "오늘 0회"가 된다.
+    test('오후 산책도 오늘로 센다', () {
+      final progress = WalkProgress.from([
+        kst(2026, 8, 10, 15),
+        kst(2026, 8, 10, 18),
+        kst(2026, 8, 10, 21),
+      ], now: nowAt(2026, 8, 10, 22));
+
+      expect(progress.todayCount, 3);
     });
 
     test('최장 연속 일수는 참고용으로 계산된다', () {

@@ -128,6 +128,77 @@ void main() {
     viewModel.dispose();
   });
 
+  // 피드 날짜는 **한국 벽시계 값을 UTC 객체에 담은 것**이라는 규약이 있다.
+  // 날짜 계산(byDate·statsForDay·WalkProgress)이 전부 이걸 전제로 한다.
+  // isUtc 가 섞이면 .toUtc()·difference() 가 기기 시간대만큼 어긋나서, 해외로
+  // 맞춰진 기기에서 날짜가 하루 밀린다.
+  //
+  // 서버 응답을 파싱하는 쪽은 walk_diary_model_test 가 지킨다(DateTime 의 == 는
+  // isUtc 까지 비교해서 local 이 되면 바로 깨진다). 여기서는 **피드를 합치는
+  // 쪽**을 지킨다 — 출처가 넷이라 한 곳만 규약을 어겨도 그 항목만 조용히 밀린다.
+  test('피드에 합쳐지는 모든 날짜는 UTC 객체다', () async {
+    SharedPreferences.setMockInitialValues({});
+    const store = WalkRecordStore();
+    final localStartedAt = DateTime.utc(2026, 8, 11, 1);
+    await store.save(
+      startedAt: localStartedAt,
+      endedAt: localStartedAt.add(const Duration(minutes: 20)),
+      route: [
+        WalkLocationPoint(
+          latitude: 37.0,
+          longitude: 127.0,
+          sequence: 1,
+          recordedAt: localStartedAt,
+        ),
+        WalkLocationPoint(
+          latitude: 37.001,
+          longitude: 127.0,
+          sequence: 2,
+          recordedAt: localStartedAt.add(const Duration(minutes: 1)),
+        ),
+      ],
+    );
+
+    final viewModel = WalkDiaryViewModel(
+      // S3 일지 — 서버가 주는 `yyyy-MM-dd` 를 파싱하는 경로
+      _DiaryOnlyRepository([
+        WalkDiaryFeedItem(
+          walkId: -100006,
+          walkedAt: DateTime.utc(2026, 8, 5),
+          deviceId: 'device-001',
+          session: 1,
+        ),
+      ]),
+      // 서버 산책 — 절대 시각을 한국 시각으로 바꾸는 경로
+      walkRepository: _StubWalkRepository([
+        Walk(
+          walkId: 901,
+          status: WalkStatus.completed,
+          startedAt: DateTime.utc(2026, 8, 12, 10),
+          durationSeconds: 900,
+          distanceMeters: 1200,
+        ),
+      ]),
+    );
+
+    await viewModel.loadFeed(refresh: true);
+
+    // 비어 있으면 아무것도 검증하지 못한다. 네 출처(S3·서버·기기·7월 예시)가
+    // 모두 들어왔는지 먼저 확인한다.
+    expect(viewModel.feed.length, greaterThan(3));
+
+    for (final item in viewModel.feed) {
+      expect(
+        item.walkedAt?.isUtc,
+        isTrue,
+        reason: 'walkId ${item.walkId} 의 날짜가 local 이다 — '
+            'DateTime.utc 로 만들거나 KoreaTime 을 거쳐야 한다',
+      );
+    }
+
+    viewModel.dispose();
+  });
+
   // 앞에서부터 순서대로 짝지으면 일지 하나가 누락됐을 때 그 뒤가 한 칸씩
   // 밀린다. 오전·오후를 걸었는데 오전 일지만 없으면 오후 일지가 오전 산책에
   // 붙고, 오후 산책은 일지 없이 남는다. 회차 번호로 찾아야 제자리에 붙는다.
