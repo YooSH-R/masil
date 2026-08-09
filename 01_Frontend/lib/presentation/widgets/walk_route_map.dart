@@ -83,10 +83,23 @@ class _WalkRouteMapState extends State<WalkRouteMap> {
   /// 떨린다. 마커는 매번 움직이되 카메라는 이만큼 벗어났을 때만 따라간다.
   static const double _cameraFollowMeters = 5;
 
+  /// 선을 다시 그리는 최소 간격.
+  ///
+  /// 마커는 100ms 마다 옮겨야 부드럽지만 선까지 그렇게 자주 그릴 필요는 없다.
+  /// 아래 '그리기 규칙' 때문에 선을 하나만 고칠 수 없어서 **매번 경로 전체를
+  /// 다시 보낸다.** 오래 걸으면 좌표가 수백 개가 되는데 그걸 100ms 마다 보내면
+  /// WebView 가 버벅인다. 꼬리 선분이 0.3초 늦게 따라오는 건 눈에 안 띈다.
+  ///
+  /// 경로점이 늘어난 경우는 이 간격을 기다리지 않고 바로 그린다.
+  static const Duration _polylineInterval = Duration(milliseconds: 300);
+
   KakaoMapController? _controller;
 
   /// 지도에 이미 반영한 확정점 개수. 폴리라인을 다시 그릴지 판단하는 기준.
   int _drawnAnchorCount = 0;
+
+  /// 마지막으로 선을 그린 시각. [_polylineInterval] 을 재는 기준.
+  DateTime? _polylineDrawnAt;
 
   /// 지금 마커가 있는 자리. 애니메이션 중에는 중간값이다.
   LatLng? _markerAt;
@@ -111,19 +124,45 @@ class _WalkRouteMapState extends State<WalkRouteMap> {
   // 그래서 '무시'가 아니라 '미뤄 두고 끝나면 한 번 더'다. 요청이 몰리면
   // 중간 것들은 합쳐지고 **마지막 상태는 반드시 그려진다.**
   //
-  // 경로와 실시간 오버레이가 같은 잠금을 쓴다. 따로 두면, 새 산책이 시작돼
-  // 경로를 지우는 사이에 진행 중이던 실시간 그리기가 마커를 다시 찍어
-  // 이전 산책의 핀이 남는다.
+  // 선과 마커가 같은 잠금을 쓴다. 따로 두면, 새 산책이 시작돼 경로를 지우는
+  // 사이에 진행 중이던 마커 그리기가 이전 산책의 핀을 다시 찍는다.
   bool _drawing = false;
-  bool _routeDrawPending = false;
-  bool _liveDrawPending = false;
+  bool _polylinePending = false;
+  bool _markerPending = false;
+
+  // --- 그리기 규칙 (kakao_map_plugin 0.4.0) ---
+  //
+  // 이 플러그인의 `clearMarker(ids)` / `clearPolyline(ids)` 는 이름과 뜻이
+  // 반대다. **"넘긴 id 만 남기고 나머지를 전부 지운다."**
+  //
+  //   markers = markers.filter(m => {
+  //     if (!ids.includes(m.id)) { m.setMap(null); return false; }  // 없는 걸 지움
+  //     return true;                                                // 있는 걸 남김
+  //   });
+  //
+  // 그리고 `addMarker(list)` 는 내부에서 그 clear 를 먼저 부른다. 그래서
+  // **일부만 넘겨 그리면 나머지가 지워진다.** 예전에는 경로 그리기가
+  // `addMarker([출발핀])`, 실시간 그리기가 `addMarker([현재위치])` 를 따로
+  // 불러서 서로를 지웠고, 100ms 마다 도는 실시간 쪽이 이겨 출발핀과 경로선이
+  // 사라졌다.
+  //
+  // 게다가 JS 쪽 `addMarker`/`addPolyline` 은 같은 id 가 이미 있으면 그냥
+  // 돌아간다. 그래서 위치를 옮기려면 **먼저 지워야** 한다.
+  //
+  // 두 규칙을 합치면 방법은 하나다: 지울 때는 id 를 주지 않아 전부 지우고,
+  // 그릴 때는 **화면에 있어야 할 것 전부**를 한 번에 넘긴다.
 
   @override
   void didUpdateWidget(WalkRouteMap oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     if (widget.points.length != _drawnAnchorCount) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _requestRouteDraw());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // 경로점이 바뀌면 선도 출발핀도 다시 그려야 한다.
+        _polylinePending = true;
+        _markerPending = true;
+        _drain();
+      });
     }
 
     final live = widget.livePosition;
@@ -138,31 +177,36 @@ class _WalkRouteMapState extends State<WalkRouteMap> {
     super.dispose();
   }
 
-  void _requestRouteDraw() {
-    _routeDrawPending = true;
-    _drain();
-  }
+  /// 마커를 옮긴다. 선은 [_polylineInterval] 이 지났을 때만 같이 그린다.
+  ///
+  /// [force] 는 애니메이션의 마지막 프레임에서 준다. 그걸 건너뛰면 꼬리 선분이
+  /// 마커에 못 미친 자리에 멈춘 채 다음 좌표를 기다린다.
+  void _requestDraw({bool force = false}) {
+    _markerPending = true;
 
-  void _requestLiveDraw() {
-    _liveDrawPending = true;
+    final drawnAt = _polylineDrawnAt;
+    if (force ||
+        drawnAt == null ||
+        DateTime.now().difference(drawnAt) >= _polylineInterval) {
+      _polylinePending = true;
+    }
     _drain();
   }
 
   /// 밀린 그리기 요청을 하나씩 순서대로 처리한다.
   ///
-  /// 경로를 먼저 그린다. 임시 선분이 마지막 확정점에서 출발하므로, 경로가
-  /// 갱신된 뒤에 그려야 이어진 모양이 된다.
+  /// 선을 먼저 그린다. 마커가 선 위에 얹혀 보여야 하기 때문이다.
   Future<void> _drain() async {
     if (_drawing) return;
     _drawing = true;
     try {
-      while (mounted && (_routeDrawPending || _liveDrawPending)) {
-        if (_routeDrawPending) {
-          _routeDrawPending = false;
-          await _drawRoute();
+      while (mounted && (_polylinePending || _markerPending)) {
+        if (_polylinePending) {
+          _polylinePending = false;
+          await _drawPolylines();
         } else {
-          _liveDrawPending = false;
-          await _drawLive();
+          _markerPending = false;
+          await _drawMarkers();
         }
       }
     } finally {
@@ -170,36 +214,36 @@ class _WalkRouteMapState extends State<WalkRouteMap> {
     }
   }
 
-  /// 확정 경로선과 출발 핀. 확정점이 늘어날 때만 그린다.
+  /// 확정 경로선 + 마지막 확정점에서 현재 위치까지 잇는 꼬리 선분.
   ///
-  /// 확정점은 2~3m 마다 또는 방향이 꺾일 때만 늘어나므로, 좌표가 들어올 때마다
-  /// 폴리라인 전체를 다시 만들던 예전보다 호출이 훨씬 뜸하다.
+  /// 꼬리가 필요한 이유: 확정점은 몇 미터마다, 그것도 다음 좌표를 봐야 확정되기
+  /// 때문에 현재 위치보다 늘 조금 뒤에 있다. 꼬리가 없으면 마커와 선 사이가
+  /// 비어 경로가 끊겨 보인다.
   ///
   /// [_drain] 만 부른다. 직접 부르면 직렬화가 깨진다.
-  Future<void> _drawRoute() async {
+  Future<void> _drawPolylines() async {
     final controller = _controller;
-    final points = widget.points;
     if (controller == null || !mounted) return;
 
-    // 새 산책이 시작되어 points가 비면 WebView 안에 남아 있는 이전 산책의
-    // 폴리라인과 마커도 직접 지운다. Flutter 위젯만 갱신해서는 지도 오버레이가
-    // 자동으로 없어지지 않는다.
-    if (points.isEmpty) {
-      _drawnAnchorCount = 0;
-      _markerAt = null;
-      controller.clearPolyline(polylineIds: const [_routeId, _tailId]);
-      controller.clearMarker(markerIds: const [_startId, _endId]);
-      return;
-    }
+    _polylineDrawnAt = DateTime.now();
+    _drawnAnchorCount = widget.points.length;
 
-    _drawnAnchorCount = points.length;
-    final path = points
+    final path = widget.points
         .map((p) => LatLng(p.latitude, p.longitude))
         .toList(growable: false);
 
-    // 점이 하나뿐이면 선을 그릴 수 없다. 마커만 찍는다.
-    if (path.length >= 2) {
-      await controller.addPolyline(polylines: [
+    // 새 산책이 시작되면 points 가 빈다. 위젯만 갱신해서는 WebView 안에 남은
+    // 이전 산책의 선이 없어지지 않으므로 여기서 직접 지운다.
+    if (path.isEmpty) {
+      _markerAt = null;
+      controller.clearPolyline();
+      return;
+    }
+
+    final tailTo = _markerAt;
+    final polylines = <Polyline>[
+      // 점이 하나뿐이면 선을 그릴 수 없다.
+      if (path.length >= 2)
         Polyline(
           polylineId: _routeId,
           points: path,
@@ -208,10 +252,22 @@ class _WalkRouteMapState extends State<WalkRouteMap> {
           strokeOpacity: 0.9,
           strokeStyle: StrokeStyle.solid,
         ),
-      ]);
-    }
+      if (tailTo != null)
+        Polyline(
+          polylineId: _tailId,
+          points: [path.last, tailTo],
+          strokeWidth: 12,
+          strokeColor: _brand,
+          strokeOpacity: 0.9,
+          strokeStyle: StrokeStyle.solid,
+        ),
+    ];
 
-    await _drawPins(controller, path);
+    // 전부 지우고 전부 다시 그린다(위 '그리기 규칙').
+    controller.clearPolyline();
+    if (polylines.isNotEmpty) {
+      await controller.addPolyline(polylines: polylines);
+    }
 
     if (widget.fitWholeRoute && path.length >= 2) {
       await controller.fitBounds(path);
@@ -228,7 +284,7 @@ class _WalkRouteMapState extends State<WalkRouteMap> {
     // 첫 좌표는 비교할 이전 자리가 없다. 그냥 그 자리에 찍는다.
     if (from == null) {
       _markerAt = target;
-      _requestLiveDraw();
+      _requestDraw(force: true);
       return;
     }
 
@@ -245,55 +301,82 @@ class _WalkRouteMapState extends State<WalkRouteMap> {
         from.latitude + (target.latitude - from.latitude) * t,
         from.longitude + (target.longitude - from.longitude) * t,
       );
-      _requestLiveDraw();
+      // 도착 프레임은 선까지 반드시 맞춘다.
+      _requestDraw(force: t >= 1);
       if (t >= 1) timer.cancel();
     });
   }
 
-  /// 현재 위치 마커와, 마지막 확정점에서 거기까지 잇는 임시 선분.
+  /// 출발 핀과 도착 핀을 **한 번에** 찍는다.
   ///
-  /// 임시 선분은 다음 확정점이 나오면 [_drawRoute] 가 그리는 영구 경로선에
-  /// 흡수된다. 그때까지는 경로가 마커 뒤에서 끊겨 보이지 않게 메워 준다.
+  /// 시작은 민트 발바닥, 끝은 오렌지 하트로 서로 다르게 보이게 한다.
+  /// 산책 중에는 도착 핀이 현재 위치를 따라 움직이고, 지난 기록에서는 경로의
+  /// 마지막 점에 고정된다.
+  ///
+  /// 둘을 따로 그리면 안 된다 — 위 '그리기 규칙' 참고. 한쪽만 넘기는 순간
+  /// 다른 쪽이 지도에서 사라진다.
+  ///
   /// [_drain] 만 부른다. 직접 부르면 직렬화가 깨진다.
-  Future<void> _drawLive() async {
+  Future<void> _drawMarkers() async {
     final controller = _controller;
-    final at = _markerAt;
-    if (controller == null || at == null || !mounted) return;
+    if (controller == null || !mounted) return;
+
+    final points = widget.points;
+    final live = _markerAt;
+
+    final start = points.isEmpty
+        ? null
+        : LatLng(points.first.latitude, points.first.longitude);
+
+    // 지난 기록에는 현재 위치가 없다. 경로의 끝을 도착 지점으로 쓴다.
+    // 점이 하나뿐이면 출발 핀과 같은 자리라 찍지 않는다 — 겹치면 뒤에 찍힌
+    // 것만 보여서 시작 지점이 사라진 것처럼 된다.
+    final end = live ??
+        (points.length >= 2
+            ? LatLng(points.last.latitude, points.last.longitude)
+            : null);
+
+    if (start == null && end == null) {
+      controller.clearMarker();
+      return;
+    }
 
     // 캐시가 차 있으면 await 없이 바로 쓴다. 프레임마다 마이크로태스크로
     // 한 번 끊기는 것도 그리기 순서가 뒤섞일 틈이 된다.
-    final icon = _cachedEnd ?? await _endIcon();
+    final startIcon = start == null ? null : (_cachedStart ?? await _startIcon());
+    final endIcon = end == null ? null : (_cachedEnd ?? await _endIcon());
     if (!mounted) return;
 
+    // 전부 지우고 전부 다시 그린다(위 '그리기 규칙').
+    controller.clearMarker();
     await controller.addMarker(markers: [
-      Marker(
-        markerId: _endId,
-        latLng: at,
-        width: _pinWidth,
-        height: _pinHeight,
-        offsetX: _pinWidth ~/ 2,
-        offsetY: _pinHeight,
-        icon: icon,
-        zIndex: 2,
-      ),
+      if (start != null)
+        Marker(
+          markerId: _startId,
+          latLng: start,
+          width: _pinWidth,
+          height: _pinHeight,
+          // 핀 끝(아래 꼭지점)이 좌표를 가리키게 맞춘다. 기본값이면 이미지
+          // 가운데가 좌표에 놓여 실제 위치보다 아래에 찍힌 것처럼 보인다.
+          offsetX: _pinWidth ~/ 2,
+          offsetY: _pinHeight,
+          icon: startIcon,
+          zIndex: 1,
+        ),
+      if (end != null)
+        Marker(
+          markerId: _endId,
+          latLng: end,
+          width: _pinWidth,
+          height: _pinHeight,
+          offsetX: _pinWidth ~/ 2,
+          offsetY: _pinHeight,
+          icon: endIcon,
+          zIndex: 2,
+        ),
     ]);
 
-    final anchors = widget.points;
-    if (anchors.isNotEmpty) {
-      final last = anchors.last;
-      await controller.addPolyline(polylines: [
-        Polyline(
-          polylineId: _tailId,
-          points: [LatLng(last.latitude, last.longitude), at],
-          strokeWidth: 12,
-          strokeColor: _brand,
-          strokeOpacity: 0.9,
-          strokeStyle: StrokeStyle.solid,
-        ),
-      ]);
-    }
-
-    _maybeFollowCamera(at);
+    if (live != null) _maybeFollowCamera(live);
   }
 
   /// 카메라는 마커와 따로 움직인다. 매번 따라가면 지도가 떨린다.
@@ -314,50 +397,6 @@ class _WalkRouteMapState extends State<WalkRouteMap> {
     }
     _centeredAt = at;
     controller.setCenter(at);
-  }
-
-  /// 출발 핀과, 실시간 위치가 없을 때의 도착 핀.
-  ///
-  /// 시작은 민트 발바닥, 끝은 오렌지 하트로 **서로 다르게** 보이게 한다.
-  /// 예전에는 같은 기본 마커라 어디가 시작인지 알 수 없었다.
-  ///
-  /// 좌표가 하나뿐이면 출발 핀만 찍는다 — 같은 자리에 두 핀이 겹치면
-  /// 뒤에 찍힌 것만 보여서 시작 지점이 사라진 것처럼 된다.
-  Future<void> _drawPins(
-    KakaoMapController controller,
-    List<LatLng> path,
-  ) async {
-    final start = await _startIcon();
-    // 산책 중에는 도착 핀을 [_updateLiveOverlays] 가 현재 위치에 찍는다.
-    final live = widget.livePosition != null;
-    final end = live ? null : await _endIcon();
-    if (!mounted) return;
-
-    await controller.addMarker(markers: [
-      Marker(
-        markerId: _startId,
-        latLng: path.first,
-        width: _pinWidth,
-        height: _pinHeight,
-        // 핀 끝(아래 꼭지점)이 좌표를 가리키게 맞춘다. 기본값이면 이미지
-        // 가운데가 좌표에 놓여 실제 위치보다 아래에 찍힌 것처럼 보인다.
-        offsetX: _pinWidth ~/ 2,
-        offsetY: _pinHeight,
-        icon: start,
-        zIndex: 1,
-      ),
-      if (end != null && path.length >= 2)
-        Marker(
-          markerId: _endId,
-          latLng: path.last,
-          width: _pinWidth,
-          height: _pinHeight,
-          offsetX: _pinWidth ~/ 2,
-          offsetY: _pinHeight,
-          icon: end,
-          zIndex: 2,
-        ),
-    ]);
   }
 
   /// 핀 이미지는 한 번만 읽어 재사용한다. 좌표마다 다시 읽으면 산책 중에
@@ -389,12 +428,11 @@ class _WalkRouteMapState extends State<WalkRouteMap> {
         _controller = controller;
         // 지도가 늦게 준비될 수 있어, 이미 쌓인 좌표를 즉시 반영한다.
         _drawnAnchorCount = 0;
-        _requestRouteDraw();
         final live = widget.livePosition;
         if (live != null) {
           _markerAt = LatLng(live.latitude, live.longitude);
-          _requestLiveDraw();
         }
+        _requestDraw(force: true);
       },
       center: LatLng(
         center?.latitude ?? MapConfig.fallbackLatitude,
